@@ -318,29 +318,34 @@ window.togglePassword = function(inputId, btn) {
 // ─── 5. AUTHENTICATION (LOGIN / REGISTER / LOGOUT) ──────────────────────────
 
 // ── Tab Switcher ──────────────────────────────────────────────────────────────
+let currentAuthView = 'login';
+
 window.switchTab = function(tabName) {
-  console.log('[AUTH] switchTab called:', tabName);
-  var loginForm = document.getElementById('login-form');
-  var regForm   = document.getElementById('register-form');
-  var tabLogin  = document.getElementById('tab-login');
-  var tabReg    = document.getElementById('tab-register');
+  const nextView = tabName === 'register' ? 'register' : 'login';
+  const loginForm = document.getElementById('login-form');
+  const regForm = document.getElementById('register-form');
+  const tabLogin = document.getElementById('tab-login');
+  const tabReg = document.getElementById('tab-register');
 
   if (!loginForm || !regForm) {
     console.warn('[AUTH] switchTab: login-form or register-form not found in DOM');
     return;
   }
 
-  if (tabName === 'login') {
-    loginForm.classList.remove('hidden');
-    regForm.classList.add('hidden');
-    if (tabLogin) { tabLogin.classList.add('active'); }
-    if (tabReg)   { tabReg.classList.remove('active'); }
-  } else {
-    loginForm.classList.add('hidden');
-    regForm.classList.remove('hidden');
-    if (tabLogin) { tabLogin.classList.remove('active'); }
-    if (tabReg)   { tabReg.classList.add('active'); }
-  }
+  currentAuthView = nextView;
+  const isLogin = currentAuthView === 'login';
+
+  loginForm.classList.toggle('hidden', !isLogin);
+  regForm.classList.toggle('hidden', isLogin);
+  tabLogin?.classList.toggle('active', isLogin);
+  tabReg?.classList.toggle('active', !isLogin);
+  tabLogin?.setAttribute('aria-selected', String(isLogin));
+  tabReg?.setAttribute('aria-selected', String(!isLogin));
+
+  const loginError = document.getElementById('login-error');
+  const registerError = document.getElementById('register-error');
+  if (loginError) loginError.textContent = '';
+  if (registerError) registerError.textContent = '';
 };
 
 // ── Login ─────────────────────────────────────────────────────────────────────
@@ -1141,6 +1146,12 @@ window.massCompensation = function() {
 
 // 9. DOM READY INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('tab-login')?.addEventListener('click', () => window.switchTab('login'));
+  document.getElementById('tab-register')?.addEventListener('click', () => window.switchTab('register'));
+  document.getElementById('login-form')?.addEventListener('submit', window.handleLogin);
+  document.getElementById('register-form')?.addEventListener('submit', window.handleRegister);
+  window.switchTab(currentAuthView);
+
   // Remove plaintext passwords left by older local-preview versions.
   if (localStorage.getItem('registeredUsers')) {
     saveRegisteredUsers(getRegisteredUsers());

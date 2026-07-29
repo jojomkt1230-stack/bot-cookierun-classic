@@ -48,16 +48,16 @@
 
       <!-- Tab Switcher -->
       <div class="auth-tabs">
-        <button id="tab-login" type="button" class="tab-btn active" onclick="switchTab('login')">
+        <button id="tab-login" type="button" class="tab-btn active" aria-selected="true">
           🔐 เข้าสู่ระบบ
         </button>
-        <button id="tab-register" type="button" class="tab-btn" onclick="switchTab('register')">
+        <button id="tab-register" type="button" class="tab-btn" aria-selected="false">
           ✨ สมัครสมาชิก
         </button>
       </div>
 
       <!-- Login Form -->
-      <form id="login-form" class="auth-form" onsubmit="handleLogin(event)">
+      <form id="login-form" class="auth-form">
         <div class="form-group">
           <label>👤 ชื่อผู้ใช้</label>
           <input id="login-username" type="text" placeholder="กรอกชื่อผู้ใช้" autocomplete="username" required />
@@ -76,7 +76,7 @@
       </form>
 
       <!-- Register Form -->
-      <form id="register-form" class="auth-form hidden" onsubmit="handleRegister(event)">
+      <form id="register-form" class="auth-form hidden">
         <div class="form-group">
           <label>👤 ชื่อผู้ใช้</label>
           <input id="reg-username" type="text" placeholder="กรอกชื่อผู้ใช้ (a-z, 0-9, _)" autocomplete="username" required />
@@ -597,6 +597,6 @@
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <script src="src/app.js"></script>
+  <script type="module" src="/src/app.js"></script>
 </body>
 </html>
