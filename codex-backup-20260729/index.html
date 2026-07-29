@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CKRCS Bot Rental - ระบบเช่าบอท Cyberpunk</title>
+  <meta name="description" content="ระบบเช่าบอทเกม Cookie Run Kingdom - บอทเหรียญ บอทเพิ่มเพื่อน บอทย่อยผง ราคาถูก ใช้งานง่าย" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍪</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js",
+      "axios": "https://cdn.jsdelivr.net/npm/axios@1.6.8/+esm"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <!-- Fixed Background Layer (Rule 1) -->
+  <div class="bg-layer"></div>
+
+  <!-- Three.js Canvas Background -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Scanline Overlay -->
+  <div class="scanlines"></div>
+
+  <!-- Particle Container -->
+  <div id="particles-container"></div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- AUTH PAGE -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="auth-page" class="page active">
+    <div class="auth-container">
+      <!-- Logo -->
+      <div class="auth-logo">
+        <div class="logo-icon">
+          <img src="cookierun-world.png" class="cr-icon-badge" alt="Cookie Run World" />
+        </div>
+        <h1 class="logo-title">CKRCS<span class="accent"> BOT</span></h1>
+        <p class="logo-subtitle">ระบบเช่าบอท Cookie Run Kingdom</p>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="auth-tabs">
+        <button id="tab-login" class="tab-btn active" onclick="switchTab('login')">
+          🔐 เข้าสู่ระบบ
+        </button>
+        <button id="tab-register" class="tab-btn" onclick="switchTab('register')">
+          ✨ สมัครสมาชิก
+        </button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>👤 ชื่อผู้ใช้</label>
+          <input id="login-username" type="text" placeholder="กรอกชื่อผู้ใช้" autocomplete="username" required />
+        </div>
+        <div class="form-group">
+          <label>🔑 รหัสผ่าน</label>
+          <div class="password-wrapper">
+            <input id="login-password" type="password" placeholder="กรอกรหัสผ่าน" autocomplete="current-password" required />
+            <button type="button" class="eye-btn" onclick="togglePassword('login-password', this)">👁️</button>
+          </div>
+        </div>
+        <div id="login-error" class="form-error"></div>
+        <button type="submit" class="btn-primary" id="login-btn">
+          <span class="btn-icon">🚀</span> เข้าสู่ระบบ
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" class="auth-form hidden" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label>👤 ชื่อผู้ใช้</label>
+          <input id="reg-username" type="text" placeholder="กรอกชื่อผู้ใช้ (a-z, 0-9, _)" autocomplete="username" required />
+        </div>
+        <div class="form-group">
+          <label>🔑 รหัสผ่าน</label>
+          <div class="password-wrapper">
+            <input id="reg-password" type="password" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="new-password" required />
+            <button type="button" class="eye-btn" onclick="togglePassword('reg-password', this)">👁️</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>🔑 ยืนยันรหัสผ่าน</label>
+          <div class="password-wrapper">
+            <input id="reg-confirm" type="password" placeholder="พิมพ์รหัสผ่านอีกครั้ง" autocomplete="new-password" required />
+            <button type="button" class="eye-btn" onclick="togglePassword('reg-confirm', this)">👁️</button>
+          </div>
+        </div>
+        <div id="register-error" class="form-error"></div>
+        <button type="submit" class="btn-primary" id="register-btn">
+          <span class="btn-icon">✨</span> สมัครสมาชิก
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- DASHBOARD PAGE -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="dashboard-page" class="page hidden">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-logo">🍪 CKRCS BOT</div>
+      </div>
+      <div class="topbar-center">
+        <!-- Bot Status Badge -->
+        <div id="bot-status-badge" class="status-badge online">
+          <span class="status-dot"></span>
+          <span id="status-text">ออนไลน์</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="user-info-wrapper">
+          <span class="username-display" id="topbar-username">jojomkt1230</span>
+        </div>
+        <div class="diamond-display">
+          <span class="diamond-icon">💎</span>
+          <span id="topbar-diamonds">99999</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Announcement Banner -->
+    <div id="announcement-banner" class="announcement hidden">
+      <span class="announce-icon">📢</span>
+      <span id="announce-text"></span>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="dashboard-layout">
+      <!-- Sidebar -->
+      <nav class="sidebar">
+        <div class="sidebar-menu">
+          <button class="menu-item active" onclick="showSection('home')" id="menu-home">
+            <span class="menu-icon">🏠</span>
+            <span class="menu-text">หน้าหลัก</span>
+          </button>
+          <button class="menu-item" onclick="showSection('rent')" id="menu-rent">
+            <span class="menu-icon">🤖</span>
+            <span class="menu-text">เช่าบอท</span>
+          </button>
+          <button class="menu-item" onclick="showSection('download')" id="menu-download">
+            <span class="menu-icon">⬇️</span>
+            <span class="menu-text">ดาวน์โหลด</span>
+          </button>
+          <button class="menu-item" onclick="showSection('tutorial')" id="menu-tutorial">
+            <span class="menu-icon">📖</span>
+            <span class="menu-text">วิธีใช้งาน</span>
+          </button>
+          <button class="menu-item" onclick="showSection('topup')" id="menu-topup">
+            <span class="menu-icon">💰</span>
+            <span class="menu-text">เติมเงิน</span>
+          </button>
+          <button class="menu-item" onclick="showSection('activity')" id="menu-activity">
+            <span class="menu-icon">📋</span>
+            <span class="menu-text">ประวัติกิจกรรม</span>
+          </button>
+          <!-- Admin only (Visible for jojomkt1230) -->
+          <button class="menu-item admin-only hidden" onclick="showSection('admin')" id="menu-admin">
+            <span class="menu-icon">👑</span>
+            <span class="menu-text">แผงผู้ดูแลระบบ</span>
+          </button>
+          <!-- Soft Orange Logout Button at bottom of sidebar (Rule 1) -->
+          <button class="menu-item menu-logout" onclick="handleLogout()">
+            <span class="menu-icon">🚪</span>
+            <span class="menu-text">ออกจากระบบ</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- Content Area -->
+      <main class="content-area">
+
+        <!-- ── HOME SECTION ────────────────────────── -->
+        <section id="section-home" class="content-section active">
+          <div class="section-header card-panel">
+            <h2>🏠 ยินดีต้อนรับ</h2>
+            <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
+          </div>
+          <div class="home-grid single-card">
+            <div class="stat-card centered-stat">
+              <div class="stat-icon">🤖</div>
+              <div class="stat-value" id="home-bot-status">-</div>
+              <div class="stat-label">สถานะบอท</div>
+            </div>
+          </div>
+
+          <!-- Countdown Timer -->
+          <div class="countdown-card" id="countdown-card">
+            <h3>⏰ เวลาการใช้งานที่เหลือ</h3>
+            <div class="countdown-display" id="countdown-display">
+              <div class="countdown-unit"><span id="cd-days">00</span><label>วัน</label></div>
+              <div class="countdown-sep">:</div>
+              <div class="countdown-unit"><span id="cd-hours">00</span><label>ชั่วโมง</label></div>
+              <div class="countdown-sep">:</div>
+              <div class="countdown-unit"><span id="cd-mins">00</span><label>นาที</label></div>
+              <div class="countdown-sep">:</div>
+              <div class="countdown-unit"><span id="cd-secs">00</span><label>วินาที</label></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── RENT SECTION ────────────────────────── -->
+        <section id="section-rent" class="content-section hidden">
+          <div class="section-header card-panel">
+            <h2>🤖 เช่าบอท</h2>
+            <p class="subtitle">เลือกแพ็กเกจที่ต้องการ (วันใช้งานจะ+ต่อจากวันเดิม)</p>
+          </div>
+          <div id="packages-grid" class="packages-grid">
+            <!-- 1 Day / 15 Diamonds -->
+            <div class="pkg-card">
+              <div class="pkg-title">1 วัน</div>
+              <div class="pkg-price">15 เพชร</div>
+              <div class="pkg-chest-container">
+                <div class="chest-box">
+                  <span class="chest-icon">📦</span>
+                  <span class="chest-badge">1</span>
+                </div>
+              </div>
+              <button class="btn-redeem" onclick="rentBot(1, 15)">แลกวัน</button>
+            </div>
+
+            <!-- 3 Days / 45 Diamonds -->
+            <div class="pkg-card">
+              <div class="pkg-title">3 วัน</div>
+              <div class="pkg-price">45 เพชร</div>
+              <div class="pkg-chest-container">
+                <div class="chest-box">
+                  <span class="chest-icon">🎁</span>
+                  <span class="chest-badge">3</span>
+                </div>
+              </div>
+              <button class="btn-redeem" onclick="rentBot(3, 45)">แลกวัน</button>
+            </div>
+
+            <!-- 7 Days / 100 Diamonds -->
+            <div class="pkg-card highlight-gold">
+              <div class="pkg-title gold-text">7 วัน</div>
+              <div class="pkg-price gold-text">100 เพชร</div>
+              <div class="pkg-chest-container">
+                <div class="chest-box">
+                  <span class="chest-icon">👑</span>
+                  <span class="chest-badge gold-badge">7</span>
+                </div>
+              </div>
+              <button class="btn-redeem gold-btn" onclick="rentBot(7, 100)">แลกวัน</button>
+            </div>
+
+            <!-- 30 Days / 300 Diamonds -->
+            <div class="pkg-card highlight-purple">
+              <div class="pkg-title purple-text">30 วัน</div>
+              <div class="pkg-price purple-text">300 เพชร</div>
+              <div class="pkg-chest-container">
+                <div class="chest-box">
+                  <span class="chest-icon">💎</span>
+                  <span class="chest-badge purple-badge">30</span>
+                </div>
+              </div>
+              <button class="btn-redeem purple-btn" onclick="rentBot(30, 300)">แลกวัน</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── DOWNLOAD SECTION ───────────────────── -->
+        <section id="section-download" class="content-section hidden">
+          <div class="section-header card-panel">
+            <h2>⬇️ ดาวน์โหลดบอท</h2>
+          </div>
+          <div class="download-card">
+            <div class="bot-info-display">
+              <div class="bot-info-row">
+                <span class="info-label">🤖 ชื่อบอท:</span>
+                <span id="bot-name-display" class="info-value">CKRCS Bot</span>
+              </div>
+              <div class="bot-info-row">
+                <span class="info-label">🏷️ เวอร์ชัน:</span>
+                <span id="bot-version-display" class="info-value accent">v2.9.0</span>
+              </div>
+              <div class="bot-info-row">
+                <span class="info-label">📅 วันหมดอายุ:</span>
+                <span id="bot-expiry-display" class="info-value">-</span>
+              </div>
+            </div>
+            <div id="download-btn-area" class="download-btn-area">
+              <a id="download-link" href="#" class="btn-primary btn-download" target="_blank">
+                <span class="btn-icon">⬇️</span> ดาวน์โหลดบอท
+              </a>
+              <p id="download-warning" class="download-warning hidden">
+                ⚠️ วันใช้งานหมดแล้ว กรุณาต่ออายุก่อนดาวน์โหลด
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── TUTORIAL SECTION ───────────────────── -->
+        <section id="section-tutorial" class="content-section hidden">
+          <div class="section-header card-panel">
+            <h2>📖 วิธีใช้งานบอท</h2>
+          </div>
+          <div class="tutorial-video-wrapper">
+            <iframe id="tutorial-iframe" src="" allowfullscreen></iframe>
+          </div>
+          <div id="tutorial-steps" class="tutorial-steps">
+            <!-- Steps loaded dynamically -->
+          </div>
+        </section>
+
+        <!-- ── TOPUP SECTION ──────────────────────── -->
+        <section id="section-topup" class="content-section hidden">
+          <div class="section-header card-panel">
+            <h2>💰 เติมเงิน</h2>
+            <div class="rate-badge">1 บาท = 1 💎 เพชร</div>
+          </div>
+          <div class="topup-grid">
+            <div class="topup-promptpay-card">
+              <h3>📱 PromptPay</h3>
+              <div class="promptpay-account-name" id="promptpay-account-name">ชื่อบัญชี: กำลังโหลด...</div>
+              <div class="promptpay-number-box" id="promptpay-number">0655611571</div>
+              <div class="qr-container">
+                <img id="qr-code-img" src="" alt="QR Code PromptPay" class="qr-image" />
+              </div>
+            </div>
+            <div class="topup-slip-card">
+              <h3>📸 แนบสลิป</h3>
+              <form id="slip-form" onsubmit="handleSlipSubmit(event)">
+                <div class="slip-upload-area" id="slip-upload-area">
+                  <input type="file" id="slip-input" accept="image/*" hidden onchange="handleSlipPreview(event)" />
+                  <div class="upload-placeholder" id="upload-placeholder" onclick="document.getElementById('slip-input').click()">
+                    <div class="upload-icon">📎</div>
+                    <p>คลิกเพื่อเลือกรูปสลิป</p>
+                    <p class="upload-hint">JPG, PNG, WEBP (สูงสุด 5MB)</p>
+                  </div>
+                  <div id="slip-preview-container" class="hidden">
+                    <img id="slip-preview" src="" alt="slip preview" class="slip-preview-img" />
+                    <button type="button" class="remove-slip-btn" onclick="removeSlip()">✕</button>
+                  </div>
+                </div>
+                <div id="topup-msg" class="form-error"></div>
+                <button type="submit" class="btn-primary" id="submit-slip-btn">
+                  <span class="btn-icon">📤</span> ส่งสลิปตรวจสอบ
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── ACTIVITY SECTION ───────────────────── -->
+        <section id="section-activity" class="content-section hidden">
+          <div class="section-header">
+            <h2>📋 ประวัติกิจกรรม</h2>
+          </div>
+          <div id="activity-list" class="activity-list">
+            <div class="loading-spinner">⟳</div>
+          </div>
+        </section>
+
+        <!-- ── ADMIN SECTION ──────────────────────── -->
+        <section id="section-admin" class="content-section hidden">
+          <div class="admin-panel">
+            <!-- Admin Tabs -->
+            <div class="admin-tabs">
+              <button class="admin-tab active" onclick="switchAdminTab('stats')">📊 ภาพรวม</button>
+              <button class="admin-tab" onclick="switchAdminTab('users')">👥 จัดการผู้ใช้</button>
+              <button class="admin-tab" onclick="switchAdminTab('topups')">💰 เติมเงิน</button>
+              <button class="admin-tab" onclick="switchAdminTab('system')">⚙️ ระบบ</button>
+            </div>
+
+            <!-- Stats Panel -->
+            <div id="admin-stats" class="admin-panel-content active">
+              <h3>📊 สถิติระบบ</h3>
+              <div class="admin-stats-grid">
+                <div class="admin-stat-card">
+                  <div class="stat-icon">👥</div>
+                  <div class="stat-value" id="stat-total-users">-</div>
+                  <div class="stat-label">ผู้ใช้ทั้งหมด</div>
+                </div>
+                <div class="admin-stat-card">
+                  <div class="stat-icon">🟢</div>
+                  <div class="stat-value" id="stat-active-users">-</div>
+                  <div class="stat-label">มีบอทใช้งาน</div>
+                </div>
+                <div class="admin-stat-card">
+                  <div class="stat-icon">⏳</div>
+                  <div class="stat-value" id="stat-pending-topups">-</div>
+                  <div class="stat-label">รอตรวจสลิป</div>
+                </div>
+                <div class="admin-stat-card">
+                  <div class="stat-icon">💰</div>
+                  <div class="stat-value" id="stat-today-revenue">-</div>
+                  <div class="stat-label">รายได้วันนี้ (บาท)</div>
+                </div>
+              </div>
+
+              <!-- Mass Compensation -->
+              <div class="admin-card">
+                <h4>🎁 ชดเชยเวลาใช้งานบอท (ผู้ใช้ทุกคน)</h4>
+                <div class="input-row">
+                  <input type="number" id="comp-time" placeholder="เช่น 1, 12 หรือ 24" min="1" class="admin-input" style="flex:1" />
+                  <select id="comp-unit" class="admin-select" style="width:120px; font-weight:700;">
+                    <option value="hours">ชั่วโมง (Hrs)</option>
+                    <option value="days">วัน (Days)</option>
+                  </select>
+                  <input type="text" id="comp-note" placeholder="หมายเหตุ (ถ้ามี)" class="admin-input" style="flex:1" />
+                  <button class="btn-secondary" onclick="massCompensation()">🎁 ชดเชยเวลา</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Users Panel -->
+            <div id="admin-users" class="admin-panel-content hidden">
+              <h3>👥 จัดการผู้ใช้</h3>
+              <div class="admin-search-bar">
+                <input type="text" id="user-search" placeholder="🔍 ค้นหาชื่อผู้ใช้..." class="admin-input" oninput="searchUsers()" />
+              </div>
+              <div id="users-table-container" class="table-container">
+                <div class="loading-spinner">⟳</div>
+              </div>
+            </div>
+
+            <!-- Topups Panel -->
+            <div id="admin-topups" class="admin-panel-content hidden">
+              <h3>💰 ประวัติเติมเงิน</h3>
+              <div class="admin-filter-bar">
+                <select id="topup-filter" class="admin-select" onchange="loadAdminTopups()">
+                  <option value="">ทั้งหมด</option>
+                  <option value="pending">รอตรวจสอบ</option>
+                  <option value="approved">อนุมัติแล้ว</option>
+                  <option value="rejected">ปฏิเสธ</option>
+                </select>
+              </div>
+              <div id="topups-table-container" class="table-container">
+                <div class="loading-spinner">⟳</div>
+              </div>
+            </div>
+
+            <!-- System Panel -->
+            <div id="admin-system" class="admin-panel-content hidden">
+              <h3>⚙️ ตั้งค่าระบบ</h3>
+              <div class="system-settings-grid">
+                <!-- Bot Status -->
+                <div class="admin-card">
+                  <h4>🤖 สถานะบอท</h4>
+                  <div class="input-row">
+                    <select id="sys-bot-status" class="admin-select">
+                      <option value="online">🟢 Online</option>
+                      <option value="maintenance">🔴 Maintenance</option>
+                    </select>
+                    <button class="btn-secondary" onclick="saveSetting('botStatus', document.getElementById('sys-bot-status').value)">บันทึก</button>
+                  </div>
+                </div>
+                <!-- Announcement -->
+                <div class="admin-card">
+                  <h4>📢 ข้อความประกาศ</h4>
+                  <div class="input-col">
+                    <textarea id="sys-announcement" class="admin-textarea" rows="3" placeholder="ข้อความประกาศ..."></textarea>
+                    <button class="btn-secondary" onclick="saveSetting('announcement', document.getElementById('sys-announcement').value)">บันทึก</button>
+                  </div>
+                </div>
+                <!-- PromptPay Settings Card -->
+                <div class="admin-card">
+                  <h4>📱 ตั้งค่าพร้อมเพย์ & คิวอาร์โค้ด</h4>
+                  <div class="input-col">
+                    <label style="font-size:0.85rem; color:var(--text-muted);">เบอร์พร้อมเพย์ (แสดงในช่องสีเขียว):</label>
+                    <input type="text" id="sys-promptpay" class="admin-input" placeholder="0655611571" />
+                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">ชื่อบัญชีผู้รับเงิน (ระบบตรวจสลิปต้องตรงกับชื่อนี้):</label>
+                    <input type="text" id="sys-promptpay-name" class="admin-input" placeholder="เจษฎาภรณ์..." />
+                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">อัปโหลดรูป QR Code PromptPay:</label>
+                    <input type="file" id="sys-qr-file" accept="image/*" class="admin-input" onchange="handleAdminQrUpload(event)" />
+                    <div id="admin-qr-preview-container" style="margin-top:6px;">
+                      <img id="admin-qr-preview" src="" alt="QR Preview" style="max-width:120px; border-radius:8px; display:none;" />
+                    </div>
+                    <button class="btn-primary" onclick="savePromptPaySettings()" style="margin-top:10px;">💾 บันทึกข้อมูลพร้อมเพย์</button>
+                  </div>
+                </div>
+                <!-- Bot Download -->
+                <div class="admin-card">
+                  <h4>⬇️ ข้อมูลดาวน์โหลดบอท</h4>
+                  <div class="input-col">
+                    <input type="text" id="sys-bot-name" class="admin-input" placeholder="ชื่อบอท" />
+                    <input type="text" id="sys-bot-version" class="admin-input" placeholder="เวอร์ชัน เช่น v2.9.0" />
+                    <input type="text" id="sys-bot-url" class="admin-input" placeholder="URL ดาวน์โหลด" />
+                    <button class="btn-secondary" onclick="saveBotInfo()">บันทึกข้อมูลบอท</button>
+                  </div>
+                </div>
+                <!-- Tutorial Video -->
+                <div class="admin-card">
+                  <h4>🎬 URL วิดีโอสอนใช้งาน</h4>
+                  <div class="input-row">
+                    <input type="text" id="sys-video-url" class="admin-input" placeholder="https://www.youtube.com/embed/..." />
+                    <button class="btn-secondary" onclick="saveSetting('videoUrl', document.getElementById('sys-video-url').value)">บันทึก</button>
+                  </div>
+                </div>
+                <!-- Steps Editor -->
+                <div class="admin-card full-width">
+                  <h4>📋 ขั้นตอนการใช้งาน</h4>
+                  <div id="steps-editor"></div>
+                  <div class="input-row" style="margin-top:10px">
+                    <input type="text" id="new-step-text" class="admin-input" placeholder="ขั้นตอนใหม่..." />
+                    <button class="btn-secondary" onclick="addStep()">+ เพิ่ม</button>
+                  </div>
+                  <button class="btn-primary" onclick="saveSteps()" style="margin-top:10px">💾 บันทึกขั้นตอนทั้งหมด</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- PACKAGE CONFIRMATION MODAL -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="confirm-modal" class="modal hidden" onclick="closeModal('confirm-modal', event)">
+    <div class="modal-content confirm-modal-content" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal('confirm-modal')">✕</button>
+      <div class="confirm-icon">🤖</div>
+      <h3 class="confirm-title">ยืนยันการแลกแพ็กเกจ</h3>
+      <div class="confirm-details">
+        <p id="confirm-pkg-name" class="confirm-pkg-name">แพ็กเกจ 1 วัน</p>
+        <p id="confirm-pkg-cost" class="confirm-pkg-cost">ใช้ 15 เพชร</p>
+        <p id="confirm-diamonds-left" class="confirm-diamonds-left">เพชรคงเหลือหลังแลก: 0 เพชร</p>
+      </div>
+      <div class="confirm-btn-group">
+        <button id="confirm-submit-btn" class="btn-confirm-yes" onclick="confirmRedeemBot()">
+          ✅ ยืนยันการแลก
+        </button>
+        <button class="btn-confirm-no" onclick="closeModal('confirm-modal')">
+          ❌ ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- USER EDIT MODAL (ADMIN) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="user-modal" class="modal hidden" onclick="closeModal('user-modal', event)">
+    <div class="modal-content card-panel" onclick="event.stopPropagation()" style="max-width:440px; padding:30px; border-radius:16px;">
+      <button class="modal-close" onclick="closeModal('user-modal')">✕</button>
+      <h3 style="color:var(--primary); margin-bottom:18px; font-family:var(--font-cyber);">✏️ แก้ไขข้อมูลสมาชิก</h3>
+      <input type="hidden" id="edit-user-id" />
+      <div class="form-group" style="margin-bottom:12px;">
+        <label style="font-size:0.9rem; color:var(--text-muted);">👤 ชื่อผู้ใช้</label>
+        <input type="text" id="edit-user-username" class="admin-input" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label style="font-size:0.9rem; color:var(--text-muted);">🔑 รหัสผ่านใหม่ (เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน)</label>
+        <input type="text" id="edit-user-password" class="admin-input" placeholder="รหัสผ่านใหม่..." style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label style="font-size:0.9rem; color:var(--text-muted);">💎 จำนวนเพชร</label>
+        <input type="number" id="edit-user-diamonds" class="admin-input" min="0" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label style="font-size:0.9rem; color:var(--text-muted);">⏰ เพิ่มเวลาใช้งานบอท (+ชั่วโมง / +วัน)</label>
+        <div style="display:flex; gap:8px;">
+          <input type="number" id="edit-user-add-time" class="admin-input" placeholder="เช่น 1, 12 หรือ 24" min="0" style="flex:1; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
+          <select id="edit-user-time-unit" class="admin-select" style="width:120px; padding:10px; border-radius:8px; background:rgba(0,15,40,0.9); border:1px solid var(--border-bright); color:var(--primary); font-weight:700;">
+            <option value="hours">ชั่วโมง (Hrs)</option>
+            <option value="days">วัน (Days)</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:20px;">
+        <button class="btn-primary" onclick="saveEditedUser()" style="flex:1; padding:12px; border-radius:8px; font-weight:700; cursor:pointer;">💾 บันทึกแก้ไข</button>
+        <button class="btn-danger" onclick="deleteSelectedUser()" style="background:var(--danger); color:#fff; border:none; padding:12px 18px; border-radius:8px; font-weight:700; cursor:pointer;">🗑️ ลบสมาชิก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TOPUP IMAGE MODAL -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="slip-modal" class="modal hidden" onclick="closeModal('slip-modal', event)">
+    <div class="modal-content modal-img" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal('slip-modal')">✕</button>
+      <h3>🧾 รูปสลิป</h3>
+      <img id="slip-modal-img" src="" alt="slip" style="max-width:100%;border-radius:10px;margin-top:10px" />
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

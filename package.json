@@ -1,0 +1,21 @@
+{
+  "name": "bot-rental-frontend",
+  "version": "1.0.0",
+  "description": "CKRCS Bot Rental Frontend - Cyberpunk 3D",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
