@@ -6,7 +6,7 @@ const getApiUrl = () => {
       return import.meta.env.VITE_API_URL;
     }
   } catch (e) {}
-  return 'http://localhost:5000';
+  return 'https://ibot-cookierun-classic.onrender.com';
 };
 const API_URL = getApiUrl();
 console.log('[API] Base URL:', `${API_URL}/api`);

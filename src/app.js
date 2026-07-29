@@ -32,7 +32,9 @@ window.showSection = function(sectionId) {
   if (sectionId === 'topup') applySystemSettingsToUI();
 };
 
-const API_BASE_URL = (window.BACKEND_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const API_BASE_URL = (
+  window.BACKEND_URL || 'https://ibot-cookierun-classic.onrender.com/api'
+).replace(/\/$/, '');
 console.log('[API] Base URL:', API_BASE_URL);
 
 function getAuthHeaders() {
@@ -384,8 +386,11 @@ window.handleLogin = async function(event) {
       method: error.config?.method,
       url: error.config?.url
     });
-    const message = error.response?.data?.error || error.message || 'ไม่สามารถเข้าสู่ระบบได้';
-    const friendly = message.includes('Network') || message.includes('connect') || message.includes('ECONNREFUSED')
+    const message = error.response?.data?.message
+      || error.response?.data?.error
+      || error.message
+      || 'ไม่สามารถเข้าสู่ระบบได้';
+    const friendly = /network|connect|econnrefused|failed to fetch/i.test(message)
       ? 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง'
       : message;
     if (errEl) errEl.textContent = friendly;
@@ -439,8 +444,11 @@ window.handleRegister = async function(event) {
     passwordEl.value = '';
     confirmEl.value = '';
   } catch (error) {
-    const message = error.response?.data?.error || error.message || 'ไม่สามารถสมัครสมาชิกได้';
-    const friendly = message.includes('Network') || message.includes('connect') || message.includes('ECONNREFUSED')
+    const message = error.response?.data?.message
+      || error.response?.data?.error
+      || error.message
+      || 'ไม่สามารถสมัครสมาชิกได้';
+    const friendly = /network|connect|econnrefused|failed to fetch/i.test(message)
       ? 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง'
       : message;
     if (errEl) errEl.textContent = friendly;
