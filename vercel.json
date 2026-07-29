@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ibot-cookierun-classic.onrender.com/api/:path*"
+      "destination": "/api/proxy?path=:path*"
     },
     {
       "source": "/(.*)",
