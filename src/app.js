@@ -32,10 +32,22 @@ window.showSection = function(sectionId) {
   if (sectionId === 'topup') applySystemSettingsToUI();
 };
 
-const API_BASE_URL = (
-  window.BACKEND_URL || 'https://ibot-cookierun-classic.onrender.com/api'
-).replace(/\/$/, '');
+const DEFAULT_API_BASE_URL = window.location.hostname.endsWith('.vercel.app')
+  ? '/api'
+  : 'https://ibot-cookierun-classic.onrender.com/api';
+const API_BASE_URL = (window.BACKEND_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 console.log('[API] Base URL:', API_BASE_URL);
+
+function getApiErrorMessage(error, fallbackMessage) {
+  const responseData = error?.response?.data;
+  if (typeof responseData === 'string' && responseData.trim()) return responseData.trim();
+
+  return responseData?.message
+    || responseData?.error
+    || responseData?.details?.message
+    || error?.message
+    || fallbackMessage;
+}
 
 function getAuthHeaders() {
   const token = localStorage.getItem('token');
@@ -391,10 +403,7 @@ window.handleLogin = async function(event) {
       method: error.config?.method,
       url: error.config?.url
     });
-    const message = error.response?.data?.message
-      || error.response?.data?.error
-      || error.message
-      || 'ไม่สามารถเข้าสู่ระบบได้';
+    const message = getApiErrorMessage(error, 'ไม่สามารถเข้าสู่ระบบได้');
     const friendly = /network|connect|econnrefused|failed to fetch/i.test(message)
       ? 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง'
       : message;
@@ -449,10 +458,7 @@ window.handleRegister = async function(event) {
     passwordEl.value = '';
     confirmEl.value = '';
   } catch (error) {
-    const message = error.response?.data?.message
-      || error.response?.data?.error
-      || error.message
-      || 'ไม่สามารถสมัครสมาชิกได้';
+    const message = getApiErrorMessage(error, 'ไม่สามารถสมัครสมาชิกได้');
     const friendly = /network|connect|econnrefused|failed to fetch/i.test(message)
       ? 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง'
       : message;

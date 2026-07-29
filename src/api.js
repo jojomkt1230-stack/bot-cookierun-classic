@@ -3,16 +3,22 @@ import axios from 'axios';
 const getApiUrl = () => {
   try {
     if (typeof import.meta !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_API_URL) {
-      return import.meta.env.VITE_API_URL;
+      return import.meta.env.VITE_API_URL.replace(/\/$/, '');
     }
   } catch (e) {}
+
+  if (typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app')) {
+    return '';
+  }
+
   return 'https://ibot-cookierun-classic.onrender.com';
 };
 const API_URL = getApiUrl();
-console.log('[API] Base URL:', `${API_URL}/api`);
+const API_BASE_URL = API_URL ? `${API_URL}/api` : '/api';
+console.log('[API] Base URL:', API_BASE_URL);
 
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: API_BASE_URL,
   timeout: 30000,
 });
 
