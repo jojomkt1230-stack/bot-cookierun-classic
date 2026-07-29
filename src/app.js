@@ -819,6 +819,29 @@ function renderActivityHistory() {
 }
 
 // 8. ADMIN PANEL AND USER MANAGEMENT
+let adminUsers = [];
+let adminTopups = [];
+
+function adminApiConfig() {
+  const token = localStorage.getItem('token');
+  return { headers: { Authorization: `Bearer ${token}` } };
+}
+
+async function reloadAdminData() {
+  if (currentUser?.role !== 'admin') return;
+  try {
+    const [usersResponse, topupsResponse] = await Promise.all([
+      axios.get(`${API_BASE_URL}/admin/users?limit=500`, adminApiConfig()),
+      axios.get(`${API_BASE_URL}/admin/topups?limit=500`, adminApiConfig())
+    ]);
+    adminUsers = usersResponse.data?.users || [];
+    adminTopups = topupsResponse.data?.topups || [];
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'โหลดข้อมูลแอดมินไม่สำเร็จ'), 'error');
+    throw error;
+  }
+}
+
 window.switchAdminTab = function(tabName) {
   document.querySelectorAll('.admin-panel-content').forEach(p => {
     p.classList.remove('active');
@@ -836,43 +859,44 @@ window.switchAdminTab = function(tabName) {
   if (activeTabBtn) activeTabBtn.classList.add('active');
 
   if (tabName === 'overview') updateAdminPanelStats();
-  if (tabName === 'users') renderAdminUsersTable();
-  if (tabName === 'topups') renderAdminTopupsTable();
+  if (tabName === 'users') reloadAdminData().then(renderAdminUsersTable).catch(() => {});
+  if (tabName === 'topups') reloadAdminData().then(renderAdminTopupsTable).catch(() => {});
   if (tabName === 'system') applySystemSettingsToUI();
 };
 
-function initAdminPanel() {
-  updateAdminPanelStats();
+async function initAdminPanel() {
+  await reloadAdminData().catch(() => {});
+  await updateAdminPanelStats();
   renderAdminUsersTable();
   renderAdminTopupsTable();
   applySystemSettingsToUI();
 }
 
-function updateAdminPanelStats() {
+async function updateAdminPanelStats() {
   const totalUsersEl = document.getElementById('stat-total-users');
   const activeUsersEl = document.getElementById('stat-active-users');
   const pendingTopupsEl = document.getElementById('stat-pending-topups');
   const revenueEl = document.getElementById('stat-today-revenue');
 
-  const users = getRegisteredUsers();
-  const topups = getTopupHistory();
+  let stats;
+  try {
+    stats = (await axios.get(`${API_BASE_URL}/admin/stats`, adminApiConfig())).data;
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'โหลดสถิติไม่สำเร็จ'), 'error');
+    return;
+  }
 
-  const totalUsers = users.length;
-  const activeBots = users.filter(u => u.botExpiry && new Date(u.botExpiry) > new Date()).length;
-  const pendingTopups = topups.filter(t => t.status === 'pending').length;
-  const todayRevenue = topups.filter(t => t.status === 'approved').reduce((sum, t) => sum + (t.amount || 0), 0);
-
-  if (totalUsersEl) totalUsersEl.textContent = totalUsers;
-  if (activeUsersEl) activeUsersEl.textContent = activeBots;
-  if (pendingTopupsEl) pendingTopupsEl.textContent = pendingTopups;
-  if (revenueEl) revenueEl.textContent = todayRevenue.toLocaleString('th-TH');
+  if (totalUsersEl) totalUsersEl.textContent = stats.totalUsers || 0;
+  if (activeUsersEl) activeUsersEl.textContent = stats.activeUsers || 0;
+  if (pendingTopupsEl) pendingTopupsEl.textContent = stats.pendingTopups || 0;
+  if (revenueEl) revenueEl.textContent = Number(stats.todayRevenue || 0).toLocaleString('th-TH');
 }
 
 function renderAdminUsersTable() {
   const container = document.getElementById('users-table-container');
   if (!container) return;
 
-  const users = getRegisteredUsers();
+  const users = adminUsers;
   const searchVal = (document.getElementById('user-search')?.value || '').toLowerCase();
   const filtered = users.filter(u => u.username.toLowerCase().includes(searchVal));
 
@@ -920,7 +944,7 @@ window.searchUsers = function() {
 };
 
 window.openEditUserModal = function(userId) {
-  const users = getRegisteredUsers();
+  const users = adminUsers;
   const user = users.find(u => u._id === userId || u.username === userId);
   if (!user) return;
 
@@ -939,14 +963,43 @@ window.openEditUserModal = function(userId) {
   window.openModal('user-modal');
 };
 
-window.saveEditedUser = function() {
+window.saveEditedUser = async function() {
   const userId = document.getElementById('edit-user-id')?.value;
   const newUsername = document.getElementById('edit-user-username')?.value.trim();
   const newDiamonds = parseInt(document.getElementById('edit-user-diamonds')?.value || 0);
   const addTime = parseInt(document.getElementById('edit-user-add-time')?.value || 0);
   const timeUnit = document.getElementById('edit-user-time-unit')?.value || 'hours';
+  const newPassword = document.getElementById('edit-user-password')?.value || '';
 
   if (!userId || !newUsername) return;
+
+  try {
+    const user = adminUsers.find(item => item._id === userId);
+    const requests = [];
+    if (user?.username !== newUsername) requests.push(
+      axios.patch(`${API_BASE_URL}/admin/users/${userId}`, { username: newUsername }, adminApiConfig())
+    );
+    if (Number(user?.diamonds || 0) !== newDiamonds) requests.push(
+      axios.patch(`${API_BASE_URL}/admin/users/${userId}/diamonds`, { diamonds: newDiamonds }, adminApiConfig())
+    );
+    if (addTime > 0) requests.push(
+      axios.patch(`${API_BASE_URL}/admin/users/${userId}/days`, {
+        days: timeUnit === 'days' ? addTime : addTime / 24
+      }, adminApiConfig())
+    );
+    if (newPassword) requests.push(
+      axios.patch(`${API_BASE_URL}/admin/users/${userId}/reset-password`, { newPassword }, adminApiConfig())
+    );
+    await Promise.all(requests);
+    await reloadAdminData();
+    window.closeModal('user-modal');
+    renderAdminUsersTable();
+    await updateAdminPanelStats();
+    window.showToast('บันทึกข้อมูลสมาชิกสำเร็จ', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'บันทึกข้อมูลสมาชิกไม่สำเร็จ'), 'error');
+  }
+  return;
 
   const users = getRegisteredUsers();
   const idx = users.findIndex(u => u._id === userId);
@@ -981,8 +1034,8 @@ window.deleteSelectedUser = function() {
   if (userId) window.deleteUser(userId);
 };
 
-window.deleteUser = function(userId) {
-  const users = getRegisteredUsers();
+window.deleteUser = async function(userId) {
+  const users = adminUsers;
   const user = users.find(u => u._id === userId);
   if (!user) return;
 
@@ -992,6 +1045,17 @@ window.deleteUser = function(userId) {
   }
 
   if (confirm(`ยืนยันการลบสมาชิก "${user.username}" ใช่หรือไม่?`)) {
+    try {
+      await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, adminApiConfig());
+      await reloadAdminData();
+      window.closeModal('user-modal');
+      renderAdminUsersTable();
+      await updateAdminPanelStats();
+      window.showToast(`ลบสมาชิก "${user.username}" แล้ว`, 'info');
+    } catch (error) {
+      window.showToast(getApiErrorMessage(error, 'ลบสมาชิกไม่สำเร็จ'), 'error');
+    }
+    return;
     const updated = users.filter(u => u._id !== userId);
     saveRegisteredUsers(updated);
 
@@ -1006,7 +1070,7 @@ function renderAdminTopupsTable() {
   const container = document.getElementById('topups-table-container');
   if (!container) return;
 
-  const topups = getTopupHistory();
+  const topups = adminTopups;
   const filterVal = document.getElementById('topup-filter')?.value || '';
   const filtered = filterVal ? topups.filter(t => t.status === filterVal) : topups;
 
@@ -1038,12 +1102,16 @@ function renderAdminTopupsTable() {
             <td style="padding:10px; font-weight:700;">${t.username}</td>
             <td style="padding:10px; color:var(--accent); font-weight:700;">${t.amount} บาท</td>
             <td style="padding:10px; font-weight:700;">${t.diamonds}</td>
-            <td style="padding:10px; font-size:0.85rem;">${t.transRef}</td>
-            <td style="padding:10px; font-size:0.85rem;">${t.createdAt}</td>
+            <td style="padding:10px; font-size:0.85rem;">${t.slipRef || t.orderId || '-'}</td>
+            <td style="padding:10px; font-size:0.85rem;">${new Date(t.createdAt).toLocaleString('th-TH')}</td>
             <td style="padding:10px;">
               <span style="padding:4px 8px; border-radius:12px; font-size:0.8rem; background:${t.status === 'approved' ? 'rgba(0,255,170,0.2)' : 'rgba(255,51,102,0.2)'}; color:${t.status === 'approved' ? 'var(--accent)' : 'var(--danger)'}">
                 ${t.status === 'approved' ? '✅ อนุมัติแล้ว' : '❌ ไม่ผ่าน'}
               </span>
+              ${['pending', 'pending_review'].includes(t.status) ? `
+                <button onclick="processTopup('${t._id}', 'approved', ${Number(t.diamonds || t.amount || 0)})">อนุมัติ</button>
+                <button onclick="processTopup('${t._id}', 'rejected', 0)">ปฏิเสธ</button>
+              ` : ''}
             </td>
           </tr>
         `).join('')}
@@ -1052,8 +1120,25 @@ function renderAdminTopupsTable() {
   `;
 }
 
-window.loadAdminTopups = function() {
+window.loadAdminTopups = async function() {
+  await reloadAdminData().catch(() => {});
   renderAdminTopupsTable();
+};
+
+window.processTopup = async function(topupId, status, diamonds) {
+  try {
+    await axios.patch(`${API_BASE_URL}/admin/topups/${topupId}`, {
+      status,
+      diamonds,
+      adminNote: status === 'approved' ? 'อนุมัติผ่านแผงผู้ดูแล' : 'ปฏิเสธผ่านแผงผู้ดูแล'
+    }, adminApiConfig());
+    await reloadAdminData();
+    renderAdminTopupsTable();
+    await updateAdminPanelStats();
+    window.showToast('อัปเดตสถานะรายการแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'อัปเดตรายการไม่สำเร็จ'), 'error');
+  }
 };
 
 window.saveSetting = function(key, val) {
@@ -1110,7 +1195,7 @@ window.saveBotInfo = function() {
   window.showToast('บันทึกข้อมูลบอทสำเร็จ', 'success');
 };
 
-window.massCompensation = function() {
+window.massCompensation = async function() {
   const timeInput = document.getElementById('comp-time');
   const unitSelect = document.getElementById('comp-unit');
   const noteInput = document.getElementById('comp-note');
@@ -1122,6 +1207,22 @@ window.massCompensation = function() {
     window.showToast('กรุณาระบุระยะเวลาชดเชยให้ถูกต้อง', 'error');
     return;
   }
+
+  try {
+    const days = unit === 'days' ? addTime : addTime / 24;
+    await axios.post(`${API_BASE_URL}/admin/mass-compensation`, {
+      days,
+      note: noteInput?.value.trim() || ''
+    }, adminApiConfig());
+    if (timeInput) timeInput.value = '';
+    if (noteInput) noteInput.value = '';
+    await reloadAdminData();
+    await updateAdminPanelStats();
+    window.showToast(`ชดเชยเวลา ${addTime} ${unit === 'days' ? 'วัน' : 'ชั่วโมง'} สำเร็จ`, 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'ชดเชยเวลาไม่สำเร็จ'), 'error');
+  }
+  return;
 
   const addedMs = unit === 'hours' ? addTime * 60 * 60 * 1000 : addTime * 24 * 60 * 60 * 1000;
 
