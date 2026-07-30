@@ -1,0 +1,38 @@
+ชุดเชื่อมระบบสมาชิก Cookie Bot เดิมกับเว็บ Vercel
+=================================================
+
+ไฟล์ที่ต้องแทนที่ในโปรเจกต์เว็บใหม่
+
+1) frontend/api/proxy.js
+   นำไฟล์ integration_ready/frontend/api/proxy.js ไปแทนที่ไฟล์เดิม
+
+2) frontend/tests/vercel-proxy.test.mjs
+   นำไฟล์ integration_ready/frontend/tests/vercel-proxy.test.mjs ไปแทนที่ไฟล์เดิม
+
+3) frontend/.env.example
+   ใช้เป็นตัวอย่างเท่านั้น ห้ามใส่ Token จริงแล้วอัปโหลดขึ้น Git
+
+ตั้งค่าใน Vercel
+
+Project Settings > Environment Variables
+
+COOKIEBOT_API_URL=https://cookiebot-th.surijenafallon0.chatgpt.site
+COOKIEBOT_SITES_TOKEN=Project access token ของเว็บเก่า
+RENDER_API_URL=https://ibot-cookierun-classic.onrender.com
+
+เลือก Production, Preview และ Development แล้ว Redeploy เว็บไซต์หนึ่งครั้ง
+
+ผลลัพธ์
+
+- สมัครสมาชิกจากเว็บใหม่จะสร้างบัญชีในฐานสมาชิกเว็บเก่า
+- Password Hash ถูกสร้างโดยระบบเก่า จึงตรงกับบอทเดิม
+- ล็อกอินเว็บใหม่จะคืน memberCode และ expiresAt จากระบบเก่า
+- บัญชีเดียวกันใช้ Username/Password ล็อกอินบอท .exe ได้
+- เติมเครดิต ตรวจสลิป และซื้อวันใช้งานจะบันทึกกลับระบบเก่า
+
+หมายเหตุสำคัญ
+
+- บัญชีที่เพิ่งสมัครจะมีสถานะ pending จนกว่าจะซื้อแพ็กเกจหรือผู้ดูแลเปิดสิทธิ์
+- Cloudflare Worker/D1 ของเว็บเก่าไม่รองรับ PHP โดยตรง
+- api_register.php และ api_login.php ใช้ได้เฉพาะกรณีมีโฮสต์ PHP แยกต่างหาก
+- วิธี Vercel Proxy ในชุดนี้คือวิธีที่เหมาะกับระบบออนไลน์ปัจจุบัน

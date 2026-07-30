@@ -434,8 +434,8 @@ window.handleRegister = async function(event) {
     if (errEl) errEl.textContent = 'ชื่อผู้ใช้ต้องเป็น a-z, 0-9 หรือ _ จำนวน 3-32 ตัว';
     return;
   }
-  if (password.length < 6) {
-    if (errEl) errEl.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+  if (password.length < 8) {
+    if (errEl) errEl.textContent = 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร';
     return;
   }
   if (password !== confirm) {
