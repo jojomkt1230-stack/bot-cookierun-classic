@@ -250,7 +250,7 @@ test('rejects an invalid upstream path', async () => {
   assert.deepEqual(await response.json(), { error: 'Invalid API path' });
 });
 
-test('persists announcement and tutorial settings without changing the public download link', async () => {
+test('persists announcement and tutorial settings independently from the download link', async () => {
   const originalFetch = globalThis.fetch;
   const initialDownloadUrl = 'https://downloads.example/ckrcs-bot.zip';
   let storedSettings;
@@ -258,8 +258,8 @@ test('persists announcement and tutorial settings without changing the public do
   globalThis.fetch = async (url, init) => {
     if (url.endsWith('/api/admin/overview')) {
       return Response.json({
-        siteName: 'CKRCS BOT',
-        botName: 'CKRCS Bot',
+        siteName: storedSettings?.siteName || 'CKRCS BOT',
+        botName: storedSettings?.botName || 'CKRCS Bot',
         downloadUrl: storedSettings?.downloadUrl || initialDownloadUrl,
         members: [],
         topups: [],
@@ -267,13 +267,13 @@ test('persists announcement and tutorial settings without changing the public do
       });
     }
     if (url.endsWith('/api/admin/settings')) {
-      storedSettings = JSON.parse(init.body);
+      storedSettings = { ...storedSettings, ...JSON.parse(init.body) };
       return Response.json({ ok: true });
     }
     if (url.endsWith('/api/public/config')) {
       return Response.json({
-        siteName: 'CKRCS BOT',
-        botName: 'CKRCS Bot',
+        siteName: storedSettings.siteName,
+        botName: storedSettings.botName || 'CKRCS Bot',
         downloadUrl: storedSettings.downloadUrl,
         plans: {}
       });
@@ -297,7 +297,8 @@ test('persists announcement and tutorial settings without changing the public do
     }));
 
     assert.equal(saveResponse.status, 200);
-    assert.match(storedSettings.downloadUrl, /^https:\/\/downloads\.example\/ckrcs-bot\.zip#ckrcs=/);
+    assert.match(storedSettings.siteName, /^CKRCS#ckrcs=/);
+    assert.equal(storedSettings.downloadUrl, undefined);
 
     const botSaveResponse = await proxy.fetch(apiRequest('admin/settings', {
       method: 'POST',

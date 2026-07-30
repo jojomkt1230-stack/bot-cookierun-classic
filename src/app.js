@@ -30,6 +30,9 @@ window.showSection = function(sectionId) {
   if (sectionId === 'admin') initAdminPanel();
   if (sectionId === 'tutorial') renderTutorialSteps(getSystemSettings().steps || []);
   if (sectionId === 'topup') loadSystemSettings(false);
+  if (sectionId === 'download') {
+    refreshCurrentMember().catch(() => {}).finally(() => applySystemSettingsToUI());
+  }
 };
 
 const DEFAULT_API_BASE_URL = window.location.hostname.endsWith('.vercel.app')
@@ -227,6 +230,8 @@ function applySystemSettingsToUI() {
   const qrImg = document.getElementById('qr-code-img');
   const announcementBox = document.getElementById('home-announcement');
   const announcementText = document.getElementById('home-announcement-text');
+  const announcementBanner = document.getElementById('announcement-banner');
+  const announcementBannerText = document.getElementById('announce-text');
 
   if (ppNum) ppNum.textContent = settings.promptPayNumber || '-';
   if (ppName) ppName.textContent = `ชื่อบัญชี: ${settings.promptPayAccountName || '-'}`;
@@ -236,16 +241,10 @@ function applySystemSettingsToUI() {
   }
   if (announcementBox) announcementBox.classList.toggle('hidden', !settings.announcement);
   if (announcementText) announcementText.textContent = settings.announcement || '';
+  if (announcementBanner) announcementBanner.classList.toggle('hidden', !settings.announcement);
+  if (announcementBannerText) announcementBannerText.textContent = settings.announcement || '';
 
-  const downloadLink = document.getElementById('download-link');
-  const downloadWarning = document.getElementById('download-warning');
-  const botNameDisplay = document.getElementById('bot-name-display');
-  if (botNameDisplay) botNameDisplay.textContent = settings.botName || 'CKRCS Bot';
-  if (downloadLink) {
-    downloadLink.href = settings.botUrl || '#';
-    downloadLink.classList.toggle('disabled', !settings.botUrl);
-  }
-  if (downloadWarning) downloadWarning.classList.toggle('hidden', Boolean(settings.botUrl));
+  updateDownloadPanel(settings);
 
   // System Settings Panel Inputs
   const sysAnnounce = document.getElementById('sys-announcement');
@@ -284,6 +283,61 @@ function applySystemSettingsToUI() {
   renderTutorialSteps(visibleSteps, settings.tutorialColor || 'cyan');
   renderPackagePlans(settings.plans || {});
 }
+
+function licenseIsActive(user = currentUser) {
+  const expiresAt = user?.expiresAt || user?.botExpiry;
+  const expiresAtMs = Date.parse(expiresAt || '');
+  return Boolean(user && Number.isFinite(expiresAtMs) && expiresAtMs > Date.now());
+}
+
+function formatExpiry(expiresAt) {
+  const date = new Date(expiresAt || '');
+  if (!Number.isFinite(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('th-TH', {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+    timeZone: 'Asia/Bangkok'
+  }).format(date);
+}
+
+function updateDownloadPanel(settings = getSystemSettings()) {
+  const downloadLink = document.getElementById('download-link');
+  const downloadWarning = document.getElementById('download-warning');
+  const botNameDisplay = document.getElementById('bot-name-display');
+  const expiryDisplay = document.getElementById('bot-expiry-display');
+  const active = licenseIsActive();
+  const hasUrl = Boolean(settings.botUrl && settings.botUrl.startsWith('https://'));
+
+  if (botNameDisplay) botNameDisplay.textContent = settings.botName || 'ยังไม่ได้ตั้งชื่อบอท';
+  if (expiryDisplay) expiryDisplay.textContent = formatExpiry(currentUser?.expiresAt || currentUser?.botExpiry);
+  if (downloadLink) {
+    downloadLink.href = active && hasUrl ? settings.botUrl : '#';
+    downloadLink.target = '_blank';
+    downloadLink.rel = 'noopener noreferrer';
+    downloadLink.classList.toggle('disabled', !active || !hasUrl);
+    downloadLink.setAttribute('aria-disabled', String(!active || !hasUrl));
+  }
+  if (downloadWarning) {
+    const message = !hasUrl
+      ? '⚠️ ผู้ดูแลยังไม่ได้ตั้งลิงก์ดาวน์โหลดบอท'
+      : !active
+        ? '⚠️ วันใช้งานหมดแล้ว กรุณาต่ออายุก่อนดาวน์โหลด'
+        : '';
+    downloadWarning.textContent = message;
+    downloadWarning.classList.toggle('hidden', !message);
+  }
+}
+
+window.startDownload = function(event) {
+  const settings = getSystemSettings();
+  if (!licenseIsActive() || !settings.botUrl?.startsWith('https://')) {
+    event?.preventDefault();
+    updateDownloadPanel(settings);
+    window.showToast('ยังไม่สามารถดาวน์โหลดได้ กรุณาตรวจวันใช้งานและลิงก์ดาวน์โหลด', 'error');
+    return false;
+  }
+  return true;
+};
 
 function normalizeVideoEmbedUrl(value) {
   const raw = String(value || '').trim();
@@ -712,6 +766,15 @@ function initDashboard(skipRefresh = false) {
         }
       });
   }
+}
+
+async function refreshCurrentMember() {
+  if (!currentUser || currentUser.role === 'admin') return currentUser;
+  const response = await axios.get(`${API_BASE_URL}/users/me`, { headers: getAuthHeaders() });
+  currentUser = { ...currentUser, ...response.data };
+  localStorage.setItem('user', JSON.stringify(currentUser));
+  updateHomeCountdownDisplay();
+  return currentUser;
 }
 
 window.rentBot = function(days, price) {
@@ -1403,7 +1466,7 @@ window.saveBotInfo = async function() {
   const name = document.getElementById('sys-bot-name')?.value.trim();
   const url = document.getElementById('sys-bot-url')?.value.trim();
 
-  if (!name || !url) {
+  if (!name) {
     window.showToast('กรุณากรอกชื่อบอทและลิงก์ดาวน์โหลดให้ครบ', 'error');
     return;
   }
@@ -1413,10 +1476,9 @@ window.saveBotInfo = async function() {
   }
 
   try {
-    await axios.post(`${API_BASE_URL}/admin/settings`, {
-      botName: name,
-      downloadUrl: url
-    }, adminApiConfig());
+    const payload = { botName: name };
+    if (url) payload.downloadUrl = url;
+    await axios.post(`${API_BASE_URL}/admin/settings`, payload, adminApiConfig());
     await loadSystemSettings(true);
     window.showToast('บันทึกชื่อบอทและลิงก์ดาวน์โหลดแล้ว', 'success');
   } catch (error) {

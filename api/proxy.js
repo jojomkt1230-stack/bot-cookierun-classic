@@ -16,6 +16,7 @@ const FORWARDED_RESPONSE_HEADERS = [
   'last-modified'
 ];
 const PORTAL_CONFIG_FRAGMENT = 'ckrcs';
+const PORTAL_CONFIG_PREFIX = 'CKRCS#';
 const TUTORIAL_COLORS = new Set(['orange', 'cyan', 'blue', 'pink']);
 
 function json(data, status = 200) {
@@ -127,23 +128,21 @@ async function encodePortalConfig(config) {
   return toBase64Url(compressed);
 }
 
-async function decodePortalConfig(downloadUrl) {
+async function decodePortalConfig(value) {
   const fallback = {
     announcement: '',
     tutorialVideoUrl: '',
     tutorialColor: 'cyan',
     tutorialSteps: []
   };
-  if (!downloadUrl) return { cleanUrl: '', config: fallback };
+  const raw = String(value || '');
+  if (!raw) return { isStored: false, config: fallback };
 
   try {
-    const url = new URL(downloadUrl);
-    const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
-    const encoded = hash.get(PORTAL_CONFIG_FRAGMENT);
-    hash.delete(PORTAL_CONFIG_FRAGMENT);
-    url.hash = hash.toString();
-    const cleanUrl = url.toString().replace(/#$/, '');
-    if (!encoded) return { cleanUrl, config: fallback };
+    const marker = `${PORTAL_CONFIG_PREFIX}${PORTAL_CONFIG_FRAGMENT}=`;
+    if (!raw.startsWith(marker)) return { isStored: false, config: fallback };
+    const encoded = raw.slice(marker.length);
+    if (!encoded) return { isStored: false, config: fallback };
 
     const bytes = fromBase64Url(encoded);
     const decompressed = await new Response(
@@ -151,7 +150,7 @@ async function decodePortalConfig(downloadUrl) {
     ).text();
     const parsed = JSON.parse(decompressed);
     return {
-      cleanUrl,
+      isStored: true,
       config: {
         announcement: typeof parsed.a === 'string' ? parsed.a : '',
         tutorialVideoUrl: typeof parsed.v === 'string' ? parsed.v : '',
@@ -162,17 +161,12 @@ async function decodePortalConfig(downloadUrl) {
       }
     };
   } catch {
-    return { cleanUrl: downloadUrl, config: fallback };
+    return { isStored: false, config: fallback };
   }
 }
 
-async function attachPortalConfig(downloadUrl, config) {
-  if (!downloadUrl) return '';
-  const url = new URL(downloadUrl);
-  const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
-  hash.set(PORTAL_CONFIG_FRAGMENT, await encodePortalConfig(config));
-  url.hash = hash.toString();
-  return url.toString();
+async function attachPortalConfig(config) {
+  return `${PORTAL_CONFIG_PREFIX}${PORTAL_CONFIG_FRAGMENT}=${await encodePortalConfig(config)}`;
 }
 
 function publicUser(member, memberCode) {
@@ -529,10 +523,21 @@ async function saveAdminSettings(request) {
     'tutorialColor',
     'tutorialSteps'
   ].some((key) => Object.hasOwn(payload, key));
-  if (hasPortalSettings || Object.hasOwn(payload, 'downloadUrl')) {
+  if (Object.hasOwn(payload, 'downloadUrl')) {
+    const downloadUrl = String(payload.downloadUrl || '').trim();
+    if (downloadUrl && !downloadUrl.startsWith('https://')) {
+      return json({ error: 'ลิงก์ดาวน์โหลดต้องขึ้นต้นด้วย https://' }, 400);
+    }
+    if (downloadUrl.length > 500) {
+      return json({ error: 'ลิงก์ดาวน์โหลดยาวเกินไป' }, 400);
+    }
+    clean.downloadUrl = downloadUrl;
+  }
+
+  if (hasPortalSettings) {
     const overview = await adminOverview(request);
     if (overview.errorResponse) return overview.errorResponse;
-    const previous = await decodePortalConfig(overview.data.downloadUrl || '');
+    const previous = await decodePortalConfig(overview.data.siteName || '');
     const announcement = Object.hasOwn(payload, 'announcement')
       ? String(payload.announcement || '').trim()
       : previous.config.announcement;
@@ -566,28 +571,26 @@ async function saveAdminSettings(request) {
       return json({ error: 'ข้อความแต่ละขั้นต้องไม่เกิน 100 ตัว และรวมไม่เกิน 500 ตัวอักษร' }, 400);
     }
 
-    const requestedUrl = Object.hasOwn(payload, 'downloadUrl')
-      ? String(payload.downloadUrl || '').trim()
-      : previous.cleanUrl;
-    if (!requestedUrl) {
+    const requestedUrl = 'https://portal.invalid';
+    if (false && !requestedUrl) {
       return json({ error: 'กรุณาบันทึกลิงก์ดาวน์โหลดบอทก่อนบันทึกวิธีใช้งาน' }, 400);
     }
-    if (!requestedUrl.startsWith('https://')) {
+    if (false && !requestedUrl.startsWith('https://')) {
       return json({ error: 'ลิงก์ดาวน์โหลดต้องขึ้นต้นด้วย https://' }, 400);
     }
 
-    const storedUrl = await attachPortalConfig(requestedUrl, {
+    const storedUrl = await attachPortalConfig({
       announcement,
       tutorialVideoUrl,
       tutorialColor,
       tutorialSteps: cleanSteps
     });
-    if (storedUrl.length > 500) {
+    if (storedUrl.length > 1800) {
       return json({
         error: 'ข้อความวิธีใช้งานยาวเกินพื้นที่จัดเก็บ กรุณาย่อข้อความแต่ละขั้น'
       }, 400);
     }
-    clean.downloadUrl = storedUrl;
+    clean.siteName = storedUrl;
   }
 
   const { response, data } = await legacyJson(request, '/api/admin/settings', {
@@ -601,14 +604,14 @@ async function getAdminSettings(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
   const data = overview.data;
-  const portal = await decodePortalConfig(data.downloadUrl || '');
+  const portal = await decodePortalConfig(data.siteName || '');
 
   return json({
     siteName: 'CKRCS BOT',
     announcement: portal.config.announcement,
     botName: data.botName || '',
-    botUrl: portal.cleanUrl,
-    downloadUrl: portal.cleanUrl,
+    botUrl: data.downloadUrl || '',
+    downloadUrl: data.downloadUrl || '',
     promptPayNumber: data.promptpayNumber || '',
     promptPayAccountName: data.promptpayLabel || '',
     slipReceiverName: data.slipReceiverName || '',
@@ -629,14 +632,14 @@ async function publicSettings(request) {
     includeContentType: false
   });
   if (!response.ok) return json(data, response.status);
-  const portal = await decodePortalConfig(data.downloadUrl || '');
+  const portal = await decodePortalConfig(data.siteName || '');
 
   return json({
     siteName: 'CKRCS BOT',
     announcement: portal.config.announcement,
     botName: data.botName || '',
-    botUrl: portal.cleanUrl,
-    downloadUrl: portal.cleanUrl,
+    botUrl: data.downloadUrl || '',
+    downloadUrl: data.downloadUrl || '',
     promptPayNumber: data.promptpayNumber || '',
     promptPayAccountName: data.promptpayLabel || '',
     promptPayQrUrl: data.paymentQrUrl || '',
