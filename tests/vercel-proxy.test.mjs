@@ -308,7 +308,10 @@ test('persists announcement and tutorial settings independently from the downloa
       },
       body: JSON.stringify({
         botName: 'CKRCS Bot V2',
-        downloadUrl: initialDownloadUrl
+        downloadUrl: initialDownloadUrl,
+        promptpayNumber: '0655611571',
+        promptpayLabel: 'CKRCS Shop',
+        paymentQrUrl: 'https://cdn.example/promptpay-qr.png'
       })
     }));
     assert.equal(botSaveResponse.status, 200);
@@ -317,7 +320,10 @@ test('persists announcement and tutorial settings independently from the downloa
     const publicData = await publicResponse.json();
     assert.equal(publicResponse.status, 200);
     assert.equal(publicData.announcement, 'แจ้งปรับปรุงระบบเวลา 02:00 น.');
+    assert.equal(publicData.botName, 'CKRCS Bot V2');
     assert.equal(publicData.downloadUrl, initialDownloadUrl);
+    assert.equal(publicData.promptPayNumber, '0655611571');
+    assert.equal(publicData.promptPayQrUrl, 'https://cdn.example/promptpay-qr.png');
     assert.equal(publicData.videoUrl, 'https://www.youtube.com/watch?v=demo123');
     assert.equal(publicData.tutorialColor, 'pink');
     assert.deepEqual(publicData.steps, ['เปิดโปรแกรม', 'กดเชื่อมต่อ', 'เริ่มใช้งาน']);

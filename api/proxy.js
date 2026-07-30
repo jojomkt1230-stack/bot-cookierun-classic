@@ -120,7 +120,12 @@ async function encodePortalConfig(config) {
     a: String(config.announcement || ''),
     v: String(config.tutorialVideoUrl || ''),
     c: TUTORIAL_COLORS.has(config.tutorialColor) ? config.tutorialColor : 'cyan',
-    s: Array.isArray(config.tutorialSteps) ? config.tutorialSteps : []
+    s: Array.isArray(config.tutorialSteps) ? config.tutorialSteps : [],
+    b: String(config.botName || ''),
+    d: String(config.downloadUrl || ''),
+    q: String(config.paymentQrUrl || ''),
+    n: String(config.promptpayNumber || ''),
+    l: String(config.promptpayLabel || '')
   }));
   const compressed = new Uint8Array(await new Response(
     new Blob([source]).stream().pipeThrough(new CompressionStream('deflate-raw'))
@@ -133,7 +138,12 @@ async function decodePortalConfig(value) {
     announcement: '',
     tutorialVideoUrl: '',
     tutorialColor: 'cyan',
-    tutorialSteps: []
+    tutorialSteps: [],
+    botName: '',
+    downloadUrl: '',
+    paymentQrUrl: '',
+    promptpayNumber: '',
+    promptpayLabel: ''
   };
   const raw = String(value || '');
   if (!raw) return { isStored: false, config: fallback };
@@ -157,7 +167,12 @@ async function decodePortalConfig(value) {
         tutorialColor: TUTORIAL_COLORS.has(parsed.c) ? parsed.c : 'cyan',
         tutorialSteps: Array.isArray(parsed.s)
           ? parsed.s.filter((item) => typeof item === 'string').slice(0, 8)
-          : []
+          : [],
+        botName: typeof parsed.b === 'string' ? parsed.b : '',
+        downloadUrl: typeof parsed.d === 'string' ? parsed.d : '',
+        paymentQrUrl: typeof parsed.q === 'string' ? parsed.q : '',
+        promptpayNumber: typeof parsed.n === 'string' ? parsed.n : '',
+        promptpayLabel: typeof parsed.l === 'string' ? parsed.l : ''
       }
     };
   } catch {
@@ -521,7 +536,12 @@ async function saveAdminSettings(request) {
     'announcement',
     'tutorialVideoUrl',
     'tutorialColor',
-    'tutorialSteps'
+    'tutorialSteps',
+    'botName',
+    'downloadUrl',
+    'paymentQrUrl',
+    'promptpayNumber',
+    'promptpayLabel'
   ].some((key) => Object.hasOwn(payload, key));
   if (Object.hasOwn(payload, 'downloadUrl')) {
     const downloadUrl = String(payload.downloadUrl || '').trim();
@@ -550,6 +570,21 @@ async function saveAdminSettings(request) {
     const tutorialSteps = Object.hasOwn(payload, 'tutorialSteps')
       ? payload.tutorialSteps
       : previous.config.tutorialSteps;
+    const botName = Object.hasOwn(payload, 'botName')
+      ? String(payload.botName || '').trim()
+      : previous.config.botName || String(overview.data.botName || '');
+    const downloadUrl = Object.hasOwn(payload, 'downloadUrl')
+      ? String(payload.downloadUrl || '').trim()
+      : previous.config.downloadUrl || String(overview.data.downloadUrl || '');
+    const paymentQrUrl = Object.hasOwn(payload, 'paymentQrUrl')
+      ? String(payload.paymentQrUrl || '').trim()
+      : previous.config.paymentQrUrl || String(overview.data.paymentQrUrl || '');
+    const promptpayNumber = Object.hasOwn(payload, 'promptpayNumber')
+      ? String(payload.promptpayNumber || '').trim()
+      : previous.config.promptpayNumber || String(overview.data.promptpayNumber || '');
+    const promptpayLabel = Object.hasOwn(payload, 'promptpayLabel')
+      ? String(payload.promptpayLabel || '').trim()
+      : previous.config.promptpayLabel || String(overview.data.promptpayLabel || '');
 
     if (announcement.length > 240) {
       return json({ error: 'ข้อความประกาศต้องไม่เกิน 240 ตัวอักษร' }, 400);
@@ -575,7 +610,12 @@ async function saveAdminSettings(request) {
       announcement,
       tutorialVideoUrl,
       tutorialColor,
-      tutorialSteps: cleanSteps
+      tutorialSteps: cleanSteps,
+      botName,
+      downloadUrl,
+      paymentQrUrl,
+      promptpayNumber,
+      promptpayLabel
     });
     if (storedUrl.length > 1800) {
       return json({
@@ -598,16 +638,17 @@ async function getAdminSettings(request) {
   const data = overview.data;
   const portal = await decodePortalConfig(data.siteName || '');
 
+  const stored = portal.config;
   return json({
     siteName: 'CKRCS BOT',
     announcement: portal.config.announcement,
-    botName: data.botName || '',
-    botUrl: data.downloadUrl || '',
-    downloadUrl: data.downloadUrl || '',
-    promptPayNumber: data.promptpayNumber || '',
-    promptPayAccountName: data.promptpayLabel || '',
+    botName: portal.isStored ? stored.botName : data.botName || '',
+    botUrl: portal.isStored ? stored.downloadUrl : data.downloadUrl || '',
+    downloadUrl: portal.isStored ? stored.downloadUrl : data.downloadUrl || '',
+    promptPayNumber: portal.isStored ? stored.promptpayNumber : data.promptpayNumber || '',
+    promptPayAccountName: portal.isStored ? stored.promptpayLabel : data.promptpayLabel || '',
     slipReceiverName: data.slipReceiverName || '',
-    promptPayQrUrl: data.paymentQrUrl || '',
+    promptPayQrUrl: portal.isStored ? stored.paymentQrUrl : data.paymentQrUrl || '',
     tutorialVideoUrl: portal.config.tutorialVideoUrl,
     videoUrl: portal.config.tutorialVideoUrl,
     tutorialColor: portal.config.tutorialColor,
@@ -626,15 +667,16 @@ async function publicSettings(request) {
   if (!response.ok) return json(data, response.status);
   const portal = await decodePortalConfig(data.siteName || '');
 
+  const stored = portal.config;
   return json({
     siteName: 'CKRCS BOT',
     announcement: portal.config.announcement,
-    botName: data.botName || '',
-    botUrl: data.downloadUrl || '',
-    downloadUrl: data.downloadUrl || '',
-    promptPayNumber: data.promptpayNumber || '',
-    promptPayAccountName: data.promptpayLabel || '',
-    promptPayQrUrl: data.paymentQrUrl || '',
+    botName: portal.isStored ? stored.botName : data.botName || '',
+    botUrl: portal.isStored ? stored.downloadUrl : data.downloadUrl || '',
+    downloadUrl: portal.isStored ? stored.downloadUrl : data.downloadUrl || '',
+    promptPayNumber: portal.isStored ? stored.promptpayNumber : data.promptpayNumber || '',
+    promptPayAccountName: portal.isStored ? stored.promptpayLabel : data.promptpayLabel || '',
+    promptPayQrUrl: portal.isStored ? stored.paymentQrUrl : data.paymentQrUrl || '',
     tutorialVideoUrl: portal.config.tutorialVideoUrl,
     videoUrl: portal.config.tutorialVideoUrl,
     tutorialColor: portal.config.tutorialColor,

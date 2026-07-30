@@ -221,6 +221,30 @@ async function loadSystemSettings(useAdminEndpoint = false) {
   return getSystemSettings();
 }
 
+function promptPayQrPayload(number) {
+  const digits = String(number || '').replace(/\D/g, '');
+  if (!/^0\d{9}$/.test(digits)) return '';
+
+  const merchantAccount = `0016A00000067701011101130066${digits.slice(1)}`;
+  const tlv = (id, value) => `${id}${String(value.length).padStart(2, '0')}${value}`;
+  const beforeCrc = `000201010211${tlv('29', merchantAccount)}5802TH5303764`;
+  let crc = 0xFFFF;
+  for (const character of `${beforeCrc}6304`) {
+    crc ^= character.charCodeAt(0) << 8;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+    }
+  }
+  return `${beforeCrc}6304${crc.toString(16).toUpperCase().padStart(4, '0')}`;
+}
+
+function fallbackPromptPayQrUrl(number) {
+  const payload = promptPayQrPayload(number);
+  return payload
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=512x512&format=png&data=${encodeURIComponent(payload)}`
+    : '';
+}
+
 function applySystemSettingsToUI() {
   const settings = getSystemSettings();
 
@@ -236,8 +260,9 @@ function applySystemSettingsToUI() {
   if (ppNum) ppNum.textContent = settings.promptPayNumber || '-';
   if (ppName) ppName.textContent = `ชื่อบัญชี: ${settings.promptPayAccountName || '-'}`;
   if (qrImg) {
-    qrImg.src = settings.promptPayQrUrl || '';
-    qrImg.classList.toggle('hidden', !settings.promptPayQrUrl);
+    const qrUrl = settings.promptPayQrUrl || fallbackPromptPayQrUrl(settings.promptPayNumber);
+    qrImg.src = qrUrl;
+    qrImg.classList.toggle('hidden', !qrUrl);
   }
   if (announcementBox) announcementBox.classList.toggle('hidden', !settings.announcement);
   if (announcementText) announcementText.textContent = settings.announcement || '';
