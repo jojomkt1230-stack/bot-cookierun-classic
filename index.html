@@ -217,57 +217,7 @@
             <p class="subtitle">เลือกแพ็กเกจที่ต้องการ (วันใช้งานจะ+ต่อจากวันเดิม)</p>
           </div>
           <div id="packages-grid" class="packages-grid">
-            <!-- 1 Day / 15 Diamonds -->
-            <div class="pkg-card">
-              <div class="pkg-title">1 วัน</div>
-              <div class="pkg-price">15 เพชร</div>
-              <div class="pkg-chest-container">
-                <div class="chest-box">
-                  <span class="chest-icon">📦</span>
-                  <span class="chest-badge">1</span>
-                </div>
-              </div>
-              <button class="btn-redeem" onclick="rentBot(1, 15)">แลกวัน</button>
-            </div>
-
-            <!-- 3 Days / 45 Diamonds -->
-            <div class="pkg-card">
-              <div class="pkg-title">3 วัน</div>
-              <div class="pkg-price">45 เพชร</div>
-              <div class="pkg-chest-container">
-                <div class="chest-box">
-                  <span class="chest-icon">🎁</span>
-                  <span class="chest-badge">3</span>
-                </div>
-              </div>
-              <button class="btn-redeem" onclick="rentBot(3, 45)">แลกวัน</button>
-            </div>
-
-            <!-- 7 Days / 100 Diamonds -->
-            <div class="pkg-card highlight-gold">
-              <div class="pkg-title gold-text">7 วัน</div>
-              <div class="pkg-price gold-text">100 เพชร</div>
-              <div class="pkg-chest-container">
-                <div class="chest-box">
-                  <span class="chest-icon">👑</span>
-                  <span class="chest-badge gold-badge">7</span>
-                </div>
-              </div>
-              <button class="btn-redeem gold-btn" onclick="rentBot(7, 100)">แลกวัน</button>
-            </div>
-
-            <!-- 30 Days / 300 Diamonds -->
-            <div class="pkg-card highlight-purple">
-              <div class="pkg-title purple-text">30 วัน</div>
-              <div class="pkg-price purple-text">300 เพชร</div>
-              <div class="pkg-chest-container">
-                <div class="chest-box">
-                  <span class="chest-icon">💎</span>
-                  <span class="chest-badge purple-badge">30</span>
-                </div>
-              </div>
-              <button class="btn-redeem purple-btn" onclick="rentBot(30, 300)">แลกวัน</button>
-            </div>
+            <div class="loading-spinner">⟳ กำลังโหลดแพ็กเกจจริง...</div>
           </div>
         </section>
 
@@ -281,10 +231,6 @@
               <div class="bot-info-row">
                 <span class="info-label">🤖 ชื่อบอท:</span>
                 <span id="bot-name-display" class="info-value">CKRCS Bot</span>
-              </div>
-              <div class="bot-info-row">
-                <span class="info-label">🏷️ เวอร์ชัน:</span>
-                <span id="bot-version-display" class="info-value accent">v2.9.0</span>
               </div>
               <div class="bot-info-row">
                 <span class="info-label">📅 วันหมดอายุ:</span>
@@ -325,7 +271,7 @@
             <div class="topup-promptpay-card">
               <h3>📱 PromptPay</h3>
               <div class="promptpay-account-name" id="promptpay-account-name">ชื่อบัญชี: กำลังโหลด...</div>
-              <div class="promptpay-number-box" id="promptpay-number">0655611571</div>
+              <div class="promptpay-number-box" id="promptpay-number">กำลังโหลด...</div>
               <div class="qr-container">
                 <img id="qr-code-img" src="" alt="QR Code PromptPay" class="qr-image" />
               </div>
@@ -409,13 +355,9 @@
               <div class="admin-card">
                 <h4>🎁 ชดเชยเวลาใช้งานบอท (ผู้ใช้ทุกคน)</h4>
                 <div class="input-row">
-                  <input type="number" id="comp-time" placeholder="เช่น 1, 12 หรือ 24" min="1" class="admin-input" style="flex:1" />
-                  <select id="comp-unit" class="admin-select" style="width:120px; font-weight:700;">
-                    <option value="hours">ชั่วโมง (Hrs)</option>
-                    <option value="days">วัน (Days)</option>
-                  </select>
+                  <input type="number" id="comp-time" placeholder="จำนวนวัน 1-365" min="1" max="365" class="admin-input" style="flex:1" />
                   <input type="text" id="comp-note" placeholder="หมายเหตุ (ถ้ามี)" class="admin-input" style="flex:1" />
-                  <button class="btn-secondary" onclick="massCompensation()">🎁 ชดเชยเวลา</button>
+                  <button class="btn-secondary" onclick="massCompensation()">🎁 ชดเชยเป็นวัน</button>
                 </div>
               </div>
             </div>
@@ -451,38 +393,18 @@
             <div id="admin-system" class="admin-panel-content hidden">
               <h3>⚙️ ตั้งค่าระบบ</h3>
               <div class="system-settings-grid">
-                <!-- Bot Status -->
-                <div class="admin-card">
-                  <h4>🤖 สถานะบอท</h4>
-                  <div class="input-row">
-                    <select id="sys-bot-status" class="admin-select">
-                      <option value="online">🟢 Online</option>
-                      <option value="maintenance">🔴 Maintenance</option>
-                    </select>
-                    <button class="btn-secondary" onclick="saveSetting('botStatus', document.getElementById('sys-bot-status').value)">บันทึก</button>
-                  </div>
-                </div>
-                <!-- Announcement -->
-                <div class="admin-card">
-                  <h4>📢 ข้อความประกาศ</h4>
-                  <div class="input-col">
-                    <textarea id="sys-announcement" class="admin-textarea" rows="3" placeholder="ข้อความประกาศ..."></textarea>
-                    <button class="btn-secondary" onclick="saveSetting('announcement', document.getElementById('sys-announcement').value)">บันทึก</button>
-                  </div>
-                </div>
                 <!-- PromptPay Settings Card -->
                 <div class="admin-card">
                   <h4>📱 ตั้งค่าพร้อมเพย์ & คิวอาร์โค้ด</h4>
                   <div class="input-col">
                     <label style="font-size:0.85rem; color:var(--text-muted);">เบอร์พร้อมเพย์ (แสดงในช่องสีเขียว):</label>
                     <input type="text" id="sys-promptpay" class="admin-input" placeholder="0655611571" />
-                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">ชื่อบัญชีผู้รับเงิน (ระบบตรวจสลิปต้องตรงกับชื่อนี้):</label>
+                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">ชื่อบัญชีที่แสดงให้ลูกค้า:</label>
                     <input type="text" id="sys-promptpay-name" class="admin-input" placeholder="เจษฎาภรณ์..." />
-                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">อัปโหลดรูป QR Code PromptPay:</label>
-                    <input type="file" id="sys-qr-file" accept="image/*" class="admin-input" onchange="handleAdminQrUpload(event)" />
-                    <div id="admin-qr-preview-container" style="margin-top:6px;">
-                      <img id="admin-qr-preview" src="" alt="QR Preview" style="max-width:120px; border-radius:8px; display:none;" />
-                    </div>
+                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">ชื่อผู้รับที่ใช้ตรวจสลิป:</label>
+                    <input type="text" id="sys-slip-receiver" class="admin-input" placeholder="ต้องตรงกับชื่อในบัญชีธนาคาร" />
+                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">ลิงก์รูป QR Code แบบ HTTPS (เว้นว่างเพื่อสร้างจากเบอร์อัตโนมัติ):</label>
+                    <input type="url" id="sys-qr-url" class="admin-input" placeholder="https://..." />
                     <button class="btn-primary" onclick="savePromptPaySettings()" style="margin-top:10px;">💾 บันทึกข้อมูลพร้อมเพย์</button>
                   </div>
                 </div>
@@ -490,29 +412,17 @@
                 <div class="admin-card">
                   <h4>⬇️ ข้อมูลดาวน์โหลดบอท</h4>
                   <div class="input-col">
+                    <input type="text" id="sys-site-name" class="admin-input" placeholder="ชื่อเว็บไซต์" />
                     <input type="text" id="sys-bot-name" class="admin-input" placeholder="ชื่อบอท" />
-                    <input type="text" id="sys-bot-version" class="admin-input" placeholder="เวอร์ชัน เช่น v2.9.0" />
-                    <input type="text" id="sys-bot-url" class="admin-input" placeholder="URL ดาวน์โหลด" />
+                    <input type="url" id="sys-bot-url" class="admin-input" placeholder="URL ดาวน์โหลดแบบ https://" />
                     <button class="btn-secondary" onclick="saveBotInfo()">บันทึกข้อมูลบอท</button>
                   </div>
                 </div>
-                <!-- Tutorial Video -->
-                <div class="admin-card">
-                  <h4>🎬 URL วิดีโอสอนใช้งาน</h4>
-                  <div class="input-row">
-                    <input type="text" id="sys-video-url" class="admin-input" placeholder="https://www.youtube.com/embed/..." />
-                    <button class="btn-secondary" onclick="saveSetting('videoUrl', document.getElementById('sys-video-url').value)">บันทึก</button>
-                  </div>
-                </div>
-                <!-- Steps Editor -->
                 <div class="admin-card full-width">
-                  <h4>📋 ขั้นตอนการใช้งาน</h4>
-                  <div id="steps-editor"></div>
-                  <div class="input-row" style="margin-top:10px">
-                    <input type="text" id="new-step-text" class="admin-input" placeholder="ขั้นตอนใหม่..." />
-                    <button class="btn-secondary" onclick="addStep()">+ เพิ่ม</button>
-                  </div>
-                  <button class="btn-primary" onclick="saveSteps()" style="margin-top:10px">💾 บันทึกขั้นตอนทั้งหมด</button>
+                  <h4>🔐 สถานะการตรวจสลิป</h4>
+                  <p style="color:var(--text-muted); margin:0;">
+                    ค่าทุกช่องในหน้านี้อ่านและบันทึกลงฐานข้อมูลเดิมโดยตรง ไม่ใช้ข้อมูลจำลองในเบราว์เซอร์
+                  </p>
                 </div>
               </div>
             </div>
@@ -556,26 +466,24 @@
       <h3 style="color:var(--primary); margin-bottom:18px; font-family:var(--font-cyber);">✏️ แก้ไขข้อมูลสมาชิก</h3>
       <input type="hidden" id="edit-user-id" />
       <div class="form-group" style="margin-bottom:12px;">
-        <label style="font-size:0.9rem; color:var(--text-muted);">👤 ชื่อผู้ใช้</label>
-        <input type="text" id="edit-user-username" class="admin-input" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
+        <label style="font-size:0.9rem; color:var(--text-muted);">👤 ชื่อผู้ใช้ (อ่านอย่างเดียว)</label>
+        <input type="text" id="edit-user-username" readonly class="admin-input" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.7); border:1px solid var(--border); color:#aaa;" />
       </div>
       <div class="form-group" style="margin-bottom:12px;">
         <label style="font-size:0.9rem; color:var(--text-muted);">💎 จำนวนเพชร</label>
         <input type="number" id="edit-user-diamonds" class="admin-input" min="0" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
       </div>
       <div class="form-group" style="margin-bottom:16px;">
-        <label style="font-size:0.9rem; color:var(--text-muted);">⏰ เพิ่มเวลาใช้งานบอท (+ชั่วโมง / +วัน)</label>
-        <div style="display:flex; gap:8px;">
-          <input type="number" id="edit-user-add-time" class="admin-input" placeholder="เช่น 1, 12 หรือ 24" min="0" style="flex:1; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
-          <select id="edit-user-time-unit" class="admin-select" style="width:120px; padding:10px; border-radius:8px; background:rgba(0,15,40,0.9); border:1px solid var(--border-bright); color:var(--primary); font-weight:700;">
-            <option value="hours">ชั่วโมง (Hrs)</option>
-            <option value="days">วัน (Days)</option>
-          </select>
-        </div>
+        <label style="font-size:0.9rem; color:var(--text-muted);">⏰ เพิ่มเวลาใช้งานบอท (วัน)</label>
+        <input type="number" id="edit-user-add-time" class="admin-input" placeholder="1-365 วัน" min="0" max="365" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label style="font-size:0.9rem; color:var(--text-muted);">🔑 ตั้งรหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)</label>
+        <input type="password" id="edit-user-password" autocomplete="new-password" minlength="8" class="admin-input" placeholder="อย่างน้อย 8 ตัวอักษร" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
       </div>
       <div style="display:flex; gap:12px; margin-top:20px;">
         <button class="btn-primary" onclick="saveEditedUser()" style="flex:1; padding:12px; border-radius:8px; font-weight:700; cursor:pointer;">💾 บันทึกแก้ไข</button>
-        <button class="btn-danger" onclick="deleteSelectedUser()" style="background:var(--danger); color:#fff; border:none; padding:12px 18px; border-radius:8px; font-weight:700; cursor:pointer;">🗑️ ลบสมาชิก</button>
+        <button class="btn-secondary" onclick="resetSelectedDevice()" style="padding:12px 18px; border-radius:8px; font-weight:700; cursor:pointer;">♻️ รีเซ็ตเครื่อง</button>
       </div>
     </div>
   </div>

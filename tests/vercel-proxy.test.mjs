@@ -109,7 +109,7 @@ test('does not forward browser origin, cookies, or referer to Render', async () 
   };
 
   try {
-    const response = await proxy.fetch(apiRequest('settings', {
+    const response = await proxy.fetch(apiRequest('health', {
       headers: {
         Accept: 'application/json',
         Cookie: 'private=session',
@@ -119,10 +119,126 @@ test('does not forward browser origin, cookies, or referer to Render', async () 
     }));
 
     assert.equal(response.status, 200);
-    assert.equal(captured.url, 'https://render.example/api/settings');
+    assert.equal(captured.url, 'https://render.example/api/health');
     assert.equal(captured.init.headers.get('cookie'), null);
     assert.equal(captured.init.headers.get('origin'), null);
     assert.equal(captured.init.headers.get('referer'), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('falls back to the real legacy admin login and returns an admin session', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    if (url.endsWith('/api/auth/login')) {
+      return Response.json({ error: 'invalid member' }, { status: 401 });
+    }
+    if (url.endsWith('/api/admin/login')) {
+      return Response.json({ token: 'legacy-admin-token', expiresIn: 3600 });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  try {
+    const response = await proxy.fetch(apiRequest('auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'admin_user', password: 'safe-password' })
+    }));
+    const data = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].url, 'https://legacy.example/api/admin/login');
+    assert.equal(data.token, 'legacy-admin-token');
+    assert.equal(data.user.role, 'admin');
+    assert.equal(data.user.username, 'admin_user');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('maps the real legacy admin overview to the website user table', async () => {
+  const originalFetch = globalThis.fetch;
+  let captured;
+
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init };
+    return Response.json({
+      members: [{
+        member_code: 'CKRCS-1234',
+        username: 'member_one',
+        credits: 77,
+        status: 'active',
+        expires_at: '2099-01-02T03:04:05.000Z',
+        device_name: 'Windows'
+      }],
+      topups: [],
+      orders: []
+    });
+  };
+
+  try {
+    const response = await proxy.fetch(apiRequest('admin/users', {
+      headers: { Authorization: 'Bearer legacy-admin-token' }
+    }));
+    const data = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(captured.url, 'https://legacy.example/api/admin/overview');
+    assert.equal(
+      captured.init.headers.get('authorization'),
+      'Bearer legacy-admin-token'
+    );
+    assert.equal(data.users[0].memberCode, 'CKRCS-1234');
+    assert.equal(data.users[0].username, 'member_one');
+    assert.equal(data.users[0].diamonds, 77);
+    assert.equal(data.users[0].isActive, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('updates a member credit balance through the legacy admin credit API', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    if (url.endsWith('/api/admin/overview')) {
+      return Response.json({
+        members: [{ member_code: 'CKRCS-1234', credits: 20 }],
+        topups: [],
+        orders: []
+      });
+    }
+    if (url.endsWith('/api/admin/credit')) {
+      return Response.json({ ok: true, credits: 50 });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  try {
+    const response = await proxy.fetch(apiRequest('admin/users/CKRCS-1234/diamonds', {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer legacy-admin-token',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ diamonds: 50 })
+    }));
+
+    assert.equal(response.status, 200);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].url, 'https://legacy.example/api/admin/credit');
+    assert.deepEqual(JSON.parse(calls[1].init.body), {
+      memberCode: 'CKRCS-1234',
+      delta: 30
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }

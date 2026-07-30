@@ -108,13 +108,48 @@ function publicUser(member, memberCode) {
     id: memberCode,
     username: String(member?.username || ''),
     email: '',
-    role: 'user',
+    role: member?.isAdmin ? 'admin' : 'user',
     diamonds: Number(member?.credits || 0),
     memberCode,
     botExpiry: expiresAt,
     expiresAt,
     status: valid ? 'active' : status,
     valid
+  };
+}
+
+function publicAdmin(username) {
+  return {
+    id: 'admin',
+    username,
+    email: '',
+    role: 'admin',
+    diamonds: 0,
+    memberCode: '',
+    botExpiry: null,
+    expiresAt: null,
+    status: 'active',
+    valid: true
+  };
+}
+
+async function legacyJson(request, pathname, options = {}) {
+  const response = await legacyFetch(request, pathname, options);
+  const data = await responseData(response);
+  return { response, data };
+}
+
+async function tryAdminLogin(request, username, password) {
+  const { response, data } = await legacyJson(request, '/api/admin/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
+  });
+
+  if (!response.ok || !data.token) return null;
+  return {
+    ok: true,
+    token: String(data.token),
+    user: publicAdmin(username)
   };
 }
 
@@ -166,6 +201,9 @@ async function loginWithLegacy(request) {
   const auth = await responseData(authResponse);
 
   if (!authResponse.ok) {
+    const adminSession = await tryAdminLogin(request, username, password);
+    if (adminSession) return json(adminSession);
+
     return json({
       error: auth.error || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
     }, authResponse.status);
@@ -189,6 +227,11 @@ async function loginWithLegacy(request) {
   }
 
   const user = publicUser(member, memberCode);
+  if (user.role === 'admin') {
+    const adminSession = await tryAdminLogin(request, username, password);
+    if (adminSession) return json(adminSession);
+  }
+
   return json({
     ok: true,
     token,
@@ -197,6 +240,296 @@ async function loginWithLegacy(request) {
     valid: user.valid,
     user
   });
+}
+
+function mapMember(member) {
+  const expiresAt = typeof member?.expires_at === 'string' ? member.expires_at : null;
+  const active = String(member?.status || '') === 'active'
+    && Boolean(expiresAt)
+    && Date.parse(expiresAt) > Date.now();
+
+  return {
+    _id: String(member?.member_code || ''),
+    id: String(member?.member_code || ''),
+    memberCode: String(member?.member_code || ''),
+    username: String(member?.username || member?.display_name || member?.member_code || ''),
+    displayName: String(member?.display_name || ''),
+    contact: String(member?.contact || ''),
+    role: 'user',
+    diamonds: Number(member?.credits || 0),
+    credits: Number(member?.credits || 0),
+    botExpiry: expiresAt,
+    expiresAt,
+    status: String(member?.status || 'pending'),
+    isActive: active,
+    valid: active,
+    deviceName: String(member?.device_name || ''),
+    createdAt: member?.created_at || null
+  };
+}
+
+function mapTopup(topup) {
+  const sourceStatus = String(topup?.status || 'pending');
+  const status = sourceStatus === 'verified'
+    ? 'approved'
+    : sourceStatus === 'cancelled'
+      ? 'rejected'
+      : 'pending';
+
+  return {
+    _id: String(topup?.id || ''),
+    id: String(topup?.id || ''),
+    orderId: String(topup?.id || ''),
+    memberCode: String(topup?.member_code || ''),
+    username: String(topup?.username || topup?.display_name || topup?.member_code || ''),
+    amount: Number(topup?.amount || 0),
+    diamonds: Number(topup?.credits || 0),
+    credits: Number(topup?.credits || 0),
+    status,
+    sourceStatus,
+    slipRef: String(topup?.slip_reference || ''),
+    hasSlip: Boolean(topup?.has_slip),
+    createdAt: topup?.created_at || null,
+    verifiedAt: topup?.verified_at || null
+  };
+}
+
+async function adminOverview(request) {
+  const { response, data } = await legacyJson(request, '/api/admin/overview', {
+    method: 'GET',
+    includeContentType: false
+  });
+  if (!response.ok) return { errorResponse: json(data, response.status) };
+  return { data };
+}
+
+function thailandDate(value = new Date()) {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(value);
+}
+
+async function adminUsers(request) {
+  const overview = await adminOverview(request);
+  if (overview.errorResponse) return overview.errorResponse;
+  return json({ users: (overview.data.members || []).map(mapMember) });
+}
+
+async function adminTopups(request) {
+  const overview = await adminOverview(request);
+  if (overview.errorResponse) return overview.errorResponse;
+  return json({ topups: (overview.data.topups || []).map(mapTopup) });
+}
+
+async function adminStats(request) {
+  const overview = await adminOverview(request);
+  if (overview.errorResponse) return overview.errorResponse;
+
+  const members = (overview.data.members || []).map(mapMember);
+  const topups = (overview.data.topups || []).map(mapTopup);
+  const today = thailandDate();
+  const todayRevenue = topups
+    .filter((item) => item.status === 'approved'
+      && item.verifiedAt
+      && thailandDate(new Date(item.verifiedAt)) === today)
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  return json({
+    totalUsers: members.length,
+    activeUsers: members.filter((item) => item.isActive).length,
+    pendingTopups: topups.filter((item) => item.status === 'pending').length,
+    todayRevenue
+  });
+}
+
+async function updateAdminUser(request, path) {
+  const match = path.match(/^admin\/users\/([^/]+)\/(diamonds|days|reset-password|reset-device)$/);
+  if (!match) {
+    return json({
+      error: 'ระบบฐานข้อมูลเดิมไม่รองรับการเปลี่ยนชื่อหรือลบสมาชิกจากหน้าเว็บ'
+    }, 405);
+  }
+
+  const memberCode = decodeURIComponent(match[1]);
+  const action = match[2];
+  const payload = await readJson(request);
+
+  if (action === 'diamonds') {
+    const overview = await adminOverview(request);
+    if (overview.errorResponse) return overview.errorResponse;
+    const member = (overview.data.members || [])
+      .find((item) => String(item.member_code) === memberCode);
+    if (!member) return json({ error: 'ไม่พบสมาชิก' }, 404);
+
+    const desired = Number(payload.diamonds);
+    if (!Number.isInteger(desired) || desired < 0 || desired > 1000000) {
+      return json({ error: 'จำนวนเครดิตไม่ถูกต้อง' }, 400);
+    }
+    const delta = desired - Number(member.credits || 0);
+    if (delta === 0) return json({ ok: true, credits: desired });
+
+    const { response, data } = await legacyJson(request, '/api/admin/credit', {
+      method: 'POST',
+      body: JSON.stringify({ memberCode, delta })
+    });
+    return json(data, response.status);
+  }
+
+  if (action === 'days') {
+    const days = Number(payload.days);
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      return json({ error: 'จำนวนวันต้องเป็นเลขเต็ม 1-365 วัน' }, 400);
+    }
+    const { response, data } = await legacyJson(request, '/api/admin/license', {
+      method: 'POST',
+      body: JSON.stringify({ memberCode, action: 'activate', days })
+    });
+    return json(data, response.status);
+  }
+
+  if (action === 'reset-device') {
+    const { response, data } = await legacyJson(request, '/api/admin/license', {
+      method: 'POST',
+      body: JSON.stringify({ memberCode, action: 'reset_device' })
+    });
+    return json(data, response.status);
+  }
+
+  const newPassword = String(payload.newPassword || '');
+  if (newPassword.length < 8 || newPassword.length > 128) {
+    return json({ error: 'รหัสผ่านใหม่ต้องยาว 8-128 ตัวอักษร' }, 400);
+  }
+  const { response, data } = await legacyJson(request, '/api/admin/member-password', {
+    method: 'POST',
+    body: JSON.stringify({ memberCode, newPassword })
+  });
+  return json(data, response.status);
+}
+
+async function updateAdminTopup(request, path) {
+  const match = path.match(/^admin\/topups\/([^/]+)$/);
+  if (!match) return json({ error: 'ไม่พบรายการเติมเงิน' }, 404);
+
+  const payload = await readJson(request);
+  const topupId = decodeURIComponent(match[1]);
+  const pathname = payload.status === 'approved'
+    ? '/api/admin/topup/approve'
+    : payload.status === 'rejected'
+      ? '/api/admin/topup/cancel'
+      : '';
+  if (!pathname) return json({ error: 'สถานะรายการไม่ถูกต้อง' }, 400);
+
+  const { response, data } = await legacyJson(request, pathname, {
+    method: 'POST',
+    body: JSON.stringify({ topupId })
+  });
+  return json(data, response.status);
+}
+
+async function saveAdminSettings(request) {
+  const payload = await readJson(request);
+  const supported = [
+    'downloadUrl',
+    'siteName',
+    'botName',
+    'promptpayLabel',
+    'promptpayNumber',
+    'slipReceiverName',
+    'slip2goApiSecret',
+    'paymentQrUrl'
+  ];
+  const clean = Object.fromEntries(
+    supported
+      .filter((key) => Object.hasOwn(payload, key))
+      .map((key) => [key, payload[key]])
+  );
+
+  const { response, data } = await legacyJson(request, '/api/admin/settings', {
+    method: 'POST',
+    body: JSON.stringify(clean)
+  });
+  return json(data, response.status);
+}
+
+async function getAdminSettings(request) {
+  const overview = await adminOverview(request);
+  if (overview.errorResponse) return overview.errorResponse;
+  const data = overview.data;
+
+  return json({
+    siteName: data.siteName || '',
+    botName: data.botName || '',
+    botUrl: data.downloadUrl || '',
+    downloadUrl: data.downloadUrl || '',
+    promptPayNumber: data.promptpayNumber || '',
+    promptPayAccountName: data.promptpayLabel || '',
+    slipReceiverName: data.slipReceiverName || '',
+    promptPayQrUrl: data.paymentQrUrl || '',
+    plans: data.plans || {},
+    slip2goConfigured: Boolean(data.slip2goConfigured)
+  });
+}
+
+async function publicSettings(request) {
+  const { response, data } = await legacyJson(request, '/api/public/config', {
+    method: 'GET',
+    includeContentType: false
+  });
+  if (!response.ok) return json(data, response.status);
+
+  return json({
+    siteName: data.siteName || '',
+    botName: data.botName || '',
+    botUrl: data.downloadUrl || '',
+    downloadUrl: data.downloadUrl || '',
+    promptPayNumber: data.promptpayNumber || '',
+    promptPayAccountName: data.promptpayLabel || '',
+    promptPayQrUrl: data.paymentQrUrl || '',
+    plans: data.plans || {},
+    creditRate: Number(data.creditRate || 1)
+  });
+}
+
+async function massCompensation(request) {
+  const payload = await readJson(request);
+  const days = Number(payload.days);
+  if (!Number.isInteger(days) || days < 1 || days > 365) {
+    return json({ error: 'จำนวนวันต้องเป็นเลขเต็ม 1-365 วัน' }, 400);
+  }
+
+  const overview = await adminOverview(request);
+  if (overview.errorResponse) return overview.errorResponse;
+  const memberCodes = (overview.data.members || [])
+    .map((member) => String(member.member_code || ''))
+    .filter(Boolean);
+
+  let updated = 0;
+  const failures = [];
+  for (let index = 0; index < memberCodes.length; index += 8) {
+    const batch = memberCodes.slice(index, index + 8);
+    const results = await Promise.all(batch.map(async (memberCode) => {
+      const { response, data } = await legacyJson(request, '/api/admin/license', {
+        method: 'POST',
+        body: JSON.stringify({ memberCode, action: 'activate', days })
+      });
+      return { memberCode, ok: response.ok, error: data.error };
+    }));
+
+    for (const result of results) {
+      if (result.ok) updated += 1;
+      else failures.push(result);
+    }
+  }
+
+  return json({
+    ok: failures.length === 0,
+    updated,
+    failed: failures.length,
+    message: `เพิ่มเวลา ${days} วันให้สมาชิก ${updated} คนแล้ว`
+  }, failures.length ? 207 : 200);
 }
 
 async function memberMe(request) {
@@ -373,6 +706,33 @@ export default {
       }
       if (path === 'topup/verify-slip' && request.method === 'POST') {
         return verifyLegacyTopup(request);
+      }
+      if (path === 'settings' && request.method === 'GET') {
+        return publicSettings(request);
+      }
+      if (path === 'admin/users' && request.method === 'GET') {
+        return adminUsers(request);
+      }
+      if (path === 'admin/topups' && request.method === 'GET') {
+        return adminTopups(request);
+      }
+      if (path === 'admin/stats' && request.method === 'GET') {
+        return adminStats(request);
+      }
+      if (path.startsWith('admin/users/') && request.method === 'PATCH') {
+        return updateAdminUser(request, path);
+      }
+      if (path.startsWith('admin/topups/') && request.method === 'PATCH') {
+        return updateAdminTopup(request, path);
+      }
+      if (path === 'admin/settings' && request.method === 'POST') {
+        return saveAdminSettings(request);
+      }
+      if (path === 'admin/settings' && request.method === 'GET') {
+        return getAdminSettings(request);
+      }
+      if (path === 'admin/mass-compensation' && request.method === 'POST') {
+        return massCompensation(request);
       }
 
       return forwardToRender(request, requestUrl, path);

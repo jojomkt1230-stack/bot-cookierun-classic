@@ -29,7 +29,7 @@ window.showSection = function(sectionId) {
   if (sectionId === 'activity') renderActivityHistory();
   if (sectionId === 'admin') initAdminPanel();
   if (sectionId === 'tutorial') renderTutorialSteps(getSystemSettings().steps || []);
-  if (sectionId === 'topup') applySystemSettingsToUI();
+  if (sectionId === 'topup') loadSystemSettings(false);
 };
 
 const DEFAULT_API_BASE_URL = window.location.hostname.endsWith('.vercel.app')
@@ -47,6 +47,16 @@ function getApiErrorMessage(error, fallbackMessage) {
     || responseData?.details?.message
     || error?.message
     || fallbackMessage;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[character]);
 }
 
 function getAuthHeaders() {
@@ -153,13 +163,19 @@ function initThreeJS() {
 // 2. SYSTEM SETTINGS AND LOCAL STORAGE
 const DEFAULT_SETTINGS = {
   botStatus: 'online',
-  announcement: 'ยินดีต้อนรับสู่ CKRCS Bot Classic! 1 บาท = 1 เพชร',
-  promptPayNumber: '0655611571',
-  promptPayAccountName: 'กรุณาตั้งชื่อบัญชี',
-  promptPayQrUrl: 'cookierun-world.png',
+  announcement: '',
+  promptPayNumber: '',
+  promptPayAccountName: '',
+  promptPayQrUrl: '',
   botName: 'CKRCS Bot Classic',
-  botVersion: 'v2.9.0',
-  botUrl: 'https://drive.google.com/file/d/ckrcs_bot_v29/view',
+  siteName: 'CKRCS BOT',
+  botUrl: '',
+  plans: {
+    day1: { label: '1 วัน', days: 1, price: 15 },
+    day3: { label: '3 วัน', days: 3, price: 40 },
+    day7: { label: '7 วัน', days: 7, price: 100 },
+    month1: { label: '30 วัน', days: 30, price: 300 }
+  },
   videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
   steps: [
     'สมัครสมาชิกและเข้าสู่ระบบด้วยบัญชีของคุณ',
@@ -169,17 +185,36 @@ const DEFAULT_SETTINGS = {
   ]
 };
 
+let systemSettings = { ...DEFAULT_SETTINGS };
+
 function getSystemSettings() {
   const saved = localStorage.getItem('systemSettings');
   if (saved) {
-    try { return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }; } catch (e) {}
+    try {
+      systemSettings = { ...systemSettings, ...JSON.parse(saved) };
+    } catch (e) {}
   }
-  return DEFAULT_SETTINGS;
+  return systemSettings;
 }
 
 function saveSystemSettings(settings) {
-  localStorage.setItem('systemSettings', JSON.stringify(settings));
+  systemSettings = { ...systemSettings, ...settings };
+  localStorage.setItem('systemSettings', JSON.stringify(systemSettings));
   applySystemSettingsToUI();
+}
+
+async function loadSystemSettings(useAdminEndpoint = false) {
+  try {
+    const config = useAdminEndpoint ? adminApiConfig() : {};
+    const endpoint = useAdminEndpoint ? 'admin/settings' : 'settings';
+    const response = await axios.get(`${API_BASE_URL}/${endpoint}`, config);
+    saveSystemSettings({ ...getSystemSettings(), ...response.data });
+  } catch (error) {
+    console.warn('[SETTINGS] ใช้ค่าที่บันทึกไว้ชั่วคราว:', error?.message || error);
+    applySystemSettingsToUI();
+    if (useAdminEndpoint) throw error;
+  }
+  return getSystemSettings();
 }
 
 function applySystemSettingsToUI() {
@@ -190,26 +225,40 @@ function applySystemSettingsToUI() {
   const ppName = document.getElementById('promptpay-account-name');
   const qrImg = document.getElementById('qr-code-img');
 
-  if (ppNum) ppNum.textContent = settings.promptPayNumber || '0655611571';
-  if (ppName) ppName.textContent = `ชื่อบัญชี: ${settings.promptPayAccountName || 'กรุณาตั้งชื่อบัญชี'}`;
-  if (qrImg) qrImg.src = settings.promptPayQrUrl || 'cookierun-world.png';
+  if (ppNum) ppNum.textContent = settings.promptPayNumber || '-';
+  if (ppName) ppName.textContent = `ชื่อบัญชี: ${settings.promptPayAccountName || '-'}`;
+  if (qrImg && settings.promptPayQrUrl) qrImg.src = settings.promptPayQrUrl;
+
+  const downloadLink = document.getElementById('download-link');
+  const downloadWarning = document.getElementById('download-warning');
+  const botNameDisplay = document.getElementById('bot-name-display');
+  if (botNameDisplay) botNameDisplay.textContent = settings.botName || 'CKRCS Bot';
+  if (downloadLink) {
+    downloadLink.href = settings.botUrl || '#';
+    downloadLink.classList.toggle('disabled', !settings.botUrl);
+  }
+  if (downloadWarning) downloadWarning.classList.toggle('hidden', Boolean(settings.botUrl));
 
   // System Settings Panel Inputs
   const sysBotStatus = document.getElementById('sys-bot-status');
   const sysAnnounce = document.getElementById('sys-announcement');
   const sysPP = document.getElementById('sys-promptpay');
   const sysPPName = document.getElementById('sys-promptpay-name');
+  const sysSlipReceiver = document.getElementById('sys-slip-receiver');
+  const sysQrUrl = document.getElementById('sys-qr-url');
+  const sysSiteName = document.getElementById('sys-site-name');
   const sysBotName = document.getElementById('sys-bot-name');
-  const sysBotVer = document.getElementById('sys-bot-version');
   const sysBotUrl = document.getElementById('sys-bot-url');
   const sysVidUrl = document.getElementById('sys-video-url');
 
   if (sysBotStatus) sysBotStatus.value = settings.botStatus || 'online';
   if (sysAnnounce) sysAnnounce.value = settings.announcement || '';
-  if (sysPP) sysPP.value = settings.promptPayNumber || '0655611571';
-  if (sysPPName) sysPPName.value = settings.promptPayAccountName || 'กรุณาตั้งชื่อบัญชี';
+  if (sysPP) sysPP.value = settings.promptPayNumber || '';
+  if (sysPPName) sysPPName.value = settings.promptPayAccountName || '';
+  if (sysSlipReceiver) sysSlipReceiver.value = settings.slipReceiverName || '';
+  if (sysQrUrl) sysQrUrl.value = settings.promptPayQrUrl || '';
+  if (sysSiteName) sysSiteName.value = settings.siteName || '';
   if (sysBotName) sysBotName.value = settings.botName || '';
-  if (sysBotVer) sysBotVer.value = settings.botVersion || '';
   if (sysBotUrl) sysBotUrl.value = settings.botUrl || '';
   if (sysVidUrl) sysVidUrl.value = settings.videoUrl || '';
 
@@ -218,6 +267,47 @@ function applySystemSettingsToUI() {
   if (tutIframe && settings.videoUrl) tutIframe.src = settings.videoUrl;
 
   renderTutorialSteps(settings.steps || []);
+  renderPackagePlans(settings.plans || {});
+}
+
+function renderPackagePlans(plans) {
+  const grid = document.getElementById('packages-grid');
+  if (!grid) return;
+
+  const styles = {
+    day1: { icon: '📦', card: '', text: '', badge: '', button: '' },
+    day3: { icon: '🎁', card: '', text: '', badge: '', button: '' },
+    day7: { icon: '👑', card: 'highlight-gold', text: 'gold-text', badge: 'gold-badge', button: 'gold-btn' },
+    month1: { icon: '💎', card: 'highlight-purple', text: 'purple-text', badge: 'purple-badge', button: 'purple-btn' }
+  };
+
+  const validPlans = ['day1', 'day3', 'day7', 'month1']
+    .map((id) => ({ id, ...plans[id] }))
+    .filter((plan) => Number.isInteger(Number(plan.days)) && Number.isInteger(Number(plan.price)));
+
+  if (!validPlans.length) {
+    grid.innerHTML = '<div class="empty-state">ยังไม่มีแพ็กเกจที่พร้อมใช้งาน</div>';
+    return;
+  }
+
+  grid.innerHTML = validPlans.map((plan) => {
+    const style = styles[plan.id];
+    const days = Number(plan.days);
+    const price = Number(plan.price);
+    return `
+      <div class="pkg-card ${style.card}">
+        <div class="pkg-title ${style.text}">${escapeHtml(plan.label || `${days} วัน`)}</div>
+        <div class="pkg-price ${style.text}">${price.toLocaleString('th-TH')} เพชร</div>
+        <div class="pkg-chest-container">
+          <div class="chest-box">
+            <span class="chest-icon">${style.icon}</span>
+            <span class="chest-badge ${style.badge}">${days}</span>
+          </div>
+        </div>
+        <button class="btn-redeem ${style.button}" onclick="rentBot(${days}, ${price})">แลกวัน</button>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderTutorialSteps(steps) {
@@ -295,7 +385,9 @@ window.showToast = function(msg, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>${msg}</span>`;
+  const message = document.createElement('span');
+  message.textContent = String(msg ?? '');
+  toast.appendChild(message);
   container.appendChild(toast);
 
   setTimeout(() => {
@@ -390,6 +482,7 @@ window.handleLogin = async function(event) {
     currentUser = user;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('authSessionVersion', 'legacy-admin-v2');
     if (passwordEl) passwordEl.value = '';
     window.showPage('dashboard-page');
     initDashboard();
@@ -491,7 +584,7 @@ window.handleLogout = function() {
 let liveCountdownInterval = null;
 let pendingRedeem = null;
 
-function initDashboard() {
+function initDashboard(skipRefresh = false) {
   const userStr = localStorage.getItem('user');
   if (userStr) {
     try { currentUser = JSON.parse(userStr); } catch (e) {}
@@ -535,6 +628,24 @@ function initDashboard() {
 
   applySystemSettingsToUI();
   startLiveCountdownTicker();
+
+  if (!skipRefresh && currentUser.role !== 'admin') {
+    axios.get(`${API_BASE_URL}/users/me`, { headers: getAuthHeaders() })
+      .then((response) => {
+        currentUser = { ...currentUser, ...response.data };
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        initDashboard(true);
+      })
+      .catch((error) => {
+        if (error?.response?.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          currentUser = null;
+          window.showPage('auth-page');
+          window.showToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่', 'error');
+        }
+      });
+  }
 }
 
 window.rentBot = function(days, price) {
@@ -858,15 +969,22 @@ window.switchAdminTab = function(tabName) {
   const activeTabBtn = document.querySelector(`.admin-tab[onclick*="${tabName}"]`);
   if (activeTabBtn) activeTabBtn.classList.add('active');
 
-  if (tabName === 'overview') updateAdminPanelStats();
+  if (tabName === 'stats') updateAdminPanelStats();
   if (tabName === 'users') reloadAdminData().then(renderAdminUsersTable).catch(() => {});
   if (tabName === 'topups') reloadAdminData().then(renderAdminTopupsTable).catch(() => {});
-  if (tabName === 'system') applySystemSettingsToUI();
+  if (tabName === 'system') {
+    loadSystemSettings(true).catch((error) => {
+      window.showToast(getApiErrorMessage(error, 'โหลดการตั้งค่าจริงไม่สำเร็จ'), 'error');
+    });
+  }
 };
 
 async function initAdminPanel() {
-  await reloadAdminData().catch(() => {});
-  await updateAdminPanelStats();
+  await Promise.all([
+    reloadAdminData(),
+    loadSystemSettings(true)
+  ]).catch(() => {});
+  await updateAdminPanelStats().catch(() => {});
   renderAdminUsersTable();
   renderAdminTopupsTable();
   applySystemSettingsToUI();
@@ -898,7 +1016,10 @@ function renderAdminUsersTable() {
 
   const users = adminUsers;
   const searchVal = (document.getElementById('user-search')?.value || '').toLowerCase();
-  const filtered = users.filter(u => u.username.toLowerCase().includes(searchVal));
+  const filtered = users.filter((u) =>
+    String(u.username || '').toLowerCase().includes(searchVal)
+    || String(u.memberCode || '').toLowerCase().includes(searchVal)
+  );
 
   if (filtered.length === 0) {
     container.innerHTML = `
@@ -924,13 +1045,15 @@ function renderAdminUsersTable() {
       <tbody>
         ${filtered.map(u => `
           <tr style="border-bottom:1px solid rgba(0,212,255,0.15);">
-            <td style="padding:12px; font-weight:700;">${u.username}</td>
+            <td style="padding:12px; font-weight:700;">
+              ${escapeHtml(u.username)}
+              <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(u.memberCode)}</div>
+            </td>
             <td style="padding:12px;"><span style="padding:4px 8px; border-radius:12px; font-size:0.8rem; background:${u.role === 'admin' ? 'rgba(255,170,0,0.2)' : 'rgba(0,212,255,0.2)'}; color:${u.role === 'admin' ? '#ffcc00' : 'var(--primary)'}">${u.role === 'admin' ? '👑 แอดมิน' : '👤 สมาชิก'}</span></td>
             <td style="padding:12px; color:var(--accent); font-weight:700;">${u.diamonds || 0}</td>
             <td style="padding:12px; font-size:0.85rem;">${u.botExpiry ? new Date(u.botExpiry).toLocaleString('th-TH') : 'ยังไม่ได้เช่า'}</td>
             <td style="padding:12px; text-align:right;">
-              <button onclick="openEditUserModal('${u._id}')" style="background:rgba(0,212,255,0.2); color:var(--primary); border:1px solid var(--primary); padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer; margin-right:6px;">✏️ แก้ไข</button>
-              ${u.role !== 'admin' ? `<button onclick="deleteUser('${u._id}')" style="background:rgba(255,51,102,0.2); color:var(--danger); border:1px solid var(--danger); padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer;">🗑️ ลบ</button>` : ''}
+              <button onclick="openEditUserModal('${encodeURIComponent(u._id)}')" style="background:rgba(0,212,255,0.2); color:var(--primary); border:1px solid var(--primary); padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer;">✏️ จัดการ</button>
             </td>
           </tr>
         `).join('')}
@@ -944,6 +1067,7 @@ window.searchUsers = function() {
 };
 
 window.openEditUserModal = function(userId) {
+  userId = decodeURIComponent(userId);
   const users = adminUsers;
   const user = users.find(u => u._id === userId || u.username === userId);
   if (!user) return;
@@ -955,7 +1079,10 @@ window.openEditUserModal = function(userId) {
   const addTimeInput = document.getElementById('edit-user-add-time');
 
   if (idInput) idInput.value = user._id || user.username;
-  if (userInput) userInput.value = user.username;
+  if (userInput) {
+    userInput.value = user.username;
+    userInput.readOnly = true;
+  }
   if (passInput) passInput.value = '';
   if (diaInput) diaInput.value = user.diamonds || 0;
   if (addTimeInput) addTimeInput.value = '';
@@ -968,27 +1095,35 @@ window.saveEditedUser = async function() {
   const newUsername = document.getElementById('edit-user-username')?.value.trim();
   const newDiamonds = parseInt(document.getElementById('edit-user-diamonds')?.value || 0);
   const addTime = parseInt(document.getElementById('edit-user-add-time')?.value || 0);
-  const timeUnit = document.getElementById('edit-user-time-unit')?.value || 'hours';
   const newPassword = document.getElementById('edit-user-password')?.value || '';
 
   if (!userId || !newUsername) return;
+  if (!Number.isInteger(newDiamonds) || newDiamonds < 0 || newDiamonds > 1000000) {
+    window.showToast('จำนวนเครดิตต้องเป็นเลขเต็ม 0-1,000,000', 'error');
+    return;
+  }
+  if (addTime < 0 || addTime > 365) {
+    window.showToast('จำนวนวันต้องอยู่ระหว่าง 0-365 วัน', 'error');
+    return;
+  }
+  if (newPassword && (newPassword.length < 8 || newPassword.length > 128)) {
+    window.showToast('รหัสผ่านใหม่ต้องยาว 8-128 ตัวอักษร', 'error');
+    return;
+  }
 
   try {
     const user = adminUsers.find(item => item._id === userId);
     const requests = [];
-    if (user?.username !== newUsername) requests.push(
-      axios.patch(`${API_BASE_URL}/admin/users/${userId}`, { username: newUsername }, adminApiConfig())
-    );
     if (Number(user?.diamonds || 0) !== newDiamonds) requests.push(
-      axios.patch(`${API_BASE_URL}/admin/users/${userId}/diamonds`, { diamonds: newDiamonds }, adminApiConfig())
+      axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/diamonds`, { diamonds: newDiamonds }, adminApiConfig())
     );
     if (addTime > 0) requests.push(
-      axios.patch(`${API_BASE_URL}/admin/users/${userId}/days`, {
-        days: timeUnit === 'days' ? addTime : addTime / 24
+      axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/days`, {
+        days: addTime
       }, adminApiConfig())
     );
     if (newPassword) requests.push(
-      axios.patch(`${API_BASE_URL}/admin/users/${userId}/reset-password`, { newPassword }, adminApiConfig())
+      axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/reset-password`, { newPassword }, adminApiConfig())
     );
     await Promise.all(requests);
     await reloadAdminData();
@@ -999,70 +1134,27 @@ window.saveEditedUser = async function() {
   } catch (error) {
     window.showToast(getApiErrorMessage(error, 'บันทึกข้อมูลสมาชิกไม่สำเร็จ'), 'error');
   }
-  return;
-
-  const users = getRegisteredUsers();
-  const idx = users.findIndex(u => u._id === userId);
-  if (idx === -1) return;
-
-  users[idx].username = newUsername;
-  users[idx].diamonds = newDiamonds;
-
-  if (addTime > 0) {
-    const currentExp = users[idx].botExpiry ? new Date(users[idx].botExpiry).getTime() : Date.now();
-    const base = Math.max(Date.now(), currentExp);
-    const multiplier = timeUnit === 'days' ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
-    users[idx].botExpiry = new Date(base + addTime * multiplier).toISOString();
-  }
-
-  saveRegisteredUsers(users);
-
-  if (currentUser && currentUser._id === userId) {
-    currentUser = users[idx];
-    localStorage.setItem('user', JSON.stringify(currentUser));
-    initDashboard();
-  }
-
-  window.closeModal('user-modal');
-  renderAdminUsersTable();
-  updateAdminPanelStats();
-  window.showToast('บันทึกข้อมูลสมาชิกสำเร็จ', 'success');
 };
 
 window.deleteSelectedUser = function() {
-  const userId = document.getElementById('edit-user-id')?.value;
-  if (userId) window.deleteUser(userId);
+  window.showToast('ระบบฐานข้อมูลเดิมไม่รองรับการลบสมาชิกจากหน้าเว็บ', 'error');
 };
 
-window.deleteUser = async function(userId) {
-  const users = adminUsers;
-  const user = users.find(u => u._id === userId);
-  if (!user) return;
-
-  if (user.role === 'admin') {
-    window.showToast('ไม่สามารถลบบัญชีผู้ดูแลระบบได้', 'error');
-    return;
-  }
-
-  if (confirm(`ยืนยันการลบสมาชิก "${user.username}" ใช่หรือไม่?`)) {
-    try {
-      await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, adminApiConfig());
-      await reloadAdminData();
-      window.closeModal('user-modal');
-      renderAdminUsersTable();
-      await updateAdminPanelStats();
-      window.showToast(`ลบสมาชิก "${user.username}" แล้ว`, 'info');
-    } catch (error) {
-      window.showToast(getApiErrorMessage(error, 'ลบสมาชิกไม่สำเร็จ'), 'error');
-    }
-    return;
-    const updated = users.filter(u => u._id !== userId);
-    saveRegisteredUsers(updated);
-
-    window.closeModal('user-modal');
+window.resetSelectedDevice = async function() {
+  const userId = document.getElementById('edit-user-id')?.value;
+  if (!userId) return;
+  try {
+    await axios.patch(
+      `${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/reset-device`,
+      {},
+      adminApiConfig()
+    );
+    await reloadAdminData();
     renderAdminUsersTable();
-    updateAdminPanelStats();
-    window.showToast(`ลบสมาชิก "${user.username}" แล้ว`, 'info');
+    window.closeModal('user-modal');
+    window.showToast('รีเซ็ตเครื่องสมาชิกเรียบร้อยแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'รีเซ็ตเครื่องไม่สำเร็จ'), 'error');
   }
 };
 
@@ -1099,18 +1191,18 @@ function renderAdminTopupsTable() {
       <tbody>
         ${filtered.map(t => `
           <tr style="border-bottom:1px solid rgba(0,212,255,0.15);">
-            <td style="padding:10px; font-weight:700;">${t.username}</td>
+            <td style="padding:10px; font-weight:700;">${escapeHtml(t.username)}</td>
             <td style="padding:10px; color:var(--accent); font-weight:700;">${t.amount} บาท</td>
             <td style="padding:10px; font-weight:700;">${t.diamonds}</td>
-            <td style="padding:10px; font-size:0.85rem;">${t.slipRef || t.orderId || '-'}</td>
-            <td style="padding:10px; font-size:0.85rem;">${new Date(t.createdAt).toLocaleString('th-TH')}</td>
+            <td style="padding:10px; font-size:0.85rem;">${escapeHtml(t.slipRef || t.orderId || '-')}</td>
+            <td style="padding:10px; font-size:0.85rem;">${t.createdAt ? new Date(t.createdAt).toLocaleString('th-TH') : '-'}</td>
             <td style="padding:10px;">
-              <span style="padding:4px 8px; border-radius:12px; font-size:0.8rem; background:${t.status === 'approved' ? 'rgba(0,255,170,0.2)' : 'rgba(255,51,102,0.2)'}; color:${t.status === 'approved' ? 'var(--accent)' : 'var(--danger)'}">
-                ${t.status === 'approved' ? '✅ อนุมัติแล้ว' : '❌ ไม่ผ่าน'}
+              <span style="padding:4px 8px; border-radius:12px; font-size:0.8rem; background:${t.status === 'approved' ? 'rgba(0,255,170,0.2)' : t.status === 'pending' ? 'rgba(255,190,0,0.2)' : 'rgba(255,51,102,0.2)'}; color:${t.status === 'approved' ? 'var(--accent)' : t.status === 'pending' ? '#ffd34e' : 'var(--danger)'}">
+                ${t.status === 'approved' ? '✅ อนุมัติแล้ว' : t.status === 'pending' ? '⏳ รอตรวจสอบ' : '❌ ปฏิเสธ'}
               </span>
               ${['pending', 'pending_review'].includes(t.status) ? `
-                <button onclick="processTopup('${t._id}', 'approved', ${Number(t.diamonds || t.amount || 0)})">อนุมัติ</button>
-                <button onclick="processTopup('${t._id}', 'rejected', 0)">ปฏิเสธ</button>
+                <button onclick="processTopup('${encodeURIComponent(t._id)}', 'approved', ${Number(t.diamonds || t.amount || 0)})">อนุมัติ</button>
+                <button onclick="processTopup('${encodeURIComponent(t._id)}', 'rejected', 0)">ปฏิเสธ</button>
               ` : ''}
             </td>
           </tr>
@@ -1126,8 +1218,9 @@ window.loadAdminTopups = async function() {
 };
 
 window.processTopup = async function(topupId, status, diamonds) {
+  topupId = decodeURIComponent(topupId);
   try {
-    await axios.patch(`${API_BASE_URL}/admin/topups/${topupId}`, {
+    await axios.patch(`${API_BASE_URL}/admin/topups/${encodeURIComponent(topupId)}`, {
       status,
       diamonds,
       adminNote: status === 'approved' ? 'อนุมัติผ่านแผงผู้ดูแล' : 'ปฏิเสธผ่านแผงผู้ดูแล'
@@ -1141,114 +1234,86 @@ window.processTopup = async function(topupId, status, diamonds) {
   }
 };
 
-window.saveSetting = function(key, val) {
-  const settings = getSystemSettings();
-  settings[key] = val;
-  saveSystemSettings(settings);
-  window.showToast('บันทึกการตั้งค่าสำเร็จ', 'success');
-};
-
-window.savePromptPaySettings = function() {
+window.savePromptPaySettings = async function() {
   const ppNum = document.getElementById('sys-promptpay')?.value.trim();
   const ppName = document.getElementById('sys-promptpay-name')?.value.trim();
+  const receiverName = document.getElementById('sys-slip-receiver')?.value.trim();
+  const qrUrl = document.getElementById('sys-qr-url')?.value.trim() || '';
 
-  const settings = getSystemSettings();
-  if (ppNum) settings.promptPayNumber = ppNum;
-  if (ppName) settings.promptPayAccountName = ppName;
-
-  saveSystemSettings(settings);
-  window.showToast('บันทึกข้อมูล PromptPay สำเร็จ', 'success');
-};
-
-window.handleAdminQrUpload = function(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const dataUrl = e.target.result;
-    const settings = getSystemSettings();
-    settings.promptPayQrUrl = dataUrl;
-    saveSystemSettings(settings);
-
-    const prevImg = document.getElementById('admin-qr-preview');
-    if (prevImg) {
-      prevImg.src = dataUrl;
-      prevImg.style.display = 'block';
-    }
-    window.showToast('อัปโหลด QR Code PromptPay สำเร็จ', 'success');
-  };
-  reader.readAsDataURL(file);
-};
-
-window.saveBotInfo = function() {
-  const name = document.getElementById('sys-bot-name')?.value.trim();
-  const ver = document.getElementById('sys-bot-version')?.value.trim();
-  const url = document.getElementById('sys-bot-url')?.value.trim();
-
-  const settings = getSystemSettings();
-  if (name) settings.botName = name;
-  if (ver) settings.botVersion = ver;
-  if (url) settings.botUrl = url;
-
-  saveSystemSettings(settings);
-  window.showToast('บันทึกข้อมูลบอทสำเร็จ', 'success');
-};
-
-window.massCompensation = async function() {
-  const timeInput = document.getElementById('comp-time');
-  const unitSelect = document.getElementById('comp-unit');
-  const noteInput = document.getElementById('comp-note');
-
-  const addTime = parseInt(timeInput?.value || 0);
-  const unit = unitSelect?.value || 'hours';
-
-  if (addTime <= 0) {
-    window.showToast('กรุณาระบุระยะเวลาชดเชยให้ถูกต้อง', 'error');
+  if (!ppNum || !ppName || !receiverName) {
+    window.showToast('กรุณากรอกข้อมูลพร้อมเพย์และชื่อผู้รับให้ครบ', 'error');
+    return;
+  }
+  if (qrUrl && !qrUrl.startsWith('https://')) {
+    window.showToast('ลิงก์รูป QR ต้องขึ้นต้นด้วย https://', 'error');
     return;
   }
 
   try {
-    const days = unit === 'days' ? addTime : addTime / 24;
+    await axios.post(`${API_BASE_URL}/admin/settings`, {
+      promptpayNumber: ppNum,
+      promptpayLabel: ppName,
+      slipReceiverName: receiverName,
+      paymentQrUrl: qrUrl
+    }, adminApiConfig());
+    await loadSystemSettings(true);
+    window.showToast('บันทึกข้อมูลพร้อมเพย์ลงฐานข้อมูลแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'บันทึกข้อมูลพร้อมเพย์ไม่สำเร็จ'), 'error');
+  }
+};
+
+window.saveBotInfo = async function() {
+  const siteName = document.getElementById('sys-site-name')?.value.trim();
+  const name = document.getElementById('sys-bot-name')?.value.trim();
+  const url = document.getElementById('sys-bot-url')?.value.trim();
+
+  if (!siteName || !name) {
+    window.showToast('กรุณากรอกชื่อเว็บไซต์และชื่อบอท', 'error');
+    return;
+  }
+  if (url && !url.startsWith('https://')) {
+    window.showToast('ลิงก์ดาวน์โหลดต้องขึ้นต้นด้วย https://', 'error');
+    return;
+  }
+
+  try {
+    await axios.post(`${API_BASE_URL}/admin/settings`, {
+      siteName,
+      botName: name,
+      downloadUrl: url || ''
+    }, adminApiConfig());
+    await loadSystemSettings(true);
+    window.showToast('บันทึกข้อมูลเว็บไซต์และบอทลงฐานข้อมูลแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'บันทึกข้อมูลบอทไม่สำเร็จ'), 'error');
+  }
+};
+
+window.massCompensation = async function() {
+  const timeInput = document.getElementById('comp-time');
+  const noteInput = document.getElementById('comp-note');
+
+  const addTime = parseInt(timeInput?.value || 0);
+
+  if (!Number.isInteger(addTime) || addTime < 1 || addTime > 365) {
+    window.showToast('กรุณาระบุจำนวนวัน 1-365 วัน', 'error');
+    return;
+  }
+
+  try {
     await axios.post(`${API_BASE_URL}/admin/mass-compensation`, {
-      days,
+      days: addTime,
       note: noteInput?.value.trim() || ''
     }, adminApiConfig());
     if (timeInput) timeInput.value = '';
     if (noteInput) noteInput.value = '';
     await reloadAdminData();
     await updateAdminPanelStats();
-    window.showToast(`ชดเชยเวลา ${addTime} ${unit === 'days' ? 'วัน' : 'ชั่วโมง'} สำเร็จ`, 'success');
+    window.showToast(`ชดเชยเวลา ${addTime} วันสำเร็จ`, 'success');
   } catch (error) {
     window.showToast(getApiErrorMessage(error, 'ชดเชยเวลาไม่สำเร็จ'), 'error');
   }
-  return;
-
-  const addedMs = unit === 'hours' ? addTime * 60 * 60 * 1000 : addTime * 24 * 60 * 60 * 1000;
-
-  const users = getRegisteredUsers();
-  users.forEach(u => {
-    const currentExp = u.botExpiry ? new Date(u.botExpiry).getTime() : Date.now();
-    const base = Math.max(Date.now(), currentExp);
-    u.botExpiry = new Date(base + addedMs).toISOString();
-  });
-
-  saveRegisteredUsers(users);
-
-  if (currentUser) {
-    const me = users.find(u => u.username === currentUser.username);
-    if (me) {
-      currentUser = me;
-      localStorage.setItem('user', JSON.stringify(currentUser));
-      initDashboard();
-    }
-  }
-
-  if (timeInput) timeInput.value = '';
-  if (noteInput) noteInput.value = '';
-
-  const unitText = unit === 'hours' ? 'ชั่วโมง' : 'วัน';
-  window.showToast(`ชดเชยเวลา ${addTime} ${unitText} ให้สมาชิกแล้ว`, 'success');
 };
 
 // 9. DOM READY INITIALIZATION
@@ -1264,9 +1329,24 @@ document.addEventListener('DOMContentLoaded', () => {
     saveRegisteredUsers(getRegisteredUsers());
   }
   initThreeJS();
+  loadSystemSettings(false);
 
-  const token = localStorage.getItem('token');
-  const user = localStorage.getItem('user');
+  let token = localStorage.getItem('token');
+  let user = localStorage.getItem('user');
+
+  if (token && user) {
+    try {
+      const savedUser = JSON.parse(user);
+      const staleAdminSession = savedUser?.role === 'admin'
+        && localStorage.getItem('authSessionVersion') !== 'legacy-admin-v2';
+      if (staleAdminSession) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        token = null;
+        user = null;
+      }
+    } catch (e) {}
+  }
 
   if (token && user) {
     try {
@@ -1274,7 +1354,8 @@ document.addEventListener('DOMContentLoaded', () => {
       window.showPage('dashboard-page');
       initDashboard();
     } catch (e) {
-      localStorage.clear();
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       window.showPage('auth-page');
     }
   } else {
