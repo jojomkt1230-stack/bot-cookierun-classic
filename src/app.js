@@ -176,7 +176,8 @@ const DEFAULT_SETTINGS = {
     day7: { label: '7 วัน', days: 7, price: 100 },
     month1: { label: '30 วัน', days: 30, price: 300 }
   },
-  videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+  videoUrl: '',
+  tutorialColor: 'cyan',
   steps: [
     'สมัครสมาชิกและเข้าสู่ระบบด้วยบัญชีของคุณ',
     'เติมเงินผ่าน PromptPay และแนบรูปสลิปที่ถูกต้อง',
@@ -224,10 +225,17 @@ function applySystemSettingsToUI() {
   const ppNum = document.getElementById('promptpay-number');
   const ppName = document.getElementById('promptpay-account-name');
   const qrImg = document.getElementById('qr-code-img');
+  const announcementBox = document.getElementById('home-announcement');
+  const announcementText = document.getElementById('home-announcement-text');
 
   if (ppNum) ppNum.textContent = settings.promptPayNumber || '-';
   if (ppName) ppName.textContent = `ชื่อบัญชี: ${settings.promptPayAccountName || '-'}`;
-  if (qrImg && settings.promptPayQrUrl) qrImg.src = settings.promptPayQrUrl;
+  if (qrImg) {
+    qrImg.src = settings.promptPayQrUrl || '';
+    qrImg.classList.toggle('hidden', !settings.promptPayQrUrl);
+  }
+  if (announcementBox) announcementBox.classList.toggle('hidden', !settings.announcement);
+  if (announcementText) announcementText.textContent = settings.announcement || '';
 
   const downloadLink = document.getElementById('download-link');
   const downloadWarning = document.getElementById('download-warning');
@@ -240,34 +248,60 @@ function applySystemSettingsToUI() {
   if (downloadWarning) downloadWarning.classList.toggle('hidden', Boolean(settings.botUrl));
 
   // System Settings Panel Inputs
-  const sysBotStatus = document.getElementById('sys-bot-status');
   const sysAnnounce = document.getElementById('sys-announcement');
   const sysPP = document.getElementById('sys-promptpay');
   const sysPPName = document.getElementById('sys-promptpay-name');
   const sysSlipReceiver = document.getElementById('sys-slip-receiver');
   const sysQrUrl = document.getElementById('sys-qr-url');
-  const sysSiteName = document.getElementById('sys-site-name');
+  const sysQrPreview = document.getElementById('admin-qr-preview');
   const sysBotName = document.getElementById('sys-bot-name');
   const sysBotUrl = document.getElementById('sys-bot-url');
   const sysVidUrl = document.getElementById('sys-video-url');
+  const sysTutorialColor = document.getElementById('sys-tutorial-color');
 
-  if (sysBotStatus) sysBotStatus.value = settings.botStatus || 'online';
   if (sysAnnounce) sysAnnounce.value = settings.announcement || '';
   if (sysPP) sysPP.value = settings.promptPayNumber || '';
   if (sysPPName) sysPPName.value = settings.promptPayAccountName || '';
   if (sysSlipReceiver) sysSlipReceiver.value = settings.slipReceiverName || '';
   if (sysQrUrl) sysQrUrl.value = settings.promptPayQrUrl || '';
-  if (sysSiteName) sysSiteName.value = settings.siteName || '';
+  if (sysQrPreview) {
+    sysQrPreview.src = settings.promptPayQrUrl || '';
+    sysQrPreview.classList.toggle('hidden', !settings.promptPayQrUrl);
+  }
   if (sysBotName) sysBotName.value = settings.botName || '';
   if (sysBotUrl) sysBotUrl.value = settings.botUrl || '';
   if (sysVidUrl) sysVidUrl.value = settings.videoUrl || '';
+  if (sysTutorialColor) sysTutorialColor.value = settings.tutorialColor || 'cyan';
 
   // Tutorial Video Iframe & Steps
   const tutIframe = document.getElementById('tutorial-iframe');
-  if (tutIframe && settings.videoUrl) tutIframe.src = settings.videoUrl;
+  const tutorialVideoBox = document.getElementById('tutorial-video-box');
+  const embedUrl = normalizeVideoEmbedUrl(settings.videoUrl);
+  if (tutIframe && embedUrl) tutIframe.src = embedUrl;
+  if (tutorialVideoBox) tutorialVideoBox.classList.toggle('hidden', !embedUrl);
 
-  renderTutorialSteps(settings.steps || []);
+  const visibleSteps = settings.steps?.length ? settings.steps : DEFAULT_SETTINGS.steps;
+  renderTutorialSteps(visibleSteps, settings.tutorialColor || 'cyan');
   renderPackagePlans(settings.plans || {});
+}
+
+function normalizeVideoEmbedUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.hostname === 'youtu.be') {
+      return `https://www.youtube.com/embed/${encodeURIComponent(url.pathname.slice(1))}`;
+    }
+    if (url.hostname.endsWith('youtube.com')) {
+      if (url.pathname.startsWith('/embed/')) return raw;
+      const videoId = url.searchParams.get('v');
+      if (videoId) return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`;
+    }
+    return raw;
+  } catch {
+    return '';
+  }
 }
 
 function renderPackagePlans(plans) {
@@ -310,15 +344,15 @@ function renderPackagePlans(plans) {
   }).join('');
 }
 
-function renderTutorialSteps(steps) {
+function renderTutorialSteps(steps, color = getSystemSettings().tutorialColor || 'cyan') {
   const stepsContainer = document.getElementById('tutorial-steps');
   const editorContainer = document.getElementById('steps-editor');
 
   if (stepsContainer) {
     stepsContainer.innerHTML = steps.map((step, idx) => `
-      <div class="step-card card-panel">
+      <div class="step-card card-panel tutorial-glow tutorial-glow-${escapeHtml(color)}">
         <div class="step-num">${idx + 1}</div>
-        <div class="step-text">${step}</div>
+        <div class="step-text">${escapeHtml(step)}</div>
       </div>
     `).join('');
   }
@@ -326,7 +360,7 @@ function renderTutorialSteps(steps) {
   if (editorContainer) {
     editorContainer.innerHTML = steps.map((step, idx) => `
       <div class="input-row" style="margin-bottom:8px">
-        <input type="text" value="${step}" class="admin-input step-edit-input" data-idx="${idx}" />
+        <input type="text" maxlength="100" value="${escapeHtml(step)}" class="admin-input step-edit-input" data-idx="${idx}" />
         <button class="btn-danger" onclick="deleteStep(${idx})" style="background:var(--danger); color:#fff; border:none; padding:6px 12px; border-radius:6px; font-weight:bold; cursor:pointer;">✕</button>
       </div>
     `).join('');
@@ -354,24 +388,56 @@ window.addStep = function() {
     return;
   }
   const settings = getSystemSettings();
-  settings.steps = [...(settings.steps || []), text];
+  const currentSteps = settings.steps?.length ? settings.steps : DEFAULT_SETTINGS.steps;
+  if (currentSteps.length >= 8) {
+    window.showToast('ใส่ได้ไม่เกิน 8 ขั้นตอน', 'error');
+    return;
+  }
+  settings.steps = [...currentSteps, text];
   saveSystemSettings(settings);
   input.value = '';
 };
 
 window.deleteStep = function(index) {
   const settings = getSystemSettings();
-  settings.steps = (settings.steps || []).filter((_, itemIndex) => itemIndex !== Number(index));
+  const currentSteps = settings.steps?.length ? settings.steps : DEFAULT_SETTINGS.steps;
+  settings.steps = currentSteps.filter((_, itemIndex) => itemIndex !== Number(index));
   saveSystemSettings(settings);
 };
 
-window.saveSteps = function() {
+window.saveTutorialSettings = async function() {
   const settings = getSystemSettings();
   settings.steps = [...document.querySelectorAll('.step-edit-input')]
     .map((input) => input.value.trim())
     .filter(Boolean);
   saveSystemSettings(settings);
-  window.showToast('บันทึกขั้นตอนสำเร็จ', 'success');
+  const videoUrl = document.getElementById('sys-video-url')?.value.trim() || '';
+  const tutorialColor = document.getElementById('sys-tutorial-color')?.value || 'cyan';
+
+  if (videoUrl && !videoUrl.startsWith('https://')) {
+    window.showToast('ลิงก์วิดีโอต้องขึ้นต้นด้วย https://', 'error');
+    return;
+  }
+
+  try {
+    await axios.post(`${API_BASE_URL}/admin/settings`, {
+      tutorialVideoUrl: videoUrl,
+      tutorialColor,
+      tutorialSteps: settings.steps
+    }, adminApiConfig());
+    await loadSystemSettings(true);
+    window.showToast('บันทึกวิดีโอ สี และขั้นตอนการใช้งานแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'บันทึกวิธีใช้งานไม่สำเร็จ'), 'error');
+  }
+};
+
+window.saveSteps = window.saveTutorialSettings;
+
+window.previewTutorialColor = function() {
+  const color = document.getElementById('sys-tutorial-color')?.value || 'cyan';
+  const settings = getSystemSettings();
+  renderTutorialSteps(settings.steps?.length ? settings.steps : DEFAULT_SETTINGS.steps, color);
 };
 
 function saveRegisteredUsers(users) {
@@ -1263,13 +1329,82 @@ window.savePromptPaySettings = async function() {
   }
 };
 
+window.handleAdminQrUpload = async function(event) {
+  const file = event.target.files?.[0];
+  const status = document.getElementById('admin-qr-status');
+  const preview = document.getElementById('admin-qr-preview');
+  const qrUrlInput = document.getElementById('sys-qr-url');
+  if (!file) return;
+  if (!file.type.startsWith('image/') || file.size > 5_000_000) {
+    window.showToast('กรุณาเลือกไฟล์รูปภาพขนาดไม่เกิน 5 MB', 'error');
+    event.target.value = '';
+    return;
+  }
+
+  if (status) status.textContent = 'กำลังอ่านข้อมูลจาก QR...';
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 1400;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const decoded = window.jsQR?.(
+      imageData.data,
+      imageData.width,
+      imageData.height,
+      { inversionAttempts: 'attemptBoth' }
+    );
+    if (!decoded?.data) {
+      throw new Error('อ่าน QR จากไฟล์ไม่ได้ กรุณาใช้รูปที่คมชัดและเห็น QR เต็มภาพ');
+    }
+
+    const generatedUrl = `https://api.qrserver.com/v1/create-qr-code/?size=512x512&format=png&data=${encodeURIComponent(decoded.data)}`;
+    if (generatedUrl.length > 500) {
+      throw new Error('ข้อมูลใน QR ยาวเกินไป กรุณาใช้ QR พร้อมเพย์มาตรฐาน');
+    }
+    if (qrUrlInput) qrUrlInput.value = generatedUrl;
+    if (preview) {
+      preview.src = URL.createObjectURL(file);
+      preview.classList.remove('hidden');
+    }
+    if (status) status.textContent = '✓ อ่าน QR สำเร็จ กดบันทึกข้อมูลพร้อมเพย์ได้เลย';
+    window.showToast('อ่านไฟล์ QR สำเร็จ กรุณากดบันทึก', 'success');
+  } catch (error) {
+    if (status) status.textContent = error.message;
+    window.showToast(error.message || 'อ่านไฟล์ QR ไม่สำเร็จ', 'error');
+    event.target.value = '';
+  }
+};
+
+window.saveAnnouncement = async function() {
+  const announcement = document.getElementById('sys-announcement')?.value.trim() || '';
+  if (announcement.length > 240) {
+    window.showToast('ข้อความประกาศต้องไม่เกิน 240 ตัวอักษร', 'error');
+    return;
+  }
+  try {
+    await axios.post(`${API_BASE_URL}/admin/settings`, {
+      announcement
+    }, adminApiConfig());
+    await loadSystemSettings(true);
+    window.showToast('บันทึกประกาศหน้าแรกแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'บันทึกประกาศไม่สำเร็จ'), 'error');
+  }
+};
+
 window.saveBotInfo = async function() {
-  const siteName = document.getElementById('sys-site-name')?.value.trim();
   const name = document.getElementById('sys-bot-name')?.value.trim();
   const url = document.getElementById('sys-bot-url')?.value.trim();
 
-  if (!siteName || !name) {
-    window.showToast('กรุณากรอกชื่อเว็บไซต์และชื่อบอท', 'error');
+  if (!name || !url) {
+    window.showToast('กรุณากรอกชื่อบอทและลิงก์ดาวน์โหลดให้ครบ', 'error');
     return;
   }
   if (url && !url.startsWith('https://')) {
@@ -1279,12 +1414,11 @@ window.saveBotInfo = async function() {
 
   try {
     await axios.post(`${API_BASE_URL}/admin/settings`, {
-      siteName,
       botName: name,
-      downloadUrl: url || ''
+      downloadUrl: url
     }, adminApiConfig());
     await loadSystemSettings(true);
-    window.showToast('บันทึกข้อมูลเว็บไซต์และบอทลงฐานข้อมูลแล้ว', 'success');
+    window.showToast('บันทึกชื่อบอทและลิงก์ดาวน์โหลดแล้ว', 'success');
   } catch (error) {
     window.showToast(getApiErrorMessage(error, 'บันทึกข้อมูลบอทไม่สำเร็จ'), 'error');
   }

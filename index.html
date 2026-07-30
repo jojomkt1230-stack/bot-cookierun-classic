@@ -183,6 +183,13 @@
 
         <!-- ── HOME SECTION ────────────────────────── -->
         <section id="section-home" class="content-section active">
+          <div id="home-announcement" class="home-announcement hidden" role="status">
+            <div class="announcement-icon">📢</div>
+            <div class="announcement-content">
+              <strong>ประกาศจากผู้ดูแล</strong>
+              <p id="home-announcement-text"></p>
+            </div>
+          </div>
           <div class="section-header card-panel">
             <h2>🏠 ยินดีต้อนรับ</h2>
             <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
@@ -253,7 +260,7 @@
           <div class="section-header card-panel">
             <h2>📖 วิธีใช้งานบอท</h2>
           </div>
-          <div class="tutorial-video-wrapper">
+          <div id="tutorial-video-box" class="tutorial-video-wrapper">
             <iframe id="tutorial-iframe" src="" allowfullscreen></iframe>
           </div>
           <div id="tutorial-steps" class="tutorial-steps">
@@ -403,8 +410,11 @@
                     <input type="text" id="sys-promptpay-name" class="admin-input" placeholder="เจษฎาภรณ์..." />
                     <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">ชื่อผู้รับที่ใช้ตรวจสลิป:</label>
                     <input type="text" id="sys-slip-receiver" class="admin-input" placeholder="ต้องตรงกับชื่อในบัญชีธนาคาร" />
-                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">ลิงก์รูป QR Code แบบ HTTPS (เว้นว่างเพื่อสร้างจากเบอร์อัตโนมัติ):</label>
-                    <input type="url" id="sys-qr-url" class="admin-input" placeholder="https://..." />
+                    <label style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">เลือกรูป QR Code จากเครื่อง:</label>
+                    <input type="file" id="sys-qr-file" class="admin-input admin-file-input" accept="image/png,image/jpeg,image/webp" onchange="handleAdminQrUpload(event)" />
+                    <input type="hidden" id="sys-qr-url" />
+                    <div id="admin-qr-status" class="admin-field-hint">ยังไม่ได้เลือกไฟล์ใหม่ ระบบจะใช้ QR เดิม</div>
+                    <img id="admin-qr-preview" class="admin-qr-preview hidden" src="" alt="ตัวอย่าง QR Code" />
                     <button class="btn-primary" onclick="savePromptPaySettings()" style="margin-top:10px;">💾 บันทึกข้อมูลพร้อมเพย์</button>
                   </div>
                 </div>
@@ -412,10 +422,37 @@
                 <div class="admin-card">
                   <h4>⬇️ ข้อมูลดาวน์โหลดบอท</h4>
                   <div class="input-col">
-                    <input type="text" id="sys-site-name" class="admin-input" placeholder="ชื่อเว็บไซต์" />
                     <input type="text" id="sys-bot-name" class="admin-input" placeholder="ชื่อบอท" />
                     <input type="url" id="sys-bot-url" class="admin-input" placeholder="URL ดาวน์โหลดแบบ https://" />
                     <button class="btn-secondary" onclick="saveBotInfo()">บันทึกข้อมูลบอท</button>
+                  </div>
+                </div>
+                <div class="admin-card full-width">
+                  <h4>📢 ประกาศหน้าแรก</h4>
+                  <div class="input-col">
+                    <textarea id="sys-announcement" class="admin-input admin-textarea" maxlength="240" placeholder="พิมพ์ประกาศที่ต้องการให้สมาชิกเห็นบนหน้าแรก"></textarea>
+                    <button class="btn-primary" onclick="saveAnnouncement()">💾 บันทึกประกาศ</button>
+                  </div>
+                </div>
+                <div class="admin-card full-width">
+                  <h4>📖 ตั้งค่าวิธีใช้งานบอท</h4>
+                  <div class="input-col">
+                    <label class="admin-field-label" for="sys-video-url">ลิงก์วิดีโอ YouTube หรือ HTTPS</label>
+                    <input type="url" id="sys-video-url" class="admin-input" placeholder="https://www.youtube.com/watch?v=..." />
+                    <label class="admin-field-label" for="sys-tutorial-color">สีตัวหนังสือเรืองแสง</label>
+                    <select id="sys-tutorial-color" class="admin-select tutorial-color-select" onchange="previewTutorialColor()">
+                      <option value="orange">สีส้ม</option>
+                      <option value="cyan">สีฟ้า</option>
+                      <option value="blue">สีน้ำเงิน</option>
+                      <option value="pink">สีชมพูเด่น</option>
+                    </select>
+                    <div id="steps-editor" class="steps-editor"></div>
+                    <div class="tutorial-step-add">
+                      <input type="text" id="new-step-text" class="admin-input" maxlength="100" placeholder="เพิ่มข้อความขั้นตอน (สูงสุด 100 ตัวอักษร)" />
+                      <button type="button" class="btn-secondary" onclick="addStep()">＋ เพิ่มขั้นตอน</button>
+                    </div>
+                    <div class="admin-field-hint">ใส่ได้สูงสุด 8 ขั้นตอน ตัวหนังสือบนหน้าวิธีใช้จะมีขนาดใหญ่และเรืองแสงตามสีที่เลือก</div>
+                    <button class="btn-primary" onclick="saveTutorialSettings()">💾 บันทึกวิธีใช้งาน</button>
                   </div>
                 </div>
                 <div class="admin-card full-width">
@@ -505,6 +542,7 @@
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script type="module" src="/src/app.js"></script>
 </body>
 </html>

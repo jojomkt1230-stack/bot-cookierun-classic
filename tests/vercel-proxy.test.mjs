@@ -249,3 +249,78 @@ test('rejects an invalid upstream path', async () => {
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: 'Invalid API path' });
 });
+
+test('persists announcement and tutorial settings without changing the public download link', async () => {
+  const originalFetch = globalThis.fetch;
+  const initialDownloadUrl = 'https://downloads.example/ckrcs-bot.zip';
+  let storedSettings;
+
+  globalThis.fetch = async (url, init) => {
+    if (url.endsWith('/api/admin/overview')) {
+      return Response.json({
+        siteName: 'CKRCS BOT',
+        botName: 'CKRCS Bot',
+        downloadUrl: storedSettings?.downloadUrl || initialDownloadUrl,
+        members: [],
+        topups: [],
+        plans: {}
+      });
+    }
+    if (url.endsWith('/api/admin/settings')) {
+      storedSettings = JSON.parse(init.body);
+      return Response.json({ ok: true });
+    }
+    if (url.endsWith('/api/public/config')) {
+      return Response.json({
+        siteName: 'CKRCS BOT',
+        botName: 'CKRCS Bot',
+        downloadUrl: storedSettings.downloadUrl,
+        plans: {}
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  try {
+    const saveResponse = await proxy.fetch(apiRequest('admin/settings', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer legacy-admin-token',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        announcement: 'แจ้งปรับปรุงระบบเวลา 02:00 น.',
+        tutorialVideoUrl: 'https://www.youtube.com/watch?v=demo123',
+        tutorialColor: 'pink',
+        tutorialSteps: ['เปิดโปรแกรม', 'กดเชื่อมต่อ', 'เริ่มใช้งาน']
+      })
+    }));
+
+    assert.equal(saveResponse.status, 200);
+    assert.match(storedSettings.downloadUrl, /^https:\/\/downloads\.example\/ckrcs-bot\.zip#ckrcs=/);
+
+    const botSaveResponse = await proxy.fetch(apiRequest('admin/settings', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer legacy-admin-token',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        botName: 'CKRCS Bot V2',
+        downloadUrl: initialDownloadUrl
+      })
+    }));
+    assert.equal(botSaveResponse.status, 200);
+
+    const publicResponse = await proxy.fetch(apiRequest('settings'));
+    const publicData = await publicResponse.json();
+    assert.equal(publicResponse.status, 200);
+    assert.equal(publicData.announcement, 'แจ้งปรับปรุงระบบเวลา 02:00 น.');
+    assert.equal(publicData.downloadUrl, initialDownloadUrl);
+    assert.equal(publicData.videoUrl, 'https://www.youtube.com/watch?v=demo123');
+    assert.equal(publicData.tutorialColor, 'pink');
+    assert.deepEqual(publicData.steps, ['เปิดโปรแกรม', 'กดเชื่อมต่อ', 'เริ่มใช้งาน']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

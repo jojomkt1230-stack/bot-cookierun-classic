@@ -15,6 +15,8 @@ const FORWARDED_RESPONSE_HEADERS = [
   'etag',
   'last-modified'
 ];
+const PORTAL_CONFIG_FRAGMENT = 'ckrcs';
+const TUTORIAL_COLORS = new Set(['orange', 'cyan', 'blue', 'pink']);
 
 function json(data, status = 200) {
   return Response.json(data, {
@@ -95,6 +97,82 @@ async function responseData(response) {
   } catch {
     return { error: 'ระบบสมาชิกเดิมตอบกลับไม่ถูกต้อง' };
   }
+}
+
+function toBase64Url(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary)
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+}
+
+function fromBase64Url(value) {
+  const base64 = value.replaceAll('-', '+').replaceAll('_', '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+  return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
+}
+
+async function encodePortalConfig(config) {
+  const source = new TextEncoder().encode(JSON.stringify({
+    a: String(config.announcement || ''),
+    v: String(config.tutorialVideoUrl || ''),
+    c: TUTORIAL_COLORS.has(config.tutorialColor) ? config.tutorialColor : 'cyan',
+    s: Array.isArray(config.tutorialSteps) ? config.tutorialSteps : []
+  }));
+  const compressed = new Uint8Array(await new Response(
+    new Blob([source]).stream().pipeThrough(new CompressionStream('deflate-raw'))
+  ).arrayBuffer());
+  return toBase64Url(compressed);
+}
+
+async function decodePortalConfig(downloadUrl) {
+  const fallback = {
+    announcement: '',
+    tutorialVideoUrl: '',
+    tutorialColor: 'cyan',
+    tutorialSteps: []
+  };
+  if (!downloadUrl) return { cleanUrl: '', config: fallback };
+
+  try {
+    const url = new URL(downloadUrl);
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+    const encoded = hash.get(PORTAL_CONFIG_FRAGMENT);
+    hash.delete(PORTAL_CONFIG_FRAGMENT);
+    url.hash = hash.toString();
+    const cleanUrl = url.toString().replace(/#$/, '');
+    if (!encoded) return { cleanUrl, config: fallback };
+
+    const bytes = fromBase64Url(encoded);
+    const decompressed = await new Response(
+      new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
+    ).text();
+    const parsed = JSON.parse(decompressed);
+    return {
+      cleanUrl,
+      config: {
+        announcement: typeof parsed.a === 'string' ? parsed.a : '',
+        tutorialVideoUrl: typeof parsed.v === 'string' ? parsed.v : '',
+        tutorialColor: TUTORIAL_COLORS.has(parsed.c) ? parsed.c : 'cyan',
+        tutorialSteps: Array.isArray(parsed.s)
+          ? parsed.s.filter((item) => typeof item === 'string').slice(0, 8)
+          : []
+      }
+    };
+  } catch {
+    return { cleanUrl: downloadUrl, config: fallback };
+  }
+}
+
+async function attachPortalConfig(downloadUrl, config) {
+  if (!downloadUrl) return '';
+  const url = new URL(downloadUrl);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+  hash.set(PORTAL_CONFIG_FRAGMENT, await encodePortalConfig(config));
+  url.hash = hash.toString();
+  return url.toString();
 }
 
 function publicUser(member, memberCode) {
@@ -432,8 +510,6 @@ async function updateAdminTopup(request, path) {
 async function saveAdminSettings(request) {
   const payload = await readJson(request);
   const supported = [
-    'downloadUrl',
-    'siteName',
     'botName',
     'promptpayLabel',
     'promptpayNumber',
@@ -447,6 +523,73 @@ async function saveAdminSettings(request) {
       .map((key) => [key, payload[key]])
   );
 
+  const hasPortalSettings = [
+    'announcement',
+    'tutorialVideoUrl',
+    'tutorialColor',
+    'tutorialSteps'
+  ].some((key) => Object.hasOwn(payload, key));
+  if (hasPortalSettings || Object.hasOwn(payload, 'downloadUrl')) {
+    const overview = await adminOverview(request);
+    if (overview.errorResponse) return overview.errorResponse;
+    const previous = await decodePortalConfig(overview.data.downloadUrl || '');
+    const announcement = Object.hasOwn(payload, 'announcement')
+      ? String(payload.announcement || '').trim()
+      : previous.config.announcement;
+    const tutorialVideoUrl = Object.hasOwn(payload, 'tutorialVideoUrl')
+      ? String(payload.tutorialVideoUrl || '').trim()
+      : previous.config.tutorialVideoUrl;
+    const tutorialColor = Object.hasOwn(payload, 'tutorialColor')
+      ? String(payload.tutorialColor || '')
+      : previous.config.tutorialColor;
+    const tutorialSteps = Object.hasOwn(payload, 'tutorialSteps')
+      ? payload.tutorialSteps
+      : previous.config.tutorialSteps;
+
+    if (announcement.length > 240) {
+      return json({ error: 'ข้อความประกาศต้องไม่เกิน 240 ตัวอักษร' }, 400);
+    }
+    if (tutorialVideoUrl && !tutorialVideoUrl.startsWith('https://')) {
+      return json({ error: 'ลิงก์วิดีโอต้องขึ้นต้นด้วย https://' }, 400);
+    }
+    if (!TUTORIAL_COLORS.has(tutorialColor)) {
+      return json({ error: 'สีข้อความไม่ถูกต้อง' }, 400);
+    }
+    if (!Array.isArray(tutorialSteps) || tutorialSteps.length > 8) {
+      return json({ error: 'ใส่ขั้นตอนการใช้งานได้ไม่เกิน 8 ขั้นตอน' }, 400);
+    }
+    const cleanSteps = tutorialSteps
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+    if (cleanSteps.some((item) => item.length > 100)
+      || cleanSteps.join('').length > 500) {
+      return json({ error: 'ข้อความแต่ละขั้นต้องไม่เกิน 100 ตัว และรวมไม่เกิน 500 ตัวอักษร' }, 400);
+    }
+
+    const requestedUrl = Object.hasOwn(payload, 'downloadUrl')
+      ? String(payload.downloadUrl || '').trim()
+      : previous.cleanUrl;
+    if (!requestedUrl) {
+      return json({ error: 'กรุณาบันทึกลิงก์ดาวน์โหลดบอทก่อนบันทึกวิธีใช้งาน' }, 400);
+    }
+    if (!requestedUrl.startsWith('https://')) {
+      return json({ error: 'ลิงก์ดาวน์โหลดต้องขึ้นต้นด้วย https://' }, 400);
+    }
+
+    const storedUrl = await attachPortalConfig(requestedUrl, {
+      announcement,
+      tutorialVideoUrl,
+      tutorialColor,
+      tutorialSteps: cleanSteps
+    });
+    if (storedUrl.length > 500) {
+      return json({
+        error: 'ข้อความวิธีใช้งานยาวเกินพื้นที่จัดเก็บ กรุณาย่อข้อความแต่ละขั้น'
+      }, 400);
+    }
+    clean.downloadUrl = storedUrl;
+  }
+
   const { response, data } = await legacyJson(request, '/api/admin/settings', {
     method: 'POST',
     body: JSON.stringify(clean)
@@ -458,16 +601,23 @@ async function getAdminSettings(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
   const data = overview.data;
+  const portal = await decodePortalConfig(data.downloadUrl || '');
 
   return json({
-    siteName: data.siteName || '',
+    siteName: 'CKRCS BOT',
+    announcement: portal.config.announcement,
     botName: data.botName || '',
-    botUrl: data.downloadUrl || '',
-    downloadUrl: data.downloadUrl || '',
+    botUrl: portal.cleanUrl,
+    downloadUrl: portal.cleanUrl,
     promptPayNumber: data.promptpayNumber || '',
     promptPayAccountName: data.promptpayLabel || '',
     slipReceiverName: data.slipReceiverName || '',
     promptPayQrUrl: data.paymentQrUrl || '',
+    tutorialVideoUrl: portal.config.tutorialVideoUrl,
+    videoUrl: portal.config.tutorialVideoUrl,
+    tutorialColor: portal.config.tutorialColor,
+    tutorialSteps: portal.config.tutorialSteps,
+    steps: portal.config.tutorialSteps,
     plans: data.plans || {},
     slip2goConfigured: Boolean(data.slip2goConfigured)
   });
@@ -479,15 +629,22 @@ async function publicSettings(request) {
     includeContentType: false
   });
   if (!response.ok) return json(data, response.status);
+  const portal = await decodePortalConfig(data.downloadUrl || '');
 
   return json({
-    siteName: data.siteName || '',
+    siteName: 'CKRCS BOT',
+    announcement: portal.config.announcement,
     botName: data.botName || '',
-    botUrl: data.downloadUrl || '',
-    downloadUrl: data.downloadUrl || '',
+    botUrl: portal.cleanUrl,
+    downloadUrl: portal.cleanUrl,
     promptPayNumber: data.promptpayNumber || '',
     promptPayAccountName: data.promptpayLabel || '',
     promptPayQrUrl: data.paymentQrUrl || '',
+    tutorialVideoUrl: portal.config.tutorialVideoUrl,
+    videoUrl: portal.config.tutorialVideoUrl,
+    tutorialColor: portal.config.tutorialColor,
+    tutorialSteps: portal.config.tutorialSteps,
+    steps: portal.config.tutorialSteps,
     plans: data.plans || {},
     creditRate: Number(data.creditRate || 1)
   });
