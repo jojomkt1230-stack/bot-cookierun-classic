@@ -571,14 +571,6 @@ async function saveAdminSettings(request) {
       return json({ error: 'ข้อความแต่ละขั้นต้องไม่เกิน 100 ตัว และรวมไม่เกิน 500 ตัวอักษร' }, 400);
     }
 
-    const requestedUrl = 'https://portal.invalid';
-    if (false && !requestedUrl) {
-      return json({ error: 'กรุณาบันทึกลิงก์ดาวน์โหลดบอทก่อนบันทึกวิธีใช้งาน' }, 400);
-    }
-    if (false && !requestedUrl.startsWith('https://')) {
-      return json({ error: 'ลิงก์ดาวน์โหลดต้องขึ้นต้นด้วย https://' }, 400);
-    }
-
     const storedUrl = await attachPortalConfig({
       announcement,
       tutorialVideoUrl,

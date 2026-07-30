@@ -1467,7 +1467,7 @@ window.saveBotInfo = async function() {
   const url = document.getElementById('sys-bot-url')?.value.trim();
 
   if (!name) {
-    window.showToast('กรุณากรอกชื่อบอทและลิงก์ดาวน์โหลดให้ครบ', 'error');
+    window.showToast('กรุณากรอกชื่อบอท', 'error');
     return;
   }
   if (url && !url.startsWith('https://')) {
