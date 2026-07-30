@@ -18,6 +18,11 @@ const FORWARDED_RESPONSE_HEADERS = [
 const PORTAL_CONFIG_FRAGMENT = 'ckrcs';
 const PORTAL_CONFIG_PREFIX = 'CKRCS#';
 const TUTORIAL_COLORS = new Set(['orange', 'cyan', 'blue', 'pink']);
+// A public default prevents the download page from becoming blank while the
+// legacy settings service has not stored its first portal configuration yet.
+// Admin settings still take priority as soon as they are saved.
+const DEFAULT_BOT_NAME = 'Ckrcsbot V18.1';
+const DEFAULT_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq';
 
 function json(data, status = 200) {
   return Response.json(data, {
@@ -642,9 +647,9 @@ async function getAdminSettings(request) {
   return json({
     siteName: 'CKRCS BOT',
     announcement: portal.config.announcement,
-    botName: portal.isStored ? stored.botName : data.botName || '',
-    botUrl: portal.isStored ? stored.downloadUrl : data.downloadUrl || '',
-    downloadUrl: portal.isStored ? stored.downloadUrl : data.downloadUrl || '',
+    botName: portal.isStored ? stored.botName || DEFAULT_BOT_NAME : data.botName || DEFAULT_BOT_NAME,
+    botUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
+    downloadUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
     promptPayNumber: portal.isStored ? stored.promptpayNumber : data.promptpayNumber || '',
     promptPayAccountName: portal.isStored ? stored.promptpayLabel : data.promptpayLabel || '',
     slipReceiverName: data.slipReceiverName || '',
@@ -671,9 +676,9 @@ async function publicSettings(request) {
   return json({
     siteName: 'CKRCS BOT',
     announcement: portal.config.announcement,
-    botName: portal.isStored ? stored.botName : data.botName || '',
-    botUrl: portal.isStored ? stored.downloadUrl : data.downloadUrl || '',
-    downloadUrl: portal.isStored ? stored.downloadUrl : data.downloadUrl || '',
+    botName: portal.isStored ? stored.botName || DEFAULT_BOT_NAME : data.botName || DEFAULT_BOT_NAME,
+    botUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
+    downloadUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
     promptPayNumber: portal.isStored ? stored.promptpayNumber : data.promptpayNumber || '',
     promptPayAccountName: portal.isStored ? stored.promptpayLabel : data.promptpayLabel || '',
     promptPayQrUrl: portal.isStored ? stored.paymentQrUrl : data.paymentQrUrl || '',

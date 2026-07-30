@@ -170,9 +170,9 @@ const DEFAULT_SETTINGS = {
   promptPayNumber: '',
   promptPayAccountName: '',
   promptPayQrUrl: '',
-  botName: 'CKRCS Bot Classic',
+  botName: 'Ckrcsbot V18.1',
   siteName: 'CKRCS BOT',
-  botUrl: '',
+  botUrl: 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq',
   plans: {
     day1: { label: '1 วัน', days: 1, price: 15 },
     day3: { label: '3 วัน', days: 3, price: 40 },
@@ -329,12 +329,10 @@ function updateDownloadPanel(settings = getSystemSettings()) {
   const downloadLink = document.getElementById('download-link');
   const downloadWarning = document.getElementById('download-warning');
   const botNameDisplay = document.getElementById('bot-name-display');
-  const expiryDisplay = document.getElementById('bot-expiry-display');
   const active = licenseIsActive();
   const hasUrl = Boolean(settings.botUrl && settings.botUrl.startsWith('https://'));
 
   if (botNameDisplay) botNameDisplay.textContent = settings.botName || 'ยังไม่ได้ตั้งชื่อบอท';
-  if (expiryDisplay) expiryDisplay.textContent = formatExpiry(currentUser?.expiresAt || currentUser?.botExpiry);
   if (downloadLink) {
     downloadLink.href = active && hasUrl ? settings.botUrl : '#';
     downloadLink.target = '_blank';
