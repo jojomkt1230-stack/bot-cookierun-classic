@@ -44,12 +44,24 @@ function safePath(value) {
 }
 
 async function readJson(request) {
+  if (request?.body && typeof request.body === 'object'
+    && !(request.body instanceof ReadableStream)
+    && !(request.body instanceof ArrayBuffer)
+    && !ArrayBuffer.isView(request.body)) {
+    return Array.isArray(request.body) ? {} : request.body;
+  }
   try {
     const value = await request.json();
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  } catch {
-    return {};
+  } catch {}
+
+  if (typeof request?.body === 'string') {
+    try {
+      const value = JSON.parse(request.body);
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    } catch {}
   }
+  return {};
 }
 
 function sitesToken() {
@@ -660,7 +672,8 @@ async function getAdminSettings(request) {
     tutorialSteps: portal.config.tutorialSteps,
     steps: portal.config.tutorialSteps,
     plans: data.plans || {},
-    slip2goConfigured: Boolean(data.slip2goConfigured)
+    thunderConfigured: Boolean(data.thunderConfigured),
+    slip2goConfigured: Boolean(data.thunderConfigured || data.slip2goConfigured)
   });
 }
 

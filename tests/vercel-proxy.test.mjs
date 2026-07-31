@@ -99,6 +99,83 @@ test('logs in and returns the real legacy expiry date', async () => {
   }
 });
 
+test('creates a topup through the legacy Sites API with the real member token', async () => {
+  const originalFetch = globalThis.fetch;
+  let captured;
+
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init };
+    return Response.json({
+      ok: true,
+      topupId: 'topup-123456',
+      amount: 15,
+      credits: 15,
+      promptpayNumber: '0812345678'
+    });
+  };
+
+  try {
+    const response = await proxy.fetch(apiRequest('topup/orders/create', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer member-token',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ amountBaht: 15 })
+    }));
+    const data = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(captured.url, 'https://legacy.example/api/member/topup');
+    assert.equal(captured.init.headers.get('authorization'), 'Bearer member-token');
+    assert.deepEqual(JSON.parse(captured.init.body), { amount: 15 });
+    assert.equal(data.orderId, 'topup-123456');
+    assert.equal(data.creditToReceive, 15);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('sends the slip image to the legacy Thunder verification route', async () => {
+  const originalFetch = globalThis.fetch;
+  let captured;
+
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init };
+    return Response.json({
+      ok: true,
+      credits: 115,
+      message: 'verified'
+    });
+  };
+
+  try {
+    const incoming = new FormData();
+    incoming.set('orderId', 'topup-123456');
+    incoming.set('image', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], 'slip.jpg', {
+      type: 'image/jpeg'
+    }));
+
+    const response = await proxy.fetch(apiRequest('topup/verify-slip', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer member-token' },
+      body: incoming
+    }));
+    const data = await response.json();
+    const forwarded = captured.init.body;
+
+    assert.equal(response.status, 200);
+    assert.equal(captured.url, 'https://legacy.example/api/member/topup/slip');
+    assert.equal(captured.init.headers.get('authorization'), 'Bearer member-token');
+    assert.equal(forwarded.get('topupId'), 'topup-123456');
+    assert.equal(forwarded.get('file').name, 'slip.jpg');
+    assert.equal(data.status, 'approved');
+    assert.equal(data.diamonds, 115);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('does not forward browser origin, cookies, or referer to Render', async () => {
   const originalFetch = globalThis.fetch;
   let captured;

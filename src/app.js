@@ -923,9 +923,9 @@ window.handleSlipPreview = function(event) {
     window.showToast('รองรับเฉพาะไฟล์ JPG, PNG หรือ WEBP', 'error');
     return;
   }
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > 4 * 1024 * 1024) {
     event.target.value = '';
-    window.showToast('ไฟล์สลิปต้องมีขนาดไม่เกิน 5MB', 'error');
+    window.showToast('ไฟล์สลิปต้องมีขนาดไม่เกิน 4MB', 'error');
     return;
   }
 
