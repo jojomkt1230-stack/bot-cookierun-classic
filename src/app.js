@@ -282,6 +282,7 @@ function applySystemSettingsToUI() {
   const sysBotUrl = document.getElementById('sys-bot-url');
   const sysVidUrl = document.getElementById('sys-video-url');
   const sysTutorialColor = document.getElementById('sys-tutorial-color');
+  const thunderStatus = document.getElementById('admin-thunder-status');
 
   if (sysAnnounce) sysAnnounce.value = settings.announcement || '';
   if (sysPP) sysPP.value = settings.promptPayNumber || '';
@@ -296,6 +297,13 @@ function applySystemSettingsToUI() {
   if (sysBotUrl) sysBotUrl.value = settings.botUrl || '';
   if (sysVidUrl) sysVidUrl.value = settings.videoUrl || '';
   if (sysTutorialColor) sysTutorialColor.value = settings.tutorialColor || 'cyan';
+  if (thunderStatus) {
+    const ready = settings.thunderConfigured === true;
+    thunderStatus.textContent = ready
+      ? '✅ Thunder V2 พร้อมตรวจสลิปจริง'
+      : '❌ ยังไม่ได้ตั้งค่า THUNDER_API_KEY บนเซิร์ฟเวอร์';
+    thunderStatus.style.color = ready ? 'var(--success)' : 'var(--danger)';
+  }
 
   // Tutorial Video Iframe & Steps
   const tutIframe = document.getElementById('tutorial-iframe');
@@ -910,7 +918,7 @@ function updateHomeCountdownDisplay() {
   }
 }
 
-// ─── 7. CLIENT SLIP TOPUP & SLIPOK API VERIFICATION ────────────────
+// ─── 7. CLIENT SLIP TOPUP & THUNDER V2 VERIFICATION ────────────────
 let currentSelectedSlipFile = null;
 
 window.handleSlipPreview = function(event) {

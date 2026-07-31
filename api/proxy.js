@@ -540,7 +540,6 @@ async function saveAdminSettings(request) {
     'promptpayLabel',
     'promptpayNumber',
     'slipReceiverName',
-    'slip2goApiSecret',
     'paymentQrUrl'
   ];
   const clean = Object.fromEntries(
@@ -672,8 +671,7 @@ async function getAdminSettings(request) {
     tutorialSteps: portal.config.tutorialSteps,
     steps: portal.config.tutorialSteps,
     plans: data.plans || {},
-    thunderConfigured: Boolean(data.thunderConfigured),
-    slip2goConfigured: Boolean(data.thunderConfigured || data.slip2goConfigured)
+    thunderConfigured: Boolean(data.thunderConfigured)
   });
 }
 
