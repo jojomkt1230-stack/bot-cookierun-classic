@@ -808,6 +808,56 @@ async function refreshCurrentMember() {
   return currentUser;
 }
 
+function accessCodeDeviceId() {
+  const key = 'ckrcs_access_code_device';
+  let value = localStorage.getItem(key) || '';
+  if (!/^[A-Za-z0-9_-]{12,120}$/.test(value)) {
+    value = typeof crypto?.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `device_${Date.now()}_${Math.random().toString(36).slice(2, 14)}`;
+    localStorage.setItem(key, value);
+  }
+  return value;
+}
+
+window.redeemAccessCode = async function(event) {
+  event?.preventDefault();
+  const input = document.getElementById('access-code-input');
+  const button = document.getElementById('access-code-submit');
+  const message = document.getElementById('access-code-message');
+  const code = String(input?.value || '').trim().toUpperCase();
+  if (message) message.textContent = '';
+  if (!/^BOT-\d{2}COOKIE-CKR[A-Z]{11}$/.test(code)) {
+    if (message) message.textContent = 'กรุณากรอกโค้ดให้ครบและถูกต้อง';
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'กำลังตรวจสอบ...';
+  }
+  try {
+    const response = await axios.post(`${API_BASE_URL}/codes/redeem`, {
+      code,
+      deviceId: accessCodeDeviceId()
+    }, { headers: getAuthHeaders() });
+    if (input) input.value = '';
+    if (message) message.textContent = response.data?.message || 'เพิ่มวันใช้งานสำเร็จแล้ว';
+    await refreshCurrentMember();
+    initDashboard(true);
+    window.showToast(response.data?.message || 'เพิ่มวันใช้งานสำเร็จแล้ว', 'success');
+  } catch (error) {
+    const text = getApiErrorMessage(error, 'ใช้โค้ดไม่สำเร็จ');
+    if (message) message.textContent = text;
+    window.showToast(text, 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'รับวันใช้งาน';
+    }
+  }
+};
+
 window.rentBot = function(days, price) {
   if (!currentUser) return;
   const userDiamonds = currentUser.diamonds || 0;
@@ -1092,6 +1142,8 @@ function renderActivityHistory() {
 // 8. ADMIN PANEL AND USER MANAGEMENT
 let adminUsers = [];
 let adminTopups = [];
+let adminAccessCodes = [];
+let latestGeneratedAccessCodes = [];
 
 function adminApiConfig() {
   const token = localStorage.getItem('token');
@@ -1132,10 +1184,113 @@ window.switchAdminTab = function(tabName) {
   if (tabName === 'stats') updateAdminPanelStats();
   if (tabName === 'users') reloadAdminData().then(renderAdminUsersTable).catch(() => {});
   if (tabName === 'topups') reloadAdminData().then(renderAdminTopupsTable).catch(() => {});
+  if (tabName === 'codes') loadAdminAccessCodes().catch(() => {});
   if (tabName === 'system') {
     loadSystemSettings(true).catch((error) => {
       window.showToast(getApiErrorMessage(error, 'โหลดการตั้งค่าจริงไม่สำเร็จ'), 'error');
     });
+  }
+};
+
+function accessCodeDurationLabel(minutes) {
+  const value = Number(minutes);
+  if (value === 60) return '1 ชั่วโมง';
+  if (value === 1440) return '1 วัน';
+  if (value === 10080) return '7 วัน';
+  if (value === 43200) return '30 วัน';
+  return `${value} นาที`;
+}
+
+function accessCodeStatusLabel(status) {
+  if (status === 'used') return 'ใช้แล้ว';
+  if (status === 'processing') return 'กำลังเพิ่มวัน';
+  return 'พร้อมใช้งาน';
+}
+
+function renderAdminAccessCodes() {
+  const container = document.getElementById('admin-codes-table');
+  if (!container) return;
+  if (!adminAccessCodes.length) {
+    container.innerHTML = '<p style="padding:16px; color:var(--text-muted);">ยังไม่มีโค้ดในระบบ</p>';
+    return;
+  }
+  container.innerHTML = `
+    <table class="admin-table" style="width:100%; border-collapse:collapse; min-width:760px;">
+      <thead><tr>
+        <th style="padding:12px; text-align:left;">โค้ด</th>
+        <th style="padding:12px; text-align:left;">ระยะเวลา</th>
+        <th style="padding:12px; text-align:left;">สถานะ</th>
+        <th style="padding:12px; text-align:left;">สมาชิก</th>
+        <th style="padding:12px; text-align:left;">สร้างเมื่อ</th>
+      </tr></thead>
+      <tbody>${adminAccessCodes.map((item) => `
+        <tr style="border-top:1px solid var(--border);">
+          <td style="padding:12px; font-family:monospace; color:var(--primary);">${escapeHtml(item.code)}</td>
+          <td style="padding:12px;">${escapeHtml(accessCodeDurationLabel(item.durationMinutes))}</td>
+          <td style="padding:12px;"><span class="code-status ${escapeHtml(item.status || 'available')}">${escapeHtml(accessCodeStatusLabel(item.status))}</span></td>
+          <td style="padding:12px;">${escapeHtml(item.memberCode || '-')}</td>
+          <td style="padding:12px;">${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString('th-TH') : '-')}</td>
+        </tr>
+      `).join('')}</tbody>
+    </table>`;
+}
+
+window.loadAdminAccessCodes = async function() {
+  const container = document.getElementById('admin-codes-table');
+  if (container) container.innerHTML = '<div class="loading-spinner">⟳</div>';
+  try {
+    const response = await axios.get(`${API_BASE_URL}/admin/codes`, adminApiConfig());
+    adminAccessCodes = response.data?.codes || [];
+    renderAdminAccessCodes();
+  } catch (error) {
+    const text = getApiErrorMessage(error, 'โหลดข้อมูลโค้ดไม่สำเร็จ');
+    if (container) container.innerHTML = `<p style="padding:16px; color:var(--danger);">${escapeHtml(text)}</p>`;
+    window.showToast(text, 'error');
+  }
+};
+
+window.createAdminAccessCodes = async function() {
+  const count = Number(document.getElementById('admin-code-count')?.value);
+  const durationMinutes = Number(document.getElementById('admin-code-duration')?.value);
+  const button = document.getElementById('admin-code-create');
+  if (!Number.isInteger(count) || count < 1 || count > 500) {
+    window.showToast('กรุณาเลือกจำนวนโค้ด 1–500 โค้ด', 'error');
+    return;
+  }
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'กำลังสร้าง...';
+  }
+  try {
+    const response = await axios.post(`${API_BASE_URL}/admin/codes`, {
+      count,
+      durationMinutes
+    }, adminApiConfig());
+    latestGeneratedAccessCodes = response.data?.codes || [];
+    const output = document.getElementById('admin-generated-codes');
+    if (output) {
+      output.classList.remove('hidden');
+      output.innerHTML = `<button class="btn-secondary" type="button" onclick="copyGeneratedAccessCodes()" style="margin-bottom:10px;">📋 คัดลอกทั้งหมด</button>\n${escapeHtml(latestGeneratedAccessCodes.join('\n'))}`;
+    }
+    window.showToast(response.data?.message || 'สร้างโค้ดเรียบร้อยแล้ว', 'success');
+    await window.loadAdminAccessCodes();
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'สร้างโค้ดไม่สำเร็จ'), 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'สร้างโค้ด';
+    }
+  }
+};
+
+window.copyGeneratedAccessCodes = async function() {
+  if (!latestGeneratedAccessCodes.length) return;
+  try {
+    await navigator.clipboard.writeText(latestGeneratedAccessCodes.join('\n'));
+    window.showToast('คัดลอกโค้ดทั้งหมดแล้ว', 'success');
+  } catch {
+    window.showToast('คัดลอกไม่สำเร็จ กรุณาเลือกข้อความแล้วคัดลอกเอง', 'error');
   }
 };
 

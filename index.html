@@ -194,11 +194,28 @@
             <h2>🏠 ยินดีต้อนรับ</h2>
             <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
           </div>
-          <div class="home-grid single-card">
+          <div class="home-grid access-code-grid">
             <div class="stat-card centered-stat">
               <div class="stat-icon">🤖</div>
               <div class="stat-value" id="home-bot-status">-</div>
               <div class="stat-label">สถานะบอท</div>
+            </div>
+            <div class="stat-card access-code-card">
+              <div class="stat-icon">🔑</div>
+              <div class="stat-label access-code-title">ใส่โค้ดวันใช้งาน</div>
+              <form id="access-code-form" class="access-code-form" onsubmit="redeemAccessCode(event)">
+                <input
+                  id="access-code-input"
+                  class="admin-input"
+                  type="text"
+                  maxlength="40"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="bot-12cookie-ckrABCDEFGHIJK"
+                />
+                <button id="access-code-submit" class="btn-primary" type="submit">รับวันใช้งาน</button>
+              </form>
+              <div id="access-code-message" class="admin-field-hint" role="status"></div>
             </div>
           </div>
 
@@ -325,6 +342,7 @@
               <button class="admin-tab active" onclick="switchAdminTab('stats')">📊 ภาพรวม</button>
               <button class="admin-tab" onclick="switchAdminTab('users')">👥 จัดการผู้ใช้</button>
               <button class="admin-tab" onclick="switchAdminTab('topups')">💰 เติมเงิน</button>
+              <button class="admin-tab" onclick="switchAdminTab('codes')">🔑 โค้ดวันใช้งาน</button>
               <button class="admin-tab" onclick="switchAdminTab('system')">⚙️ ระบบ</button>
             </div>
 
@@ -389,6 +407,34 @@
               </div>
               <div id="topups-table-container" class="table-container">
                 <div class="loading-spinner">⟳</div>
+              </div>
+            </div>
+
+            <!-- Access Codes Panel -->
+            <div id="admin-codes" class="admin-panel-content hidden">
+              <h3>🔑 จัดการโค้ดวันใช้งาน</h3>
+              <div class="admin-card">
+                <h4>สร้างโค้ดหลายโค้ดพร้อมกัน</h4>
+                <p class="admin-field-hint">แต่ละโค้ดใช้ได้ครั้งเดียวและไม่มีวันหมดอายุก่อนนำไปใช้ โค้ดจากสลิปจะถูกสร้างอัตโนมัติ ไม่ต้องสร้างเก็บไว้ล่วงหน้า</p>
+                <div class="input-row access-code-admin-controls">
+                  <input id="admin-code-count" type="number" min="1" max="500" value="1" class="admin-input" aria-label="จำนวนโค้ด" />
+                  <select id="admin-code-duration" class="admin-select" aria-label="ระยะเวลาโค้ด">
+                    <option value="1440">1 วัน</option>
+                    <option value="10080">7 วัน</option>
+                    <option value="43200">30 วัน</option>
+                  </select>
+                  <button id="admin-code-create" class="btn-primary" type="button" onclick="createAdminAccessCodes()">สร้างโค้ด</button>
+                </div>
+                <div id="admin-generated-codes" class="generated-code-box hidden"></div>
+              </div>
+              <div class="admin-card">
+                <div class="access-code-table-heading">
+                  <h4>ประวัติโค้ดล่าสุด</h4>
+                  <button class="btn-secondary" type="button" onclick="loadAdminAccessCodes()">↻ โหลดใหม่</button>
+                </div>
+                <div id="admin-codes-table" class="table-container">
+                  <div class="loading-spinner">⟳</div>
+                </div>
               </div>
             </div>
 

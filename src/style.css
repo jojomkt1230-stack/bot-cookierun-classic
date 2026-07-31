@@ -958,6 +958,45 @@ body {
   box-shadow: 0 0 18px rgba(55, 231, 255, 0.18), inset 0 0 24px rgba(55, 231, 255, 0.05);
 }
 
+.home-grid.access-code-grid {
+  grid-template-columns: minmax(240px, 320px) minmax(300px, 460px);
+  justify-content: center;
+  align-items: stretch;
+}
+
+.access-code-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.access-code-title {
+  color: var(--text-primary) !important;
+  font-size: 1rem !important;
+  font-weight: 700;
+}
+
+.access-code-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.access-code-form .admin-input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.access-code-form .btn-primary {
+  white-space: nowrap;
+}
+
+#access-code-message {
+  min-height: 20px;
+  margin-top: 8px;
+}
+
 .announcement-icon {
   flex: 0 0 auto;
   font-size: 1.8rem;
@@ -1378,6 +1417,49 @@ body {
   font-size: 0.8rem;
   line-height: 1.45;
 }
+
+.access-code-admin-controls .admin-input {
+  width: 150px;
+}
+
+.generated-code-box {
+  margin-top: 14px;
+  padding: 12px;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.6;
+}
+
+.access-code-table-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.access-code-table-heading h4 {
+  margin-bottom: 0;
+}
+
+.code-status {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.code-status.available { color: var(--accent); background: rgba(0, 255, 170, 0.12); }
+.code-status.processing { color: #ffd34e; background: rgba(255, 211, 78, 0.12); }
+.code-status.used { color: var(--text-muted); background: rgba(255, 255, 255, 0.08); }
 
 .admin-file-input {
   padding: 8px;
@@ -1939,4 +2021,12 @@ body {
   color: #fff;
   box-shadow: 0 0 25px var(--danger);
   transform: translateY(-2px);
+}
+
+@media (max-width: 700px) {
+  .home-grid.access-code-grid { grid-template-columns: 1fr; }
+  .stat-card.centered-stat { max-width: none; }
+  .access-code-form { flex-direction: column; }
+  .access-code-form .btn-primary { width: 100%; }
+  .access-code-admin-controls > * { width: 100% !important; }
 }
