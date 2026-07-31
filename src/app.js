@@ -282,7 +282,7 @@ function applySystemSettingsToUI() {
   const sysBotUrl = document.getElementById('sys-bot-url');
   const sysVidUrl = document.getElementById('sys-video-url');
   const sysTutorialColor = document.getElementById('sys-tutorial-color');
-  const thunderStatus = document.getElementById('admin-thunder-status');
+  const slip2GoStatus = document.getElementById('admin-slip2go-status');
 
   if (sysAnnounce) sysAnnounce.value = settings.announcement || '';
   if (sysPP) sysPP.value = settings.promptPayNumber || '';
@@ -297,12 +297,12 @@ function applySystemSettingsToUI() {
   if (sysBotUrl) sysBotUrl.value = settings.botUrl || '';
   if (sysVidUrl) sysVidUrl.value = settings.videoUrl || '';
   if (sysTutorialColor) sysTutorialColor.value = settings.tutorialColor || 'cyan';
-  if (thunderStatus) {
-    const ready = settings.thunderConfigured === true;
-    thunderStatus.textContent = ready
-      ? '✅ Thunder V2 พร้อมตรวจสลิปจริง'
-      : '❌ ยังไม่ได้ตั้งค่า THUNDER_API_KEY บนเซิร์ฟเวอร์';
-    thunderStatus.style.color = ready ? 'var(--success)' : 'var(--danger)';
+  if (slip2GoStatus) {
+    const ready = settings.slip2GoConfigured === true;
+    slip2GoStatus.textContent = ready
+      ? '✅ Slip2Go พร้อมตรวจสลิปจริง'
+      : '❌ ยังไม่ได้ตั้งค่า SLIP2GO_API_SECRET บนเซิร์ฟเวอร์';
+    slip2GoStatus.style.color = ready ? 'var(--success)' : 'var(--danger)';
   }
 
   // Tutorial Video Iframe & Steps
@@ -918,7 +918,7 @@ function updateHomeCountdownDisplay() {
   }
 }
 
-// ─── 7. CLIENT SLIP TOPUP & THUNDER V2 VERIFICATION ────────────────
+// ─── 7. CLIENT SLIP TOPUP & SLIP2GO VERIFICATION ───────────────────
 let currentSelectedSlipFile = null;
 
 window.handleSlipPreview = function(event) {
@@ -984,7 +984,7 @@ window.handleSlipSubmit = async function(event) {
 
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span class="btn-icon">⟳</span> กำลังตรวจสอบสลิปผ่าน Thunder v2...';
+    btn.innerHTML = '<span class="btn-icon">⟳</span> กำลังตรวจสอบสลิปผ่าน Slip2Go...';
   }
 
   if (msgEl) msgEl.textContent = '';
@@ -1002,7 +1002,7 @@ window.handleSlipSubmit = async function(event) {
 
     const orderId = orderRes.data.orderId;
 
-    // 2. Submit Slip Image to Backend Thunder v2 Verification Endpoint
+    // 2. Submit the slip image to the backend Slip2Go verification endpoint.
     const formData = new FormData();
     formData.append('image', currentSelectedSlipFile);
     formData.append('orderId', orderId);
@@ -1025,7 +1025,7 @@ window.handleSlipSubmit = async function(event) {
         msgEl.textContent = verifyRes.data.message || 'เติมเงินสำเร็จ';
         msgEl.style.color = 'var(--accent)';
       }
-      window.showToast(verifyRes.data.message || '🎉 เติมเงินสำเร็จผ่าน Thunder v2!', 'success');
+      window.showToast(verifyRes.data.message || '🎉 เติมเงินสำเร็จผ่าน Slip2Go!', 'success');
     } else {
       const message = verifyRes.data?.error || 'สลิปไม่ผ่านเงื่อนไขความปลอดภัย';
       if (msgEl) msgEl.textContent = message;

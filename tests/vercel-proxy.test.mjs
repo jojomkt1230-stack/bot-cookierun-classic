@@ -136,7 +136,7 @@ test('creates a topup through the legacy Sites API with the real member token', 
   }
 });
 
-test('sends the slip image to the legacy Thunder verification route', async () => {
+test('sends the slip image to the legacy Slip2Go verification route', async () => {
   const originalFetch = globalThis.fetch;
   let captured;
 

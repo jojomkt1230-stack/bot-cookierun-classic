@@ -671,7 +671,7 @@ async function getAdminSettings(request) {
     tutorialSteps: portal.config.tutorialSteps,
     steps: portal.config.tutorialSteps,
     plans: data.plans || {},
-    thunderConfigured: Boolean(data.thunderConfigured)
+    slip2GoConfigured: Boolean(data.slip2GoConfigured)
   });
 }
 
