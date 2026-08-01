@@ -1088,7 +1088,112 @@ body {
   border: none;
 }
 
+.tutorial-video-wrapper.hidden { display: none !important; }
+
 .tutorial-steps { display: flex; flex-direction: column; gap: 16px; }
+
+.settings-gear,
+.section-settings-gear {
+  display: inline-grid;
+  place-items: center;
+  color: #f7fbff;
+  font-family: "Segoe UI Symbol", sans-serif;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.95));
+  text-shadow: 0 0 7px rgba(255, 255, 255, 0.9), 0 0 14px rgba(198, 232, 255, 0.5);
+  animation: settingsGearGlow 2.4s ease-in-out infinite;
+}
+
+.section-settings-gear {
+  margin-right: 7px;
+  font-size: 1.15em;
+  vertical-align: -0.05em;
+}
+
+@keyframes settingsGearGlow {
+  0%, 100% { opacity: 0.86; filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.72)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 7px rgba(255, 255, 255, 1)); }
+}
+
+.emulator-setup-guide {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: clamp(20px, 3vw, 34px);
+  border-color: rgba(111, 226, 255, 0.55);
+  background: linear-gradient(145deg, rgba(4, 20, 48, 0.94), rgba(2, 10, 29, 0.92));
+  box-shadow: 0 0 24px rgba(0, 207, 255, 0.12), inset 0 0 30px rgba(58, 127, 255, 0.05);
+}
+
+.emulator-setup-guide h3 {
+  margin: 0 0 24px;
+  color: #73efff;
+  font-size: clamp(1.18rem, 2.6vw, 1.55rem);
+  line-height: 1.45;
+  text-shadow: 0 0 10px rgba(57, 228, 255, 0.5);
+}
+
+.emulator-guide-section {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid rgba(68, 193, 255, 0.28);
+  border-radius: 14px;
+  background: rgba(4, 15, 37, 0.68);
+}
+
+.emulator-guide-section h4 {
+  margin: 0 0 14px;
+  color: #f4fbff;
+  font-size: 1.08rem;
+}
+
+.emulator-guide-section h5,
+.emulator-guide-block h5 {
+  margin: 0 0 7px;
+  color: #91eaff;
+  font-size: 0.98rem;
+}
+
+.emulator-guide-block + .emulator-guide-block { margin-top: 17px; }
+
+.emulator-setup-guide p,
+.emulator-setup-guide li {
+  color: #e7f3ff;
+  font-size: 0.96rem;
+  line-height: 1.75;
+}
+
+.emulator-setup-guide p { margin: 5px 0; }
+.emulator-setup-guide ul { margin: 5px 0 0; padding-left: 24px; }
+.emulator-setup-guide strong { color: #fff5a8; }
+.emulator-guide-note { color: #b8c8dc !important; }
+.emulator-screen-list { list-style: none; padding-left: 0 !important; }
+
+.emulator-guide-alert {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+  padding: 15px 17px;
+  border-radius: 12px;
+  line-height: 1.7;
+}
+
+.emulator-guide-alert.warning {
+  color: #fff2a8;
+  border: 1px solid rgba(255, 204, 54, 0.6);
+  background: rgba(108, 72, 0, 0.25);
+  box-shadow: 0 0 14px rgba(255, 205, 54, 0.1);
+}
+
+.emulator-guide-alert.danger {
+  color: #ffd8dc;
+  border: 1px solid rgba(255, 76, 105, 0.62);
+  background: rgba(104, 10, 28, 0.27);
+  box-shadow: 0 0 14px rgba(255, 48, 85, 0.1);
+}
+
+.powder-section {
+  border-color: rgba(204, 117, 255, 0.4);
+  box-shadow: inset 0 0 18px rgba(175, 73, 255, 0.05);
+}
 
 .step-card {
   display: flex;

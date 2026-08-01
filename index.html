@@ -146,8 +146,8 @@
             <span class="menu-text">ดาวน์โหลด</span>
           </button>
           <button class="menu-item" onclick="showSection('tutorial')" id="menu-tutorial">
-            <span class="menu-icon">📖</span>
-            <span class="menu-text">วิธีใช้งาน</span>
+            <span class="menu-icon settings-gear" aria-hidden="true">&#9881;</span>
+            <span class="menu-text">วิธีตั้งค่า</span>
           </button>
           <button class="menu-item" onclick="showSection('topup')" id="menu-topup">
             <span class="menu-icon">💰</span>
@@ -252,14 +252,76 @@
         <!-- ── TUTORIAL SECTION ───────────────────── -->
         <section id="section-tutorial" class="content-section hidden">
           <div class="section-header card-panel">
-            <h2>📖 วิธีใช้งานบอท</h2>
+            <h2><span class="section-settings-gear" aria-hidden="true">&#9881;</span> การตั้งค่า LDPlayer และ MuMu</h2>
           </div>
-          <div id="tutorial-video-box" class="tutorial-video-wrapper">
+          <div id="tutorial-video-box" class="tutorial-video-wrapper hidden">
             <iframe id="tutorial-iframe" src="" allowfullscreen></iframe>
           </div>
-          <div id="tutorial-steps" class="tutorial-steps">
-            <!-- Steps loaded dynamically -->
-          </div>
+          <article class="emulator-setup-guide card-panel" aria-labelledby="emulator-setup-title">
+            <h3 id="emulator-setup-title">🎮 การตั้งค่า LDPlayer / MuMu เพื่อใช้งานบอท</h3>
+
+            <section class="emulator-guide-section">
+              <h4>📱 1. ตั้งค่า LDPlayer</h4>
+
+              <div class="emulator-guide-block">
+                <h5>📱 การแสดงผล</h5>
+                <p>เลือก <strong>แท็บเล็ต</strong> → ความละเอียด <strong>1280x720 (DPI 240)</strong></p>
+              </div>
+
+              <div class="emulator-guide-block">
+                <h5>⚡ ประสิทธิภาพ</h5>
+                <ul>
+                  <li>CPU: <strong>3 cores</strong></li>
+                  <li>RAM: <strong>3072 MB</strong></li>
+                  <li>เฟรมเรท: <strong>60</strong></li>
+                </ul>
+                <p class="emulator-guide-note">(ถ้าคอมไม่ไหว ให้ลดตามสเปคเครื่อง หรือจะเพิ่มก็ได้ เอาที่เครื่องไหวเลย)</p>
+              </div>
+
+              <div class="emulator-guide-block">
+                <h5>🌐 เครือข่าย</h5>
+                <p>ใช้การ์ดเครือข่ายตามที่คอมมีอยู่จริง</p>
+              </div>
+
+              <div class="emulator-guide-block">
+                <h5>🔧 การตั้งค่าอื่น</h5>
+                <p>เปิด <strong>การดีบัก ADB</strong> → เลือก <strong>เปิดการเชื่อมต่อ</strong></p>
+              </div>
+            </section>
+
+            <section class="emulator-guide-section">
+              <h4>📲 2. ตั้งค่า MuMu</h4>
+              <p>ตั้งค่าเหมือน LDPlayer ทุกอย่าง</p>
+              <p>จุดเปิด ADB อยู่ที่หน้า <strong>ตัวเลือกนักพัฒนา</strong> → เปิดเหมือน LDPlayer</p>
+            </section>
+
+            <section class="emulator-guide-section">
+              <h4>💡 คำแนะนำการใช้งานบอทเพิ่มเติม</h4>
+              <h5>💰 ฟาร์ม 1 ไอดี หลายอย่างพร้อมกัน</h5>
+              <p>เปิดหลายจอของไอดีเดียวกันได้</p>
+              <ul class="emulator-screen-list">
+                <li>จอที่ 1 → ฟาร์มเหรียญ 💰</li>
+                <li>จอที่ 2 → ปล่อยบอทย่อยผง 🧪</li>
+                <li>จอที่ 3 → ปล่อยบอทย่อยผง 🧪</li>
+              </ul>
+            </section>
+
+            <div class="emulator-guide-alert warning">
+              <strong>⚠️ สำคัญ:</strong> ต้องไม่ใช้จอที่คัดลอกมา ต้องสร้างจอใหม่เท่านั้น ไม่งั้นอาจจะหลุด
+            </div>
+
+            <div class="emulator-guide-alert danger">
+              <strong>🚫 ข้อห้ามสำคัญ</strong>
+              <span>ห้ามเปิดวิ่งเหรียญพร้อมกัน 2 จอ → เกมจะหลุด</span>
+            </div>
+
+            <section class="emulator-guide-section powder-section">
+              <h4>✨ การย่อยผง</h4>
+              <p>สามารถย่อยผงพร้อมกันได้ 2–5 จอ (หรือมากกว่า)</p>
+              <p>ต้องเตรียมช่องนมให้พอ</p>
+              <p>สูงสุด 16 กล่องต่อรอบ จะพอดีกับหน้าย่อยผง</p>
+            </section>
+          </article>
         </section>
 
         <!-- ── TOPUP SECTION ──────────────────────── -->
