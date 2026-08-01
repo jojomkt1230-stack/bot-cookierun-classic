@@ -3,6 +3,13 @@ import test from 'node:test';
 
 import { reserveSlipAccessCodes } from '../api/code-store.js';
 import { lineSlipPlan, lineSlipPlanSummary } from '../api/line-slip-plans.js';
+import { slip2GoAuthorization } from '../api/slip2go-auth.js';
+
+test('formats the Slip2Go API secret as a Bearer authorization header', () => {
+  assert.equal(slip2GoAuthorization('secret-key'), 'Bearer secret-key');
+  assert.equal(slip2GoAuthorization(' Bearer secret-key '), 'Bearer secret-key');
+  assert.equal(slip2GoAuthorization(''), '');
+});
 
 test('maps verified slip amounts to the correct duration and code count', () => {
   assert.deepEqual(lineSlipPlan(1500), { durationMinutes: 1440, codeCount: 1 });

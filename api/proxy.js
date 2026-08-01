@@ -13,6 +13,7 @@ import {
   validCodeDuration
 } from './code-store.js';
 import { lineSlipPlan, lineSlipPlanSummary } from './line-slip-plans.js';
+import { slip2GoAuthorization } from './slip2go-auth.js';
 
 const LEGACY_API_ORIGIN = (
   process.env.COOKIEBOT_API_URL
@@ -471,6 +472,7 @@ async function processLineImage(request, event) {
     const lineToken = String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
     const slipSecret = String(process.env.SLIP2GO_API_SECRET || '').trim();
     if (!lineToken || !slipSecret) throw new Error('SERVICE_SECRET_MISSING');
+    const slipAuthorization = slip2GoAuthorization(slipSecret);
 
     const contentResponse = await fetch(`https://api-data.line.me/v2/bot/message/${encodeURIComponent(messageId)}/content`, {
       headers: { authorization: `Bearer ${lineToken}` },
@@ -514,7 +516,7 @@ async function processLineImage(request, event) {
       process.env.SLIP2GO_API_URL || 'https://connect.slip2go.com/api/verify-slip/qr-image/info',
       {
         method: 'POST',
-        headers: { authorization: slipSecret },
+        headers: { authorization: slipAuthorization },
         body: form,
         signal: AbortSignal.timeout(20_000)
       }
