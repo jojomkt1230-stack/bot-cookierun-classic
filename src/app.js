@@ -827,6 +827,14 @@ window.redeemAccessCode = async function(event) {
   const message = document.getElementById('access-code-message');
   const code = String(input?.value || '').trim().toUpperCase();
   if (message) message.textContent = '';
+
+  if (currentUser?.role === 'admin') {
+    const adminMessage = 'บัญชีผู้ดูแลใช้สำหรับสร้างและจัดการโค้ด ไม่ใช่บัญชีรับวันใช้งาน กรุณาออกจากระบบแล้วเข้าสู่บัญชีสมาชิกที่ต้องการเพิ่มวัน';
+    if (message) message.textContent = adminMessage;
+    window.showToast(adminMessage, 'error');
+    return;
+  }
+
   if (!/^BOT-\d{2}COOKIE-CKR[A-Z]{11}$/.test(code)) {
     if (message) message.textContent = 'กรุณากรอกโค้ดให้ครบและถูกต้อง';
     return;
