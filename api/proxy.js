@@ -9,9 +9,10 @@ import {
   normalizeAccessCode,
   releaseAccessCode,
   rememberAdminServiceToken,
-  reserveSlipAccessCode,
+  reserveSlipAccessCodes,
   validCodeDuration
 } from './code-store.js';
+import { lineSlipPlan, lineSlipPlanSummary } from './line-slip-plans.js';
 
 const LEGACY_API_ORIGIN = (
   process.env.COOKIEBOT_API_URL
@@ -530,16 +531,16 @@ async function processLineImage(request, event) {
     }
 
     const amountSatang = Math.round(Number(result.data.amount) * 100);
-    const durationByAmount = new Map([[1500, 1440], [10000, 10080], [35000, 43200]]);
-    const durationMinutes = Number.isFinite(amountSatang) ? durationByAmount.get(amountSatang) : 0;
-    if (!durationMinutes) {
+    const plan = Number.isFinite(amountSatang) ? lineSlipPlan(amountSatang) : null;
+    if (!plan) {
       await sendLineText(
         lineUserId,
         replyToken,
-        '❌ ยอดเงินไม่ตรงกับแพ็กเกจ\nรองรับเฉพาะ 15 บาท = 1 วัน, 100 บาท = 7 วัน และ 350 บาท = 30 วัน\nยังไม่มีการออกโค้ด'
+        `❌ ยอดเงินไม่ตรงกับแพ็กเกจ\nรองรับเฉพาะ ${lineSlipPlanSummary()}\nยังไม่มีการออกโค้ด`
       );
       return;
     }
+    const { durationMinutes, codeCount } = plan;
 
     const reference = String(result.data.transRef || result.data.referenceId || '').trim();
     const slipTime = Date.parse(String(result.data.dateTime || ''));
@@ -548,18 +549,28 @@ async function processLineImage(request, event) {
       return;
     }
 
-    const record = await reserveSlipAccessCode({
+    const records = await reserveSlipAccessCodes({
       reference,
       lineUserId,
       amount: amountSatang / 100,
-      durationMinutes
+      durationMinutes,
+      count: codeCount
     });
+    const codeHeading = records.length === 1
+      ? 'โค้ดวันใช้งาน:'
+      : `โค้ดวันใช้งาน (${records.length} โค้ด):`;
+    const codeLines = records.length === 1
+      ? records[0].code
+      : records.map((record, index) => `${index + 1}. ${record.code}`).join('\n');
+    const durationDescription = records.length === 1
+      ? lineDurationLabel(durationMinutes)
+      : `${lineDurationLabel(durationMinutes)} ต่อโค้ด × ${records.length} โค้ด`;
     await sendLineText(
       lineUserId,
       replyToken,
-      `✅ ตรวจสอบสลิปสำเร็จ\nยอดชำระ: ${amountSatang / 100} บาท\nได้รับวันใช้งาน: ${lineDurationLabel(durationMinutes)}\n\nโค้ดวันใช้งาน: ${record.code}\n\nนำโค้ดไปกรอกที่หน้าแรกของเว็บไซต์\nโค้ดใช้ได้ครั้งเดียว โปรดอย่าส่งต่อให้ผู้อื่น`
+      `✅ ตรวจสอบสลิปสำเร็จ\nยอดชำระ: ${amountSatang / 100} บาท\nได้รับวันใช้งาน: ${durationDescription}\n\n${codeHeading}\n${codeLines}\n\nนำโค้ดไปกรอกที่หน้าแรกของเว็บไซต์\nแต่ละโค้ดใช้ได้ครั้งเดียว โปรดอย่าส่งต่อให้ผู้อื่น`
     );
-    await markAccessCodeDelivered(record.code);
+    await Promise.all(records.map((record) => markAccessCodeDelivered(record.code)));
   } catch (error) {
     const reason = String(error?.message || 'UNKNOWN');
     const friendly = reason === 'SLIP_ALREADY_USED'

@@ -173,49 +173,91 @@ export async function listAccessCodes(limit = 200) {
     .filter(Boolean);
 }
 
-const RESERVE_SLIP_SCRIPT = `
+const RESERVE_SLIP_CODES_SCRIPT = `
 local prior = redis.call('GET', KEYS[1])
 if prior then return prior end
-if redis.call('EXISTS', KEYS[2]) == 1 then return 'COLLISION' end
-redis.call('SET', KEYS[2], ARGV[1])
+for index = 3, #KEYS do
+  if redis.call('EXISTS', KEYS[index]) == 1 then return 'COLLISION' end
+end
+for index = 3, #KEYS do
+  local offset = (index - 3) * 2
+  local record = ARGV[3 + offset]
+  local code = ARGV[4 + offset]
+  redis.call('SET', KEYS[index], record)
+  redis.call('ZADD', KEYS[2], ARGV[1], code)
+end
 redis.call('SET', KEYS[1], ARGV[2])
-redis.call('ZADD', KEYS[3], ARGV[3], ARGV[2])
 return ARGV[2]
 `;
 
-export async function reserveSlipAccessCode({ reference, lineUserId, amount, durationMinutes }) {
+function parseReservedSlipCodes(value) {
+  const legacyCode = normalizeAccessCode(value);
+  if (legacyCode) return [legacyCode];
+  const parsed = parseRecord(value);
+  if (!parsed || !Array.isArray(parsed.codes)) return [];
+  return parsed.codes.map(normalizeAccessCode).filter(Boolean);
+}
+
+export async function reserveSlipAccessCodes({ reference, lineUserId, amount, durationMinutes, count = 1 }) {
   const cleanReference = String(reference || '').trim();
   const cleanLineUserId = String(lineUserId || '').trim();
   const duration = validCodeDuration(durationMinutes);
-  if (!cleanReference || cleanReference.length > 180 || !cleanLineUserId || !duration) {
+  const total = Number(count);
+  if (!cleanReference || cleanReference.length > 180 || !cleanLineUserId || !duration
+    || !Number.isInteger(total) || total < 1 || total > 10) {
     throw new Error('INVALID_SLIP_CODE_DATA');
   }
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const code = makeAccessCode();
     const createdAt = new Date().toISOString();
-    const record = {
-      code,
+    const records = Array.from({ length: total }, (_, index) => ({
+      code: makeAccessCode(),
       durationMinutes: duration,
       status: 'available',
       source: 'line-slip',
       createdAt,
       paymentReference: cleanReference,
       lineUserId: cleanLineUserId,
-      amount: Number(amount)
-    };
+      amount: Number(amount),
+      paymentCodeIndex: index + 1,
+      paymentCodeCount: total
+    }));
+    if (new Set(records.map((record) => record.code)).size !== records.length) continue;
+    const slipReservation = JSON.stringify({
+      codes: records.map((record) => record.code),
+      lineUserId: cleanLineUserId,
+      amount: Number(amount),
+      durationMinutes: duration
+    });
+    const keys = [
+      slipKey(cleanReference),
+      CODE_INDEX_KEY,
+      ...records.map((record) => codeKey(record.code))
+    ];
+    const recordArguments = records.flatMap((record) => [JSON.stringify(record), record.code]);
     const result = await redisCommand(
-      'EVAL', RESERVE_SLIP_SCRIPT, '3',
-      slipKey(cleanReference), codeKey(code), CODE_INDEX_KEY,
-      JSON.stringify(record), code, String(Date.now())
+      'EVAL', RESERVE_SLIP_CODES_SCRIPT, String(keys.length),
+      ...keys,
+      String(Date.now()), slipReservation, ...recordArguments
     );
     if (result === 'COLLISION') continue;
-    const reserved = await getAccessCode(result);
-    if (!reserved) throw new Error('SLIP_CODE_RECORD_MISSING');
-    if (reserved.lineUserId !== cleanLineUserId) throw new Error('SLIP_ALREADY_USED');
-    return reserved;
+    const reservedCodes = parseReservedSlipCodes(result);
+    if (!reservedCodes.length) throw new Error('SLIP_CODE_RECORD_MISSING');
+    const reservedRecords = [];
+    for (const reservedCode of reservedCodes) {
+      const reserved = await getAccessCode(reservedCode);
+      if (!reserved) throw new Error('SLIP_CODE_RECORD_MISSING');
+      if (reserved.lineUserId !== cleanLineUserId) throw new Error('SLIP_ALREADY_USED');
+      reservedRecords.push(reserved);
+    }
+    return reservedRecords;
   }
   throw new Error('CODE_GENERATION_COLLISION');
+}
+
+export async function reserveSlipAccessCode(options) {
+  const records = await reserveSlipAccessCodes({ ...options, count: 1 });
+  return records[0];
 }
 
 export async function getAccessCode(value) {
