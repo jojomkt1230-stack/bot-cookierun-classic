@@ -4,11 +4,13 @@ import {
   createAccessCodes,
   finishAccessCode,
   getAdminServiceToken,
+  getMemberCodeForSession,
   listAccessCodes,
   markAccessCodeDelivered,
   normalizeAccessCode,
   releaseAccessCode,
   rememberAdminServiceToken,
+  rememberMemberSession,
   reserveSlipAccessCodes,
   validCodeDuration
 } from './code-store.js';
@@ -333,8 +335,11 @@ async function redeemAccessCode(request) {
     includeContentType: false
   });
   if (!memberResponse.ok) return json(member, memberResponse.status);
-  const memberCode = String(member.memberCode || '').trim();
-  if (!memberCode) return json({ error: 'ไม่พบรหัสสมาชิก กรุณาเข้าสู่ระบบใหม่' }, 401);
+  const bearerToken = String(request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const memberCode = String(member.memberCode || await getMemberCodeForSession(bearerToken) || '').trim();
+  if (!memberCode) {
+    return json({ error: 'ยังไม่พบรหัสสมาชิกในเซสชัน กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่ 1 ครั้ง' }, 401);
+  }
 
   const claimed = await claimAccessCode(code, memberCode, deviceId);
   if (claimed.error === 'NOT_FOUND' || claimed.error === 'INVALID') {
@@ -683,6 +688,12 @@ async function loginWithLegacy(request) {
   if (user.role === 'admin') {
     const adminSession = await tryAdminLogin(request, username, password);
     if (adminSession) return json(adminSession);
+  }
+
+  try {
+    await rememberMemberSession(token, memberCode);
+  } catch (error) {
+    console.error('[Member Session] Could not remember member code:', error?.message || error);
   }
 
   return json({
@@ -1098,13 +1109,14 @@ async function memberMe(request) {
   const member = await responseData(upstream);
   if (!upstream.ok) return json(member, upstream.status);
 
-  const token = request.headers.get('authorization') || '';
-  const memberCode = String(member.memberCode || '');
+  const authorization = request.headers.get('authorization') || '';
+  const token = String(authorization).replace(/^Bearer\s+/i, '').trim();
+  const memberCode = String(member.memberCode || await getMemberCodeForSession(token) || '');
   const user = publicUser(member, memberCode);
 
   return json({
     ...user,
-    tokenPresent: token.startsWith('Bearer ')
+    tokenPresent: Boolean(token)
   });
 }
 

@@ -62,6 +62,13 @@ function slipKey(reference) {
   return `${KEY_PREFIX}:slip:${reference}`;
 }
 
+async function memberSessionKey(token) {
+  const bytes = new TextEncoder().encode(String(token));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const hash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
+  return `${KEY_PREFIX}:member-session:${hash}`;
+}
+
 export function normalizeAccessCode(value) {
   const code = String(value || '').trim().toUpperCase();
   return /^BOT-\d{2}COOKIE-CKR[A-Z]{11}$/.test(code) ? code : '';
@@ -100,6 +107,21 @@ export async function rememberAdminServiceToken(token, expiresIn = 2_592_000) {
 export async function getAdminServiceToken() {
   if (!codeStorageConfigured()) return '';
   return String(await redisCommand('GET', ADMIN_TOKEN_KEY) || '');
+}
+
+export async function rememberMemberSession(token, memberCode, expiresIn = 2_592_000) {
+  const cleanToken = String(token || '').trim();
+  const cleanMemberCode = String(memberCode || '').trim();
+  if (!codeStorageConfigured() || !cleanToken || !cleanMemberCode || cleanMemberCode.length > 180) return false;
+  const ttl = Math.max(300, Math.min(Number(expiresIn) || 2_592_000, 2_592_000));
+  await redisCommand('SET', await memberSessionKey(cleanToken), cleanMemberCode, 'EX', String(ttl));
+  return true;
+}
+
+export async function getMemberCodeForSession(token) {
+  const cleanToken = String(token || '').trim();
+  if (!codeStorageConfigured() || !cleanToken) return '';
+  return String(await redisCommand('GET', await memberSessionKey(cleanToken)) || '').trim();
 }
 
 async function createUniqueCodeRecord(durationMinutes, source, extra = {}) {

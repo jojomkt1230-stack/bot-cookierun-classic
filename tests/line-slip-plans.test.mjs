@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { reserveSlipAccessCodes } from '../api/code-store.js';
+import {
+  getMemberCodeForSession,
+  rememberMemberSession,
+  reserveSlipAccessCodes
+} from '../api/code-store.js';
 import { lineSlipPlan, lineSlipPlanSummary } from '../api/line-slip-plans.js';
 import { slip2GoAuthorization } from '../api/slip2go-auth.js';
 
@@ -90,6 +94,41 @@ test('atomically reserves every code for one verified slip', async () => {
       }),
       /SLIP_ALREADY_USED/
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.KV_REST_API_URL;
+    else process.env.KV_REST_API_URL = originalUrl;
+    if (originalToken === undefined) delete process.env.KV_REST_API_TOKEN;
+    else process.env.KV_REST_API_TOKEN = originalToken;
+  }
+});
+
+test('remembers the member code by a hashed session token', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalUrl = process.env.KV_REST_API_URL;
+  const originalToken = process.env.KV_REST_API_TOKEN;
+  const values = new Map();
+  const commands = [];
+  process.env.KV_REST_API_URL = 'https://redis.test';
+  process.env.KV_REST_API_TOKEN = 'test-token';
+
+  globalThis.fetch = async (_url, init) => {
+    const command = JSON.parse(init.body);
+    commands.push(command);
+    if (command[0] === 'SET') {
+      values.set(command[1], command[2]);
+      return Response.json({ result: 'OK' });
+    }
+    if (command[0] === 'GET') {
+      return Response.json({ result: values.get(command[1]) ?? null });
+    }
+    throw new Error(`Unexpected Redis command: ${command[0]}`);
+  };
+
+  try {
+    assert.equal(await rememberMemberSession('member-token-secret', 'CKRCS-1234'), true);
+    assert.equal(await getMemberCodeForSession('member-token-secret'), 'CKRCS-1234');
+    assert.ok(commands.every((command) => !String(command[1]).includes('member-token-secret')));
   } finally {
     globalThis.fetch = originalFetch;
     if (originalUrl === undefined) delete process.env.KV_REST_API_URL;
