@@ -123,10 +123,6 @@
         <div class="user-info-wrapper">
           <span class="username-display" id="topbar-username">สมาชิก</span>
         </div>
-        <div class="diamond-display">
-          <span class="diamond-icon">💎</span>
-          <span id="topbar-diamonds">99999</span>
-        </div>
       </div>
     </header>
 
@@ -144,10 +140,6 @@
           <button class="menu-item active" onclick="showSection('home')" id="menu-home">
             <span class="menu-icon">🏠</span>
             <span class="menu-text">หน้าหลัก</span>
-          </button>
-          <button class="menu-item" onclick="showSection('rent')" id="menu-rent">
-            <span class="menu-icon">🤖</span>
-            <span class="menu-text">เช่าบอท</span>
           </button>
           <button class="menu-item" onclick="showSection('download')" id="menu-download">
             <span class="menu-icon">⬇️</span>
@@ -200,8 +192,8 @@
               <div class="stat-value" id="home-bot-status">-</div>
               <div class="stat-label">สถานะบอท</div>
             </div>
-            <div class="stat-card access-code-card">
-              <div class="stat-icon">🔑</div>
+            <div class="stat-card access-code-card access-code-glow">
+              <div class="stat-icon access-code-icon">🔑</div>
               <div class="stat-label access-code-title">ใส่โค้ดวันใช้งาน</div>
               <form id="access-code-form" class="access-code-form" onsubmit="redeemAccessCode(event)">
                 <input
@@ -213,7 +205,7 @@
                   spellcheck="false"
                   placeholder="bot-12cookie-ckrABCDEFGHIJK"
                 />
-                <button id="access-code-submit" class="btn-primary" type="submit">รับวันใช้งาน</button>
+                <button id="access-code-submit" class="access-code-confirm" type="submit">ยืนยันใช้โค้ด</button>
               </form>
               <div id="access-code-message" class="admin-field-hint" role="status"></div>
             </div>
@@ -231,17 +223,6 @@
               <div class="countdown-sep">:</div>
               <div class="countdown-unit"><span id="cd-secs">00</span><label>วินาที</label></div>
             </div>
-          </div>
-        </section>
-
-        <!-- ── RENT SECTION ────────────────────────── -->
-        <section id="section-rent" class="content-section hidden">
-          <div class="section-header card-panel">
-            <h2>🤖 เช่าบอท</h2>
-            <p class="subtitle">เลือกแพ็กเกจที่ต้องการ (วันใช้งานจะ+ต่อจากวันเดิม)</p>
-          </div>
-          <div id="packages-grid" class="packages-grid">
-            <div class="loading-spinner">⟳ กำลังโหลดแพ็กเกจจริง...</div>
           </div>
         </section>
 
@@ -284,42 +265,37 @@
         <!-- ── TOPUP SECTION ──────────────────────── -->
         <section id="section-topup" class="content-section hidden">
           <div class="section-header card-panel">
-            <h2>💰 เติมเงิน</h2>
-            <div class="rate-badge">1 บาท = 1 💎 เพชร</div>
+            <h2>💰 เติมเงินรับวันใช้งาน</h2>
+            <p class="subtitle">โอนเงินตามแพ็กเกจ แล้วส่งสลิปตรวจสอบผ่าน LINE OA</p>
           </div>
           <div class="topup-grid">
             <div class="topup-promptpay-card">
-              <h3>📱 PromptPay</h3>
+              <h3>📱 บัญชีสำหรับโอนเงิน</h3>
               <div class="promptpay-account-name" id="promptpay-account-name">ชื่อบัญชี: กำลังโหลด...</div>
               <div class="promptpay-number-box" id="promptpay-number">กำลังโหลด...</div>
               <div class="qr-container">
                 <img id="qr-code-img" src="" alt="QR Code PromptPay" class="qr-image" />
               </div>
+              <div class="usage-plans" aria-label="แพ็กเกจวันใช้งาน">
+                <span><strong>15 บาท</strong> = 1 วัน</span>
+                <span><strong>100 บาท</strong> = 7 วัน</span>
+                <span><strong>350 บาท</strong> = 30 วัน</span>
+              </div>
             </div>
-            <div class="topup-slip-card">
-              <h3>📸 แนบสลิป</h3>
-              <form id="slip-form" onsubmit="handleSlipSubmit(event)">
-                <div class="form-group">
-                  <label for="topup-amount">💵 จำนวนเงิน (บาท)</label>
-                  <input id="topup-amount" type="number" min="1" max="100000" step="1" inputmode="numeric" placeholder="กรอกจำนวนเงินตามสลิป" required />
-                </div>
-                <div class="slip-upload-area" id="slip-upload-area">
-                  <input type="file" id="slip-input" accept="image/*" hidden onchange="handleSlipPreview(event)" />
-                  <div class="upload-placeholder" id="upload-placeholder" onclick="document.getElementById('slip-input').click()">
-                    <div class="upload-icon">📎</div>
-                    <p>คลิกเพื่อเลือกรูปสลิป</p>
-                    <p class="upload-hint">JPG, PNG, WEBP (สูงสุด 5MB)</p>
-                  </div>
-                  <div id="slip-preview-container" class="hidden">
-                    <img id="slip-preview" src="" alt="slip preview" class="slip-preview-img" />
-                    <button type="button" class="remove-slip-btn" onclick="removeSlip()">✕</button>
-                  </div>
-                </div>
-                <div id="topup-msg" class="form-error"></div>
-                <button type="submit" class="btn-primary" id="submit-slip-btn">
-                  <span class="btn-icon">📤</span> ส่งสลิปตรวจสอบ
-                </button>
-              </form>
+            <div class="topup-slip-card payment-steps-card">
+              <h3>📋 ขั้นตอนการเติมเงินรับวันใช้งาน</h3>
+              <ol class="payment-steps">
+                <li>โอนเงินเข้าบัญชีที่แสดงทางด้านซ้าย</li>
+                <li>คลิกปุ่มตรวจสอบสลิปด้านล่าง ระบบจะเปิด LINE แล้วส่งรูปสลิปลงในแชทเพื่อตรวจสอบ</li>
+                <li>คลิกลิงก์หรือแอดไลน์ <strong>@715ybpdq</strong></li>
+                <li>เมื่อตรวจสอบสลิปเสร็จ จะได้รับโค้ดสำหรับนำไปกรอกที่หน้าแรกของเว็บไซต์</li>
+                <li>ระบบจะเพิ่มวันใช้งานให้อัตโนมัติ</li>
+              </ol>
+              <a class="line-slip-button" href="https://lin.ee/zQypOkt" target="_blank" rel="noopener noreferrer">
+                <span class="line-slip-icon">LINE</span>
+                <span>คลิกตรวจสอบสลิปที่ LINE <strong>@715ybpdq</strong></span>
+              </a>
+              <p class="payment-thanks">ขอบคุณที่ไว้วางใจ CKRCS</p>
             </div>
           </div>
         </section>

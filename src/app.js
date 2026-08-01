@@ -853,7 +853,7 @@ window.redeemAccessCode = async function(event) {
   } finally {
     if (button) {
       button.disabled = false;
-      button.textContent = 'รับวันใช้งาน';
+      button.textContent = 'ยืนยันใช้โค้ด';
     }
   }
 };

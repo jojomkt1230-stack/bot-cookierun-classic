@@ -959,37 +959,86 @@ body {
 }
 
 .home-grid.access-code-grid {
-  grid-template-columns: minmax(240px, 320px) minmax(300px, 460px);
+  grid-template-columns: minmax(220px, 280px) minmax(300px, 410px);
   justify-content: center;
-  align-items: stretch;
+  align-items: center;
 }
 
 .access-code-card {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding: 17px 18px;
+}
+
+.access-code-glow {
+  border-color: rgba(255, 216, 77, 0.92);
+  background: linear-gradient(145deg, rgba(45, 34, 3, 0.88), rgba(17, 16, 8, 0.9));
+  box-shadow: 0 0 12px rgba(255, 213, 64, 0.62), inset 0 0 22px rgba(255, 213, 64, 0.08);
+}
+
+.access-code-glow:hover {
+  border-color: #ffe66d;
+  box-shadow: 0 0 21px rgba(255, 222, 73, 0.82), inset 0 0 25px rgba(255, 213, 64, 0.12);
+}
+
+.access-code-icon {
+  font-size: 1.5rem !important;
+  margin-bottom: 3px !important;
+  filter: drop-shadow(0 0 8px rgba(255, 224, 90, 0.9));
 }
 
 .access-code-title {
-  color: var(--text-primary) !important;
-  font-size: 1rem !important;
+  color: #ffe66d !important;
+  font-size: 0.95rem !important;
   font-weight: 700;
+  text-shadow: 0 0 8px rgba(255, 222, 73, 0.72);
 }
 
 .access-code-form {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 7px;
+  margin-top: 9px;
 }
 
 .access-code-form .admin-input {
   flex: 1;
   min-width: 0;
   text-transform: uppercase;
+  padding: 9px 11px;
+  border-color: rgba(255, 222, 73, 0.8);
+  color: #fff3a8;
+  background: rgba(18, 14, 2, 0.82);
+  box-shadow: inset 0 0 12px rgba(255, 213, 64, 0.08);
 }
 
-.access-code-form .btn-primary {
+.access-code-form .admin-input:focus {
+  border-color: #ffe66d;
+  box-shadow: 0 0 12px rgba(255, 222, 73, 0.48), inset 0 0 12px rgba(255, 213, 64, 0.08);
+}
+
+.access-code-confirm {
   white-space: nowrap;
+  border: 1px solid #ffe66d;
+  border-radius: var(--radius-sm);
+  padding: 9px 13px;
+  background: linear-gradient(135deg, #ffd43b, #ffae00);
+  color: #241600;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(255, 202, 45, 0.54);
+  transition: var(--transition);
+}
+
+.access-code-confirm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(255, 221, 76, 0.82);
+}
+
+.access-code-confirm:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 
 #access-code-message {
@@ -1139,7 +1188,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  max-width: 800px;
+  max-width: 940px;
 }
 
 .topup-promptpay-card, .topup-slip-card {
@@ -1403,6 +1452,88 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+}
+
+.usage-plans {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.usage-plans span {
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 216, 77, 0.36);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 205, 39, 0.08);
+  color: var(--text-secondary);
+}
+
+.usage-plans strong {
+  color: #ffe66d;
+  text-shadow: 0 0 7px rgba(255, 222, 73, 0.52);
+}
+
+.payment-steps-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.payment-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px 22px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.payment-steps li::marker {
+  color: #ffe66d;
+  font-weight: 900;
+}
+
+.payment-steps strong {
+  color: #00ffaa;
+}
+
+.line-slip-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border: 1px solid #06c755;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #06c755, #00a844);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  box-shadow: 0 0 16px rgba(6, 199, 85, 0.45);
+  transition: var(--transition);
+}
+
+.line-slip-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(6, 199, 85, 0.72);
+}
+
+.line-slip-icon {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  height: 27px;
+  border-radius: 8px;
+  background: #fff;
+  color: #06c755;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.payment-thanks {
+  margin: 14px 0 0;
+  text-align: center;
+  color: #ffe66d;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(255, 222, 73, 0.5);
 }
 
 .admin-field-label {
@@ -2027,6 +2158,6 @@ body {
   .home-grid.access-code-grid { grid-template-columns: 1fr; }
   .stat-card.centered-stat { max-width: none; }
   .access-code-form { flex-direction: column; }
-  .access-code-form .btn-primary { width: 100%; }
+  .access-code-form .access-code-confirm { width: 100%; }
   .access-code-admin-controls > * { width: 100% !important; }
 }
