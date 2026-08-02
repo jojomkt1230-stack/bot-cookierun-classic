@@ -360,13 +360,12 @@ function updateDownloadPanel(settings = getSystemSettings()) {
     downloadWarning.classList.toggle('hidden', !message);
   }
 
-  renderDownloadItems(settings, active);
   renderHomeBotMenu(settings);
   renderDownloadItemsEditor(settings);
 }
 
-// The four bot builds shown on the download page. `id` and `icon` are fixed so
-// the cards stay consistent; the admin panel only edits label, note and link.
+// The four bots advertised on the home page. `id` and `icon` are fixed so the
+// cards stay consistent; the admin panel only edits label, note and link.
 const DOWNLOAD_ITEM_PRESETS = DEFAULT_SETTINGS.downloadItems;
 
 function downloadItemsOf(settings = getSystemSettings()) {
@@ -381,58 +380,6 @@ function downloadItemsOf(settings = getSystemSettings()) {
       url: String(item.url || '')
     };
   });
-}
-
-function renderDownloadItems(settings = getSystemSettings(), active = licenseIsActive()) {
-  const grid = document.getElementById('download-items-grid');
-  if (!grid) return;
-
-  grid.replaceChildren(...downloadItemsOf(settings).map((item) => {
-    const ready = item.url.startsWith('https://');
-    const unlocked = ready && active;
-
-    const card = document.createElement('article');
-    card.className = `bot-menu-card${unlocked ? '' : ' locked'}`;
-
-    const icon = document.createElement('div');
-    icon.className = 'bot-menu-icon';
-    icon.textContent = item.icon;
-
-    const title = document.createElement('h4');
-    title.className = 'bot-menu-title';
-    title.textContent = item.label;
-
-    const note = document.createElement('p');
-    note.className = 'bot-menu-note';
-    note.textContent = item.description;
-
-    const button = document.createElement('a');
-    button.className = 'bot-menu-btn';
-    button.textContent = !ready
-      ? '🔜 เร็ว ๆ นี้'
-      : unlocked
-        ? '⬇️ ดาวน์โหลด'
-        : '🔒 ต้องมีวันใช้งาน';
-    if (unlocked) {
-      button.href = item.url;
-      button.target = '_blank';
-      button.rel = 'noopener noreferrer';
-    } else {
-      button.href = '#';
-      button.classList.add('disabled');
-      button.setAttribute('aria-disabled', 'true');
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        window.showToast(
-          ready ? 'ต้องมีวันใช้งานคงเหลือก่อนดาวน์โหลด' : 'ผู้ดูแลยังไม่ได้ใส่ลิงก์ของบอทตัวนี้',
-          'error'
-        );
-      });
-    }
-
-    card.append(icon, title, note, button);
-    return card;
-  }));
 }
 
 // Home page showcase: the same four bots, but read-only. It advertises what the
@@ -532,9 +479,9 @@ window.saveDownloadItems = async function() {
   try {
     await axios.post(`${API_BASE_URL}/admin/settings`, { downloadItems }, adminApiConfig());
     await loadSystemSettings(true);
-    window.showToast('บันทึกเมนูดาวน์โหลดแล้ว', 'success');
+    window.showToast('บันทึกเมนูบอทหน้าแรกแล้ว', 'success');
   } catch (error) {
-    window.showToast(getApiErrorMessage(error, 'บันทึกเมนูดาวน์โหลดไม่สำเร็จ'), 'error');
+    window.showToast(getApiErrorMessage(error, 'บันทึกเมนูบอทหน้าแรกไม่สำเร็จ'), 'error');
   }
 };
 

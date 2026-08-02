@@ -262,12 +262,6 @@
               </p>
             </div>
           </div>
-
-          <div class="bot-menu-header">
-            <h3>🧩 เลือกบอทตามงานที่ต้องการ</h3>
-            <p>แต่ละตัวทำงานแยกกัน เปิดพร้อมกันคนละจอได้</p>
-          </div>
-          <div id="download-items-grid" class="download-items-grid"></div>
         </section>
 
         <!-- ── TUTORIAL SECTION ───────────────────── -->
@@ -535,13 +529,15 @@
                   </div>
                 </div>
                 <div class="admin-card full-width">
-                  <h4>🧩 เมนูดาวน์โหลด (แก้ชื่อและลิงก์ได้จริง)</h4>
+                  <h4>🧩 เมนูบอทหน้าแรก (แก้ชื่อและคำอธิบายได้จริง)</h4>
                   <div id="download-items-editor" class="download-items-editor"></div>
                   <div class="admin-field-hint">
-                    ลิงก์ต้องขึ้นต้นด้วย https:// เว้นว่างไว้ได้ถ้ายังไม่มีไฟล์ ปุ่มบนหน้าเว็บจะขึ้นว่า “เร็ว ๆ นี้”
+                    ชื่อและคำอธิบายจะขึ้นที่การ์ดหน้าแรกทันทีหลังบันทึก
+                    ส่วนช่องลิงก์ระบบเก็บไว้ให้ แต่ตอนนี้หน้าแรกเป็นการ์ดโชว์อย่างเดียวจึงยังไม่มีปุ่มกด
+                    (ลิงก์ที่ใช้ดาวน์โหลดจริงอยู่ที่ช่อง “ข้อมูลดาวน์โหลดบอท”)
                   </div>
                   <button class="btn-primary" onclick="saveDownloadItems()" style="margin-top:12px;">
-                    💾 บันทึกเมนูดาวน์โหลด
+                    💾 บันทึกเมนูบอทหน้าแรก
                   </button>
                 </div>
                 <div class="admin-card full-width">
