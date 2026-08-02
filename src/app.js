@@ -1236,7 +1236,11 @@ function renderAdminAccessCodes() {
           <td style="padding:12px; font-family:monospace; color:var(--primary);">${escapeHtml(item.code)}</td>
           <td style="padding:12px;">${escapeHtml(accessCodeDurationLabel(item.durationMinutes))}</td>
           <td style="padding:12px;"><span class="code-status ${escapeHtml(item.status || 'available')}">${escapeHtml(accessCodeStatusLabel(item.status))}</span></td>
-          <td style="padding:12px;">${escapeHtml(item.memberCode || '-')}</td>
+          <td style="padding:12px;">
+            <strong>${escapeHtml(item.memberName || item.memberUsername || (item.memberCode ? 'ไม่พบชื่อสมาชิก' : '-'))}</strong>
+            ${item.memberCode ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">${escapeHtml(item.memberCode)}</div>` : ''}
+            ${!item.memberCode && item.source === 'line-slip' ? '<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">ส่งให้ลูกค้าทาง LINE แล้ว แต่ยังไม่มีผู้ใช้โค้ด</div>' : ''}
+          </td>
           <td style="padding:12px;">${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString('th-TH') : '-')}</td>
         </tr>
       `).join('')}</tbody>
@@ -1504,8 +1508,9 @@ function renderAdminTopupsTable() {
       <thead>
         <tr style="border-bottom:1px solid var(--border-bright); text-align:left; color:var(--primary);">
           <th style="padding:10px;">สมาชิก</th>
+          <th style="padding:10px;">ช่องทาง</th>
           <th style="padding:10px;">จำนวนเงิน</th>
-          <th style="padding:10px;">เพชร 💎</th>
+          <th style="padding:10px;">สิทธิ์ที่ได้รับ</th>
           <th style="padding:10px;">เลขอ้างอิง</th>
           <th style="padding:10px;">เวลา</th>
           <th style="padding:10px;">สถานะ</th>
@@ -1514,9 +1519,16 @@ function renderAdminTopupsTable() {
       <tbody>
         ${filtered.map(t => `
           <tr style="border-bottom:1px solid rgba(0,212,255,0.15);">
-            <td style="padding:10px; font-weight:700;">${escapeHtml(t.username)}</td>
+            <td style="padding:10px;">
+              <strong>${escapeHtml(t.memberName || t.username || '-')}</strong>
+              ${t.memberCode ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">${escapeHtml(t.memberCode)}</div>` : ''}
+              ${t.source === 'line-slip' && !t.memberCode ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">ยังไม่มีสมาชิกใช้โค้ด</div>` : ''}
+            </td>
+            <td style="padding:10px;">${t.source === 'line-slip' ? 'LINE ตรวจสลิป' : 'หน้าเว็บไซต์'}</td>
             <td style="padding:10px; color:var(--accent); font-weight:700;">${t.amount} บาท</td>
-            <td style="padding:10px; font-weight:700;">${t.diamonds}</td>
+            <td style="padding:10px; font-weight:700;">${t.source === 'line-slip'
+              ? `${escapeHtml(accessCodeDurationLabel(t.durationMinutes))} × ${Number(t.codeCount || 1)} โค้ด`
+              : `${Number(t.diamonds || 0)} เครดิต`}</td>
             <td style="padding:10px; font-size:0.85rem;">${escapeHtml(t.slipRef || t.orderId || '-')}</td>
             <td style="padding:10px; font-size:0.85rem;">${t.createdAt ? new Date(t.createdAt).toLocaleString('th-TH') : '-'}</td>
             <td style="padding:10px;">

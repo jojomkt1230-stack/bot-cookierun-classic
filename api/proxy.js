@@ -298,7 +298,7 @@ async function adminAccessCodes(request) {
 
   if (request.method === 'GET') {
     const codes = await listAccessCodes(200);
-    return json({ codes });
+    return json({ codes: attachMemberNamesToCodes(codes, overview.data.members || []) });
   }
 
   const payload = await readJson(request);
@@ -758,6 +758,111 @@ function mapTopup(topup) {
   };
 }
 
+function memberDirectory(members = []) {
+  return new Map(members.map((member) => {
+    const memberCode = String(member?.member_code || member?.memberCode || '').trim();
+    const username = String(member?.username || '').trim();
+    const displayName = String(member?.display_name || member?.displayName || '').trim();
+    return [memberCode, {
+      memberCode,
+      username,
+      displayName,
+      memberName: username || displayName || memberCode
+    }];
+  }).filter(([memberCode]) => memberCode));
+}
+
+export function attachMemberNamesToCodes(codes = [], members = []) {
+  const directory = memberDirectory(members);
+  return codes.map((code) => {
+    const memberCode = String(code?.memberCode || '').trim();
+    const member = directory.get(memberCode);
+    return {
+      ...code,
+      memberName: member?.memberName || '',
+      memberUsername: member?.username || '',
+      memberDisplayName: member?.displayName || ''
+    };
+  });
+}
+
+export function buildLineSlipTopups(codes = [], members = []) {
+  const directory = memberDirectory(members);
+  const payments = new Map();
+
+  for (const code of codes) {
+    if (String(code?.source || '') !== 'line-slip') continue;
+    const paymentReference = String(code?.paymentReference || '').trim();
+    if (!paymentReference) continue;
+
+    let payment = payments.get(paymentReference);
+    if (!payment) {
+      payment = {
+        paymentReference,
+        amount: Number(code?.amount || 0),
+        durationMinutes: Number(code?.durationMinutes || 0),
+        lineUserId: String(code?.lineUserId || ''),
+        createdAt: code?.createdAt || null,
+        deliveredAt: code?.deliveredAt || null,
+        codes: [],
+        memberCodes: new Set()
+      };
+      payments.set(paymentReference, payment);
+    }
+
+    payment.codes.push(String(code?.code || ''));
+    if (code?.memberCode) payment.memberCodes.add(String(code.memberCode));
+    if (!payment.deliveredAt && code?.deliveredAt) payment.deliveredAt = code.deliveredAt;
+    if (Date.parse(String(code?.createdAt || '')) < Date.parse(String(payment.createdAt || ''))) {
+      payment.createdAt = code.createdAt;
+    }
+  }
+
+  return Array.from(payments.values()).map((payment) => {
+    const memberCodes = Array.from(payment.memberCodes);
+    const memberNames = memberCodes
+      .map((memberCode) => directory.get(memberCode)?.memberName || memberCode)
+      .filter(Boolean);
+    return {
+      _id: `line-slip:${payment.paymentReference}`,
+      id: `line-slip:${payment.paymentReference}`,
+      orderId: payment.codes.filter(Boolean).join(', '),
+      memberCode: memberCodes.join(', '),
+      memberName: memberNames.join(', '),
+      username: memberNames.join(', ') || 'ยังไม่มีสมาชิกใช้โค้ด',
+      amount: payment.amount,
+      diamonds: 0,
+      credits: 0,
+      status: 'approved',
+      sourceStatus: 'verified',
+      source: 'line-slip',
+      slipRef: payment.paymentReference,
+      lineUserId: payment.lineUserId,
+      codeCount: payment.codes.length,
+      codes: payment.codes.filter(Boolean),
+      durationMinutes: payment.durationMinutes,
+      hasSlip: true,
+      createdAt: payment.createdAt,
+      verifiedAt: payment.deliveredAt || payment.createdAt
+    };
+  });
+}
+
+async function combinedAdminTopups(overviewData) {
+  const legacyTopups = (overviewData.topups || []).map(mapTopup);
+  if (!codeStorageConfigured()) return legacyTopups;
+  try {
+    const codes = await listAccessCodes(500);
+    const lineTopups = buildLineSlipTopups(codes, overviewData.members || []);
+    return [...lineTopups, ...legacyTopups].sort((left, right) => (
+      Date.parse(String(right.createdAt || '')) - Date.parse(String(left.createdAt || ''))
+    ));
+  } catch (error) {
+    console.error('[Admin Topups] Could not load LINE slip history:', error?.message || error);
+    return legacyTopups;
+  }
+}
+
 async function adminOverview(request) {
   const { response, data } = await legacyJson(request, '/api/admin/overview', {
     method: 'GET',
@@ -785,7 +890,7 @@ async function adminUsers(request) {
 async function adminTopups(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
-  return json({ topups: (overview.data.topups || []).map(mapTopup) });
+  return json({ topups: await combinedAdminTopups(overview.data) });
 }
 
 async function adminStats(request) {
@@ -793,7 +898,7 @@ async function adminStats(request) {
   if (overview.errorResponse) return overview.errorResponse;
 
   const members = (overview.data.members || []).map(mapMember);
-  const topups = (overview.data.topups || []).map(mapTopup);
+  const topups = await combinedAdminTopups(overview.data);
   const today = thailandDate();
   const todayRevenue = topups
     .filter((item) => item.status === 'approved'
