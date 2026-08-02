@@ -463,7 +463,7 @@ function renderHomeBotMenu(settings = getSystemSettings()) {
     dot.className = 'home-bot-status-dot';
     dot.setAttribute('aria-hidden', 'true');
     const statusText = document.createElement('span');
-    statusText.textContent = 'เปิดใช้งานได้แล้ววันนี้';
+    statusText.textContent = 'ใช้งานได้ปกติ';
     status.append(dot, statusText);
 
     card.append(icon, title, note, status);

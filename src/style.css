@@ -982,17 +982,20 @@ body {
 .download-warning.hidden { display: none !important; }
 
 /* ─── Tutorial ──────────────────────────────────────────────────── */
-/* The welcome panel hugs its own text and sits against the left edge. */
+/* The welcome panel hugs its own text and is centred over the cards below. */
 .section-header.card-panel.welcome-panel {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   width: fit-content;
   max-width: 100%;
+  margin-left: auto;
   margin-right: auto;
-  padding: 18px 26px;
-  text-align: left;
+  padding: 18px 34px;
+  text-align: center;
 }
+
+.section-header.card-panel.welcome-panel p { margin-top: 6px; }
 
 .section-header.card-panel.welcome-panel h2,
 .section-header.card-panel.welcome-panel p { white-space: nowrap; }
