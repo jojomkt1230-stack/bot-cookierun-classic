@@ -174,10 +174,10 @@ const DEFAULT_SETTINGS = {
   siteName: 'CKRCS BOT',
   botUrl: 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq',
   downloadItems: [
-    { id: 'farm', icon: '💰', label: 'ฟาร์มเงิน', description: 'วิ่งเก็บเหรียญอัตโนมัติตลอดวัน', url: '' },
+    { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', url: '' },
     { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '' },
-    { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน', url: '' },
-    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว', url: '' }
+    { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', url: '' },
+    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', url: '' }
   ],
   plans: {
     day1: { label: '1 วัน', days: 1, price: 15 },
@@ -258,8 +258,6 @@ function applySystemSettingsToUI() {
   const ppNum = document.getElementById('promptpay-number');
   const ppName = document.getElementById('promptpay-account-name');
   const qrImg = document.getElementById('qr-code-img');
-  const announcementBox = document.getElementById('home-announcement');
-  const announcementText = document.getElementById('home-announcement-text');
   const announcementBanner = document.getElementById('announcement-banner');
   const announcementBannerText = document.getElementById('announce-text');
 
@@ -270,8 +268,6 @@ function applySystemSettingsToUI() {
     qrImg.src = qrUrl;
     qrImg.classList.toggle('hidden', !qrUrl);
   }
-  if (announcementBox) announcementBox.classList.toggle('hidden', !settings.announcement);
-  if (announcementText) announcementText.textContent = settings.announcement || '';
   if (announcementBanner) announcementBanner.classList.toggle('hidden', !settings.announcement);
   if (announcementBannerText) announcementBannerText.textContent = settings.announcement || '';
 
@@ -365,6 +361,7 @@ function updateDownloadPanel(settings = getSystemSettings()) {
   }
 
   renderDownloadItems(settings, active);
+  renderHomeBotMenu(settings);
   renderDownloadItemsEditor(settings);
 }
 
@@ -434,6 +431,42 @@ function renderDownloadItems(settings = getSystemSettings(), active = licenseIsA
     }
 
     card.append(icon, title, note, button);
+    return card;
+  }));
+}
+
+// Home page showcase: the same four bots, but read-only. It advertises what the
+// service covers, so it stays visible whether or not the member can download.
+function renderHomeBotMenu(settings = getSystemSettings()) {
+  const grid = document.getElementById('home-bot-menu-grid');
+  if (!grid) return;
+
+  grid.replaceChildren(...downloadItemsOf(settings).map((item) => {
+    const card = document.createElement('article');
+    card.className = 'home-bot-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'home-bot-icon';
+    icon.textContent = item.icon;
+
+    const title = document.createElement('h4');
+    title.className = 'home-bot-title';
+    title.textContent = item.label;
+
+    const note = document.createElement('p');
+    note.className = 'home-bot-note';
+    note.textContent = item.description;
+
+    const status = document.createElement('div');
+    status.className = 'home-bot-status';
+    const dot = document.createElement('span');
+    dot.className = 'home-bot-status-dot';
+    dot.setAttribute('aria-hidden', 'true');
+    const statusText = document.createElement('span');
+    statusText.textContent = 'เปิดใช้งานได้แล้ววันนี้';
+    status.append(dot, statusText);
+
+    card.append(icon, title, note, status);
     return card;
   }));
 }
@@ -890,6 +923,10 @@ function initDashboard(skipRefresh = false) {
     window.showPage('auth-page');
     return;
   }
+
+  // Check in straight away so a member with active days is counted on login
+  // instead of waiting for the next scheduled ping.
+  pingPresence();
 
   // Update Topbar Username & Diamonds
   const usernameEl = document.getElementById('topbar-username');
@@ -1864,20 +1901,20 @@ window.massCompensation = async function() {
   }
 };
 
-// 9. REALTIME PRESENCE COUNTER
+// 9. REALTIME COUNTER OF MEMBERS WITH ACTIVE BOT DAYS
+// Only a signed-in member whose licence has not expired is counted, so the
+// number reflects paying users currently on the site, not casual visitors.
 const PRESENCE_PING_MS = 20_000;
-const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+const PRESENCE_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 let presenceTimer = null;
 
-function visitorId() {
-  const saved = localStorage.getItem('visitorId');
-  if (VISITOR_ID_PATTERN.test(String(saved))) return saved;
+function activeMemberPresenceId() {
+  if (!licenseIsActive()) return '';
+  const memberCode = String(currentUser?.memberCode || currentUser?.id || '').trim();
+  if (!memberCode) return '';
 
-  const generated = (crypto.randomUUID?.() || `v${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    .replace(/[^A-Za-z0-9_-]/g, '')
-    .slice(0, 64);
-  localStorage.setItem('visitorId', generated);
-  return generated;
+  const id = `m-${memberCode}`.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+  return PRESENCE_ID_PATTERN.test(id) ? id : '';
 }
 
 function renderLiveUsers(online, live) {
@@ -1889,14 +1926,19 @@ function renderLiveUsers(online, live) {
   if (card) card.classList.toggle('offline', !live);
   if (hint) {
     hint.textContent = live
-      ? 'อัปเดตสดทุก 20 วินาที'
+      ? 'นับเฉพาะสมาชิกที่มีวันใช้งานคงเหลือ'
       : 'ยังเชื่อมต่อข้อมูลสดไม่ได้';
   }
 }
 
 async function pingPresence() {
+  const presenceId = activeMemberPresenceId();
+
   try {
-    const { data } = await axios.post(`${API_BASE_URL}/presence/ping`, { visitorId: visitorId() });
+    // Members with active days check in; everyone else only reads the total.
+    const { data } = presenceId
+      ? await axios.post(`${API_BASE_URL}/presence/ping`, { visitorId: presenceId })
+      : await axios.get(`${API_BASE_URL}/presence`);
     renderLiveUsers(Number(data?.online), Boolean(data?.live));
   } catch (error) {
     renderLiveUsers(null, false);

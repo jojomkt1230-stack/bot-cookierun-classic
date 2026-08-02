@@ -528,16 +528,55 @@ body {
 /* Announcement */
 .announcement {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 24px;
+  justify-content: center;
+  padding: 14px 24px;
   background: linear-gradient(90deg, rgba(123,47,255,0.3), rgba(0,212,255,0.3));
   border-bottom: 1px solid rgba(123,47,255,0.5);
-  font-size: 0.9rem;
   color: #ffffff;
 }
+
+/* Roomy enough to read at a glance, but capped so it never runs edge to edge. */
+.announcement-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 1100px;
+  padding: 14px 22px;
+  background:
+    linear-gradient(135deg, rgba(0, 207, 255, 0.16), rgba(97, 48, 255, 0.16)),
+    rgba(3, 15, 42, 0.85);
+  border: 1px solid rgba(55, 231, 255, 0.65);
+  border-radius: var(--radius);
+  box-shadow: 0 0 16px rgba(55, 231, 255, 0.16);
+}
+
+.announce-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.announce-title {
+  font-family: var(--font-cyber);
+  font-size: 0.95rem;
+  color: var(--primary);
+  text-shadow: 0 0 8px var(--primary-glow);
+}
+
+#announce-text {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
 .announcement.hidden { display: none !important; }
-.announce-icon { font-size: 1.1rem; }
+.announce-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px var(--primary-glow));
+}
 
 /* Dashboard Layout */
 .dashboard-layout {
@@ -943,47 +982,121 @@ body {
 .download-warning.hidden { display: none !important; }
 
 /* ─── Tutorial ──────────────────────────────────────────────────── */
-/* The announcement and the welcome panel hug their own text instead of
-   stretching across the whole content area. */
-.home-intro-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.home-announcement {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 18px 22px;
-  width: fit-content;
-  max-width: min(100%, 560px);
-  color: #fff;
-  background:
-    linear-gradient(135deg, rgba(0, 207, 255, 0.18), rgba(97, 48, 255, 0.18)),
-    rgba(3, 15, 42, 0.92);
-  border: 1px solid rgba(55, 231, 255, 0.72);
-  border-radius: var(--radius);
-  box-shadow: 0 0 18px rgba(55, 231, 255, 0.18), inset 0 0 24px rgba(55, 231, 255, 0.05);
-}
-
-.home-announcement .announcement-content p { overflow-wrap: anywhere; }
-
+/* The welcome panel hugs its own text and sits against the left edge. */
 .section-header.card-panel.welcome-panel {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: flex-start;
   width: fit-content;
   max-width: 100%;
-  margin-bottom: 0;
+  margin-right: auto;
   padding: 18px 26px;
+  text-align: left;
 }
 
 .section-header.card-panel.welcome-panel h2,
 .section-header.card-panel.welcome-panel p { white-space: nowrap; }
+
+/* ─── Home Bot Showcase (read-only) ─────────────────────────────── */
+.home-bot-menu { margin-bottom: 24px; }
+
+.home-bot-menu-header { margin-bottom: 14px; }
+
+.home-bot-menu-header h3 {
+  font-family: var(--font-cyber);
+  font-size: 1.1rem;
+  color: var(--primary);
+  text-shadow: 0 0 10px var(--primary-glow);
+  letter-spacing: 1px;
+}
+
+.home-bot-menu-header p {
+  margin-top: 5px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.home-bot-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 14px;
+}
+
+.home-bot-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 20px 16px;
+  text-align: center;
+  background:
+    linear-gradient(160deg, rgba(0, 212, 255, 0.1), rgba(123, 47, 255, 0.1)),
+    rgba(4, 14, 38, 0.92);
+  border: 1.5px solid var(--border-bright);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  /* Display only: nothing here is clickable. */
+  cursor: default;
+}
+
+.home-bot-icon {
+  font-size: 1.9rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 9px var(--primary-glow));
+}
+
+.home-bot-title {
+  font-family: var(--font-cyber);
+  font-size: 0.97rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+  text-shadow: 0 0 8px var(--primary-glow);
+  overflow-wrap: anywhere;
+}
+
+.home-bot-note {
+  flex: 1;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Soft green "available" pill — readable without glaring. */
+.home-bot-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 2px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #7dffc4;
+  background: rgba(0, 255, 170, 0.09);
+  border: 1px solid rgba(0, 255, 170, 0.38);
+  box-shadow: 0 0 8px rgba(0, 255, 170, 0.14);
+}
+
+.home-bot-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #46f5b0;
+  box-shadow: 0 0 6px rgba(70, 245, 176, 0.75);
+  animation: softLive 2.4s ease-in-out infinite;
+}
+
+@keyframes softLive {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-bot-status-dot { animation: none; }
+}
 
 .home-grid.access-code-grid {
   grid-template-columns: minmax(190px, 230px) minmax(190px, 230px) minmax(290px, 400px);
@@ -2205,7 +2318,8 @@ body {
   .tutorial-step-add { grid-template-columns: 1fr; }
   .step-card { padding: 15px; gap: 12px; }
   .step-num { flex-basis: 36px; width: 36px; height: 36px; }
-  .home-announcement { padding: 15px; }
+  .announcement { padding: 10px 14px; }
+  .announcement-inner { padding: 12px 15px; gap: 11px; }
 }
 
 @media (max-width: 480px) {
@@ -2502,8 +2616,6 @@ body {
 
 @media (max-width: 700px) {
   .home-grid.access-code-grid { grid-template-columns: 1fr; }
-  .home-intro-row { flex-direction: column; align-items: stretch; }
-  .home-announcement,
   .section-header.card-panel.welcome-panel { width: auto; max-width: none; }
   .section-header.card-panel.welcome-panel h2,
   .section-header.card-panel.welcome-panel p { white-space: normal; }

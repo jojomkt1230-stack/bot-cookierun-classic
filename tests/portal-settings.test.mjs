@@ -149,10 +149,10 @@ test('stores the four download menu entries with editable labels and links', asy
   await withStubbedBackends(async () => {
     const saveResponse = await proxy.fetch(adminRequest('admin/settings', {
       downloadItems: [
-        { id: 'farm', label: 'ฟาร์มเงิน', description: 'เก็บเหรียญอัตโนมัติ', url: 'https://files.example/farm.zip' },
+        { id: 'farm', label: 'ฟาร์มเงิน/กล่อง', description: 'เก็บกล่องอัตโนมัติ', url: 'https://files.example/farm.zip' },
         { id: 'powder', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ', url: 'https://files.example/powder.zip' },
         { id: 'friend', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'ส่งใจครบทุกวัน', url: '' },
-        { id: 'account', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่', url: 'https://files.example/account.zip' }
+        { id: 'account', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ทุกวัน', url: 'https://files.example/account.zip' }
       ]
     }));
     assert.equal(saveResponse.status, 200);
@@ -160,14 +160,42 @@ test('stores the four download menu entries with editable labels and links', asy
     const publicData = await (await proxy.fetch(apiRequest('settings'))).json();
     assert.equal(publicData.downloadItems.length, 4);
     assert.deepEqual(
-      publicData.downloadItems.map((item) => [item.id, item.label, item.url]),
+      publicData.downloadItems.map((item) => [item.id, item.label, item.description, item.url]),
       [
-        ['farm', 'ฟาร์มเงิน', 'https://files.example/farm.zip'],
-        ['powder', 'ย่อยผง', 'https://files.example/powder.zip'],
-        ['friend', 'เพิ่มเพื่อน/ส่งใจ', ''],
-        ['account', 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', 'https://files.example/account.zip']
+        ['farm', 'ฟาร์มเงิน/กล่อง', 'เก็บกล่องอัตโนมัติ', 'https://files.example/farm.zip'],
+        ['powder', 'ย่อยผง', 'ย่อยผงอัตโนมัติ', 'https://files.example/powder.zip'],
+        ['friend', 'เพิ่มเพื่อน/ส่งใจ', 'ส่งใจครบทุกวัน', ''],
+        ['account', 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', 'สมัครไอดีใหม่ทุกวัน', 'https://files.example/account.zip']
       ]
     );
+  });
+});
+
+test('refreshes menu wording the admin never edited, keeping custom text', async () => {
+  await withStubbedBackends(async () => {
+    // Simulate a config saved before the wording change: farm still carries the
+    // old preset text, powder has text the admin typed themselves.
+    await proxy.fetch(adminRequest('admin/settings', {
+      downloadItems: [
+        { id: 'farm', label: 'ฟาร์มเงิน', description: 'วิ่งเก็บเหรียญอัตโนมัติตลอดวัน', url: '' },
+        { id: 'powder', label: 'ย่อยผงของผมเอง', description: 'คำอธิบายที่แอดมินพิมพ์เอง', url: '' },
+        { id: 'friend', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน', url: '' },
+        { id: 'account', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว', url: '' }
+      ]
+    }));
+
+    const items = (await (await proxy.fetch(apiRequest('settings'))).json()).downloadItems;
+    const byId = Object.fromEntries(items.map((item) => [item.id, item]));
+
+    assert.equal(byId.farm.label, 'ฟาร์มเงิน/กล่อง');
+    assert.equal(byId.farm.description, 'วิ่งเก็บกล่องออโต้รันตลอดวัน');
+    assert.equal(byId.farm.icon, '💰📦');
+    assert.match(byId.friend.description, /ครบ 300 คน/);
+    assert.match(byId.account.description, /ขาดหัวใจ/);
+
+    // Admin-authored wording survives untouched.
+    assert.equal(byId.powder.label, 'ย่อยผงของผมเอง');
+    assert.equal(byId.powder.description, 'คำอธิบายที่แอดมินพิมพ์เอง');
   });
 });
 

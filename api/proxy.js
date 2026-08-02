@@ -55,13 +55,49 @@ const DEFAULT_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=1Wy
 // label, description and link of each entry; the id and icon stay fixed so the
 // cards keep a consistent look no matter what the admin types.
 const DEFAULT_DOWNLOAD_ITEMS = [
-  { id: 'farm', icon: '💰', label: 'ฟาร์มเงิน', description: 'วิ่งเก็บเหรียญอัตโนมัติตลอดวัน', url: '' },
+  { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', url: '' },
   { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '' },
-  { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน', url: '' },
-  { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว', url: '' }
+  { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', url: '' },
+  { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', url: '' }
 ];
 const DOWNLOAD_ITEM_LABEL_MAX = 60;
-const DOWNLOAD_ITEM_DESCRIPTION_MAX = 120;
+const DOWNLOAD_ITEM_DESCRIPTION_MAX = 160;
+
+// Wording from earlier releases. A stored entry still carrying one of these
+// strings was never edited by the admin, so it is refreshed to the current
+// preset on read. Anything the admin actually typed is left untouched.
+const SUPERSEDED_DOWNLOAD_TEXT = {
+  farm: {
+    labels: ['ฟาร์มเงิน'],
+    descriptions: ['วิ่งเก็บเหรียญอัตโนมัติตลอดวัน']
+  },
+  powder: { labels: [], descriptions: [] },
+  friend: {
+    labels: [],
+    descriptions: ['เพิ่มเพื่อนและส่งใจให้ครบทุกวัน']
+  },
+  account: {
+    labels: [],
+    descriptions: ['สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว']
+  }
+};
+
+function refreshSupersededDownloadText(items) {
+  return items.map((item) => {
+    const superseded = SUPERSEDED_DOWNLOAD_TEXT[item.id];
+    const preset = DEFAULT_DOWNLOAD_ITEMS.find((entry) => entry.id === item.id);
+    if (!superseded || !preset) return item;
+
+    return {
+      ...item,
+      icon: preset.icon,
+      label: superseded.labels.includes(item.label) ? preset.label : item.label,
+      description: superseded.descriptions.includes(item.description)
+        ? preset.description
+        : item.description
+    };
+  });
+}
 
 function downloadItemList(value) {
   return Array.isArray(value) ? value.filter((item) => item && typeof item === 'object') : null;
@@ -291,7 +327,9 @@ function normalizePortalConfig(config) {
       : [],
     botName: typeof source.botName === 'string' ? source.botName : '',
     downloadUrl: typeof source.downloadUrl === 'string' ? source.downloadUrl : '',
-    downloadItems: normalizeDownloadItems(source.downloadItems, null),
+    downloadItems: refreshSupersededDownloadText(
+      normalizeDownloadItems(source.downloadItems, null)
+    ),
     paymentQrUrl: typeof source.paymentQrUrl === 'string' ? source.paymentQrUrl : '',
     promptpayNumber: typeof source.promptpayNumber === 'string' ? source.promptpayNumber : '',
     promptpayLabel: typeof source.promptpayLabel === 'string' ? source.promptpayLabel : ''

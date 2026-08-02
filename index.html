@@ -126,10 +126,15 @@
       </div>
     </header>
 
-    <!-- Announcement Banner -->
-    <div id="announcement-banner" class="announcement hidden">
-      <span class="announce-icon">📢</span>
-      <span id="announce-text"></span>
+    <!-- Announcement Banner (the single place the admin notice appears) -->
+    <div id="announcement-banner" class="announcement hidden" role="status">
+      <div class="announcement-inner">
+        <span class="announce-icon">📢</span>
+        <div class="announce-body">
+          <strong class="announce-title">ประกาศจากผู้ดูแล</strong>
+          <span id="announce-text"></span>
+        </div>
+      </div>
     </div>
 
     <!-- Main Layout -->
@@ -175,18 +180,17 @@
 
         <!-- ── HOME SECTION ────────────────────────── -->
         <section id="section-home" class="content-section active">
-          <div class="home-intro-row">
-            <div id="home-announcement" class="home-announcement hidden" role="status">
-              <div class="announcement-icon">📢</div>
-              <div class="announcement-content">
-                <strong>ประกาศจากผู้ดูแล</strong>
-                <p id="home-announcement-text"></p>
-              </div>
+          <div class="home-bot-menu">
+            <div class="home-bot-menu-header">
+              <h3>🧩 บอทที่เปิดให้ใช้งาน</h3>
+              <p>แต่ละตัวทำงานแยกกัน เปิดพร้อมกันคนละจอได้</p>
             </div>
-            <div class="section-header card-panel welcome-panel">
-              <h2>🏠 ยินดีต้อนรับ</h2>
-              <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
-            </div>
+            <div id="home-bot-menu-grid" class="home-bot-menu-grid"></div>
+          </div>
+
+          <div class="section-header card-panel welcome-panel">
+            <h2>🏠 ยินดีต้อนรับ</h2>
+            <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
           </div>
           <div class="home-grid access-code-grid">
             <div class="stat-card centered-stat">
