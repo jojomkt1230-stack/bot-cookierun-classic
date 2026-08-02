@@ -175,22 +175,33 @@
 
         <!-- ── HOME SECTION ────────────────────────── -->
         <section id="section-home" class="content-section active">
-          <div id="home-announcement" class="home-announcement hidden" role="status">
-            <div class="announcement-icon">📢</div>
-            <div class="announcement-content">
-              <strong>ประกาศจากผู้ดูแล</strong>
-              <p id="home-announcement-text"></p>
+          <div class="home-intro-row">
+            <div id="home-announcement" class="home-announcement hidden" role="status">
+              <div class="announcement-icon">📢</div>
+              <div class="announcement-content">
+                <strong>ประกาศจากผู้ดูแล</strong>
+                <p id="home-announcement-text"></p>
+              </div>
             </div>
-          </div>
-          <div class="section-header card-panel">
-            <h2>🏠 ยินดีต้อนรับ</h2>
-            <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
+            <div class="section-header card-panel welcome-panel">
+              <h2>🏠 ยินดีต้อนรับ</h2>
+              <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
+            </div>
           </div>
           <div class="home-grid access-code-grid">
             <div class="stat-card centered-stat">
               <div class="stat-icon">🤖</div>
               <div class="stat-value" id="home-bot-status">-</div>
               <div class="stat-label">สถานะบอท</div>
+            </div>
+            <div class="stat-card centered-stat live-users-card" id="live-users-card">
+              <div class="stat-icon">🛰️</div>
+              <div class="live-users-value">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span class="stat-value" id="live-users-count">–</span>
+              </div>
+              <div class="stat-label">กำลังใช้งานอยู่ตอนนี้</div>
+              <div class="live-users-hint" id="live-users-hint">อัปเดตสดทุก 20 วินาที</div>
             </div>
             <div class="stat-card access-code-card access-code-glow">
               <div class="stat-icon access-code-icon">🔑</div>
@@ -247,6 +258,12 @@
               </p>
             </div>
           </div>
+
+          <div class="bot-menu-header">
+            <h3>🧩 เลือกบอทตามงานที่ต้องการ</h3>
+            <p>แต่ละตัวทำงานแยกกัน เปิดพร้อมกันคนละจอได้</p>
+          </div>
+          <div id="download-items-grid" class="download-items-grid"></div>
         </section>
 
         <!-- ── TUTORIAL SECTION ───────────────────── -->
@@ -512,6 +529,16 @@
                     <input type="url" id="sys-bot-url" class="admin-input" placeholder="URL ดาวน์โหลดแบบ https://" />
                     <button class="btn-secondary" onclick="saveBotInfo()">บันทึกข้อมูลบอท</button>
                   </div>
+                </div>
+                <div class="admin-card full-width">
+                  <h4>🧩 เมนูดาวน์โหลด (แก้ชื่อและลิงก์ได้จริง)</h4>
+                  <div id="download-items-editor" class="download-items-editor"></div>
+                  <div class="admin-field-hint">
+                    ลิงก์ต้องขึ้นต้นด้วย https:// เว้นว่างไว้ได้ถ้ายังไม่มีไฟล์ ปุ่มบนหน้าเว็บจะขึ้นว่า “เร็ว ๆ นี้”
+                  </div>
+                  <button class="btn-primary" onclick="saveDownloadItems()" style="margin-top:12px;">
+                    💾 บันทึกเมนูดาวน์โหลด
+                  </button>
                 </div>
                 <div class="admin-card full-width">
                   <h4>📢 ประกาศหน้าแรก</h4>

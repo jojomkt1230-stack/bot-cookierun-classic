@@ -44,11 +44,11 @@ async function redisRequest(pathname, payload) {
   return data?.result;
 }
 
-async function redisCommand(...command) {
+export async function redisCommand(...command) {
   return redisRequest('', command);
 }
 
-async function redisPipeline(commands) {
+export async function redisPipeline(commands) {
   if (!commands.length) return [];
   const result = await redisRequest('/pipeline', commands);
   return Array.isArray(result) ? result : [];

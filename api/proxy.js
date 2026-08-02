@@ -15,6 +15,14 @@ import {
   validCodeDuration
 } from './code-store.js';
 import { lineSlipPlan, lineSlipPlanSummary } from './line-slip-plans.js';
+import {
+  countPresence,
+  portalStorageConfigured,
+  readStoredPortalConfig,
+  touchPresence,
+  validVisitorId,
+  writeStoredPortalConfig
+} from './portal-store.js';
 import { slip2GoAuthorization } from './slip2go-auth.js';
 
 const LEGACY_API_ORIGIN = (
@@ -42,6 +50,58 @@ const TUTORIAL_COLORS = new Set(['orange', 'cyan', 'blue', 'pink']);
 // Admin settings still take priority as soon as they are saved.
 const DEFAULT_BOT_NAME = 'Ckrcsbot V18.1';
 const DEFAULT_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq';
+
+// The four bot builds shown on the download page. The admin panel edits the
+// label, description and link of each entry; the id and icon stay fixed so the
+// cards keep a consistent look no matter what the admin types.
+const DEFAULT_DOWNLOAD_ITEMS = [
+  { id: 'farm', icon: '💰', label: 'ฟาร์มเงิน', description: 'วิ่งเก็บเหรียญอัตโนมัติตลอดวัน', url: '' },
+  { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '' },
+  { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน', url: '' },
+  { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว', url: '' }
+];
+const DOWNLOAD_ITEM_LABEL_MAX = 60;
+const DOWNLOAD_ITEM_DESCRIPTION_MAX = 120;
+
+function downloadItemList(value) {
+  return Array.isArray(value) ? value.filter((item) => item && typeof item === 'object') : null;
+}
+
+function normalizeDownloadItems(value, previous) {
+  const priorList = downloadItemList(previous) || DEFAULT_DOWNLOAD_ITEMS;
+  const incoming = downloadItemList(value);
+
+  return DEFAULT_DOWNLOAD_ITEMS.map((preset, index) => {
+    const prior = priorList.find((item) => item.id === preset.id) || priorList[index] || preset;
+    const patch = incoming
+      ? incoming.find((item) => item.id === preset.id) || incoming[index] || {}
+      : {};
+
+    const label = String(patch.label ?? prior.label ?? preset.label).trim();
+    const description = String(patch.description ?? prior.description ?? preset.description).trim();
+    const url = String(patch.url ?? prior.url ?? '').trim();
+
+    return {
+      id: preset.id,
+      icon: preset.icon,
+      label: (label || preset.label).slice(0, DOWNLOAD_ITEM_LABEL_MAX),
+      description: description.slice(0, DOWNLOAD_ITEM_DESCRIPTION_MAX),
+      url
+    };
+  });
+}
+
+function invalidDownloadItem(items) {
+  for (const item of items) {
+    if (item.url && !item.url.startsWith('https://')) {
+      return `ลิงก์ของ "${item.label}" ต้องขึ้นต้นด้วย https://`;
+    }
+    if (item.url.length > 500) {
+      return `ลิงก์ของ "${item.label}" ยาวเกินไป`;
+    }
+  }
+  return '';
+}
 
 function json(data, status = 200) {
   return Response.json(data, {
@@ -218,6 +278,40 @@ async function decodePortalConfig(value) {
 
 async function attachPortalConfig(config) {
   return `${PORTAL_CONFIG_PREFIX}${PORTAL_CONFIG_FRAGMENT}=${await encodePortalConfig(config)}`;
+}
+
+function normalizePortalConfig(config) {
+  const source = config && typeof config === 'object' ? config : {};
+  return {
+    announcement: typeof source.announcement === 'string' ? source.announcement : '',
+    tutorialVideoUrl: typeof source.tutorialVideoUrl === 'string' ? source.tutorialVideoUrl : '',
+    tutorialColor: TUTORIAL_COLORS.has(source.tutorialColor) ? source.tutorialColor : 'cyan',
+    tutorialSteps: Array.isArray(source.tutorialSteps)
+      ? source.tutorialSteps.filter((item) => typeof item === 'string').slice(0, 8)
+      : [],
+    botName: typeof source.botName === 'string' ? source.botName : '',
+    downloadUrl: typeof source.downloadUrl === 'string' ? source.downloadUrl : '',
+    downloadItems: normalizeDownloadItems(source.downloadItems, null),
+    paymentQrUrl: typeof source.paymentQrUrl === 'string' ? source.paymentQrUrl : '',
+    promptpayNumber: typeof source.promptpayNumber === 'string' ? source.promptpayNumber : '',
+    promptpayLabel: typeof source.promptpayLabel === 'string' ? source.promptpayLabel : ''
+  };
+}
+
+// Portal display settings live in Redis so a save never depends on the legacy
+// members service accepting an oversized `siteName` blob. The old blob is still
+// read as a fallback so portals saved before this change keep working.
+async function resolvePortalConfig(legacySiteName) {
+  let stored = null;
+  try {
+    stored = await readStoredPortalConfig();
+  } catch (error) {
+    console.error('[Portal] Redis read failed:', error?.message || error);
+  }
+  if (stored) return { isStored: true, config: normalizePortalConfig(stored) };
+
+  const decoded = await decodePortalConfig(String(legacySiteName || ''));
+  return { isStored: decoded.isStored, config: normalizePortalConfig(decoded.config) };
 }
 
 function publicUser(member, memberCode) {
@@ -1020,6 +1114,7 @@ async function saveAdminSettings(request) {
     'tutorialSteps',
     'botName',
     'downloadUrl',
+    'downloadItems',
     'paymentQrUrl',
     'promptpayNumber',
     'promptpayLabel'
@@ -1038,7 +1133,7 @@ async function saveAdminSettings(request) {
   if (hasPortalSettings) {
     const overview = await adminOverview(request);
     if (overview.errorResponse) return overview.errorResponse;
-    const previous = await decodePortalConfig(overview.data.siteName || '');
+    const previous = await resolvePortalConfig(overview.data.siteName || '');
     const announcement = Object.hasOwn(payload, 'announcement')
       ? String(payload.announcement || '').trim()
       : previous.config.announcement;
@@ -1066,6 +1161,10 @@ async function saveAdminSettings(request) {
     const promptpayLabel = Object.hasOwn(payload, 'promptpayLabel')
       ? String(payload.promptpayLabel || '').trim()
       : previous.config.promptpayLabel || String(overview.data.promptpayLabel || '');
+    const downloadItems = normalizeDownloadItems(
+      Object.hasOwn(payload, 'downloadItems') ? payload.downloadItems : null,
+      previous.config.downloadItems
+    );
 
     if (announcement.length > 240) {
       return json({ error: 'ข้อความประกาศต้องไม่เกิน 240 ตัวอักษร' }, 400);
@@ -1086,24 +1185,46 @@ async function saveAdminSettings(request) {
       || cleanSteps.join('').length > 500) {
       return json({ error: 'ข้อความแต่ละขั้นต้องไม่เกิน 100 ตัว และรวมไม่เกิน 500 ตัวอักษร' }, 400);
     }
+    const downloadItemError = invalidDownloadItem(downloadItems);
+    if (downloadItemError) return json({ error: downloadItemError }, 400);
 
-    const storedUrl = await attachPortalConfig({
+    const nextConfig = {
       announcement,
       tutorialVideoUrl,
       tutorialColor,
       tutorialSteps: cleanSteps,
       botName,
       downloadUrl,
+      downloadItems,
       paymentQrUrl,
       promptpayNumber,
       promptpayLabel
-    });
-    if (storedUrl.length > 1800) {
-      return json({
-        error: 'ข้อความวิธีใช้งานยาวเกินพื้นที่จัดเก็บ กรุณาย่อข้อความแต่ละขั้น'
-      }, 400);
+    };
+
+    let savedToStorage = false;
+    try {
+      savedToStorage = await writeStoredPortalConfig(nextConfig);
+    } catch (error) {
+      console.error('[Portal] Redis write failed:', error?.message || error);
     }
-    clean.siteName = storedUrl;
+
+    if (!savedToStorage) {
+      // No key/value storage available: keep the legacy behaviour of packing the
+      // portal settings into the members service `siteName` field.
+      const storedUrl = await attachPortalConfig(nextConfig);
+      if (storedUrl.length > 1800) {
+        return json({
+          error: 'ข้อความวิธีใช้งานยาวเกินพื้นที่จัดเก็บ กรุณาย่อข้อความแต่ละขั้น'
+        }, 400);
+      }
+      clean.siteName = storedUrl;
+    }
+  }
+
+  // Nothing left for the members service (for example an announcement-only save)
+  // means the portal storage write above already finished the job.
+  if (!Object.keys(clean).length) {
+    return json({ ok: true, message: 'บันทึกการตั้งค่าเรียบร้อยแล้ว' });
   }
 
   const { response, data } = await legacyJson(request, '/api/admin/settings', {
@@ -1117,7 +1238,7 @@ async function getAdminSettings(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
   const data = overview.data;
-  const portal = await decodePortalConfig(data.siteName || '');
+  const portal = await resolvePortalConfig(data.siteName || '');
 
   const stored = portal.config;
   return json({
@@ -1126,6 +1247,7 @@ async function getAdminSettings(request) {
     botName: portal.isStored ? stored.botName || DEFAULT_BOT_NAME : data.botName || DEFAULT_BOT_NAME,
     botUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
     downloadUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
+    downloadItems: stored.downloadItems,
     promptPayNumber: portal.isStored ? stored.promptpayNumber : data.promptpayNumber || '',
     promptPayAccountName: portal.isStored ? stored.promptpayLabel : data.promptpayLabel || '',
     slipReceiverName: data.slipReceiverName || '',
@@ -1136,6 +1258,7 @@ async function getAdminSettings(request) {
     tutorialSteps: portal.config.tutorialSteps,
     steps: portal.config.tutorialSteps,
     plans: data.plans || {},
+    portalStorageReady: portalStorageConfigured(),
     slip2GoConfigured: Boolean(data.slip2GoConfigured)
   });
 }
@@ -1146,7 +1269,7 @@ async function publicSettings(request) {
     includeContentType: false
   });
   if (!response.ok) return json(data, response.status);
-  const portal = await decodePortalConfig(data.siteName || '');
+  const portal = await resolvePortalConfig(data.siteName || '');
 
   const stored = portal.config;
   return json({
@@ -1155,6 +1278,7 @@ async function publicSettings(request) {
     botName: portal.isStored ? stored.botName || DEFAULT_BOT_NAME : data.botName || DEFAULT_BOT_NAME,
     botUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
     downloadUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
+    downloadItems: stored.downloadItems,
     promptPayNumber: portal.isStored ? stored.promptpayNumber : data.promptpayNumber || '',
     promptPayAccountName: portal.isStored ? stored.promptpayLabel : data.promptpayLabel || '',
     promptPayQrUrl: portal.isStored ? stored.paymentQrUrl : data.paymentQrUrl || '',
@@ -1166,6 +1290,32 @@ async function publicSettings(request) {
     plans: data.plans || {},
     creditRate: Number(data.creditRate || 1)
   });
+}
+
+async function presencePing(request) {
+  const payload = await readJson(request);
+  const visitorId = validVisitorId(payload.visitorId);
+  if (!visitorId) return json({ error: 'รหัสผู้เข้าชมไม่ถูกต้อง' }, 400);
+
+  try {
+    const online = await touchPresence(visitorId);
+    if (online === null) return json({ online: 0, live: false });
+    return json({ online, live: true });
+  } catch (error) {
+    console.error('[Presence] ping failed:', error?.message || error);
+    return json({ online: 0, live: false });
+  }
+}
+
+async function presenceStatus() {
+  try {
+    const online = await countPresence();
+    if (online === null) return json({ online: 0, live: false });
+    return json({ online, live: true });
+  } catch (error) {
+    console.error('[Presence] count failed:', error?.message || error);
+    return json({ online: 0, live: false });
+  }
 }
 
 async function massCompensation(request) {
@@ -1392,6 +1542,12 @@ export default {
       }
       if (path === 'settings' && request.method === 'GET') {
         return publicSettings(request);
+      }
+      if (path === 'presence' && request.method === 'GET') {
+        return presenceStatus();
+      }
+      if (path === 'presence/ping' && request.method === 'POST') {
+        return presencePing(request);
       }
       if (path === 'admin/users' && request.method === 'GET') {
         return adminUsers(request);

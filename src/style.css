@@ -943,12 +943,24 @@ body {
 .download-warning.hidden { display: none !important; }
 
 /* ─── Tutorial ──────────────────────────────────────────────────── */
+/* The announcement and the welcome panel hug their own text instead of
+   stretching across the whole content area. */
+.home-intro-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
 .home-announcement {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  margin-bottom: 18px;
-  padding: 18px 20px;
+  padding: 18px 22px;
+  width: fit-content;
+  max-width: min(100%, 560px);
   color: #fff;
   background:
     linear-gradient(135deg, rgba(0, 207, 255, 0.18), rgba(97, 48, 255, 0.18)),
@@ -958,10 +970,196 @@ body {
   box-shadow: 0 0 18px rgba(55, 231, 255, 0.18), inset 0 0 24px rgba(55, 231, 255, 0.05);
 }
 
-.home-grid.access-code-grid {
-  grid-template-columns: minmax(220px, 280px) minmax(300px, 410px);
+.home-announcement .announcement-content p { overflow-wrap: anywhere; }
+
+.section-header.card-panel.welcome-panel {
+  display: flex;
+  flex-direction: column;
   justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 0;
+  padding: 18px 26px;
+}
+
+.section-header.card-panel.welcome-panel h2,
+.section-header.card-panel.welcome-panel p { white-space: nowrap; }
+
+.home-grid.access-code-grid {
+  grid-template-columns: minmax(190px, 230px) minmax(190px, 230px) minmax(290px, 400px);
+  justify-content: center;
+  align-items: stretch;
+}
+
+/* ─── Realtime Online Counter ───────────────────────────────────── */
+.live-users-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-color: rgba(0, 255, 170, 0.7);
+  box-shadow: 0 0 14px rgba(0, 255, 170, 0.28), inset 0 0 22px rgba(0, 255, 170, 0.06);
+}
+
+.live-users-value {
+  display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.live-users-card .stat-value { color: var(--accent); }
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+
+.live-users-hint {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.live-users-card.offline {
+  border-color: rgba(255, 170, 0, 0.6);
+  box-shadow: 0 0 12px rgba(255, 170, 0, 0.2);
+}
+
+.live-users-card.offline .stat-value { color: var(--warning); }
+.live-users-card.offline .live-dot {
+  background: var(--warning);
+  box-shadow: 0 0 8px var(--warning);
+  animation: none;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.75); }
+}
+
+/* ─── Bot Menu Cards (download page) ────────────────────────────── */
+.bot-menu-header {
+  margin: 30px 0 16px;
+  text-align: center;
+}
+
+.bot-menu-header h3 {
+  font-family: var(--font-cyber);
+  font-size: 1.15rem;
+  color: var(--primary);
+  text-shadow: 0 0 10px var(--primary-glow);
+  letter-spacing: 1px;
+}
+
+.bot-menu-header p {
+  margin-top: 6px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.download-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+.bot-menu-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 22px 18px;
+  background:
+    linear-gradient(160deg, rgba(0, 212, 255, 0.12), rgba(123, 47, 255, 0.12)),
+    rgba(4, 14, 38, 0.94);
+  border: 1.5px solid var(--border-bright);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55);
+  transition: var(--transition);
+}
+
+.bot-menu-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 18px var(--accent-glow);
+}
+
+.bot-menu-card.locked { opacity: 0.82; }
+
+.bot-menu-icon {
+  font-size: 2.1rem;
+  filter: drop-shadow(0 0 10px var(--primary-glow));
+}
+
+.bot-menu-title {
+  font-family: var(--font-cyber);
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+  text-shadow: 0 0 8px var(--primary-glow);
+  overflow-wrap: anywhere;
+}
+
+.bot-menu-note {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.bot-menu-btn {
+  display: inline-block;
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-cyber);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: #02121f;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  box-shadow: 0 0 14px var(--primary-glow);
+  transition: var(--transition);
+}
+
+.bot-menu-btn:hover { box-shadow: 0 0 22px var(--accent-glow); }
+
+.bot-menu-btn.disabled {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* ─── Bot Menu Editor (admin) ───────────────────────────────────── */
+.download-items-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.download-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: rgba(1, 8, 24, 0.75);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.download-item-heading {
+  font-family: var(--font-cyber);
+  font-size: 0.92rem;
+  color: var(--primary);
+  overflow-wrap: anywhere;
 }
 
 .access-code-card {
@@ -2295,8 +2493,20 @@ body {
   transform: translateY(-2px);
 }
 
+@media (max-width: 980px) {
+  .home-grid.access-code-grid {
+    grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr);
+  }
+  .home-grid.access-code-grid .access-code-card { grid-column: 1 / -1; }
+}
+
 @media (max-width: 700px) {
   .home-grid.access-code-grid { grid-template-columns: 1fr; }
+  .home-intro-row { flex-direction: column; align-items: stretch; }
+  .home-announcement,
+  .section-header.card-panel.welcome-panel { width: auto; max-width: none; }
+  .section-header.card-panel.welcome-panel h2,
+  .section-header.card-panel.welcome-panel p { white-space: normal; }
   .stat-card.centered-stat { max-width: none; }
   .access-code-form { flex-direction: column; }
   .access-code-form .access-code-confirm { width: 100%; }

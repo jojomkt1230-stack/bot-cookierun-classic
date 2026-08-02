@@ -173,6 +173,12 @@ const DEFAULT_SETTINGS = {
   botName: 'Ckrcsbot V18.1',
   siteName: 'CKRCS BOT',
   botUrl: 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq',
+  downloadItems: [
+    { id: 'farm', icon: '💰', label: 'ฟาร์มเงิน', description: 'วิ่งเก็บเหรียญอัตโนมัติตลอดวัน', url: '' },
+    { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '' },
+    { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน', url: '' },
+    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว', url: '' }
+  ],
   plans: {
     day1: { label: '1 วัน', days: 1, price: 15 },
     day3: { label: '3 วัน', days: 3, price: 40 },
@@ -357,7 +363,147 @@ function updateDownloadPanel(settings = getSystemSettings()) {
     downloadWarning.textContent = message;
     downloadWarning.classList.toggle('hidden', !message);
   }
+
+  renderDownloadItems(settings, active);
+  renderDownloadItemsEditor(settings);
 }
+
+// The four bot builds shown on the download page. `id` and `icon` are fixed so
+// the cards stay consistent; the admin panel only edits label, note and link.
+const DOWNLOAD_ITEM_PRESETS = DEFAULT_SETTINGS.downloadItems;
+
+function downloadItemsOf(settings = getSystemSettings()) {
+  const saved = Array.isArray(settings.downloadItems) ? settings.downloadItems : [];
+  return DOWNLOAD_ITEM_PRESETS.map((preset, index) => {
+    const item = saved.find((entry) => entry?.id === preset.id) || saved[index] || {};
+    return {
+      id: preset.id,
+      icon: preset.icon,
+      label: String(item.label || preset.label),
+      description: String(item.description ?? preset.description),
+      url: String(item.url || '')
+    };
+  });
+}
+
+function renderDownloadItems(settings = getSystemSettings(), active = licenseIsActive()) {
+  const grid = document.getElementById('download-items-grid');
+  if (!grid) return;
+
+  grid.replaceChildren(...downloadItemsOf(settings).map((item) => {
+    const ready = item.url.startsWith('https://');
+    const unlocked = ready && active;
+
+    const card = document.createElement('article');
+    card.className = `bot-menu-card${unlocked ? '' : ' locked'}`;
+
+    const icon = document.createElement('div');
+    icon.className = 'bot-menu-icon';
+    icon.textContent = item.icon;
+
+    const title = document.createElement('h4');
+    title.className = 'bot-menu-title';
+    title.textContent = item.label;
+
+    const note = document.createElement('p');
+    note.className = 'bot-menu-note';
+    note.textContent = item.description;
+
+    const button = document.createElement('a');
+    button.className = 'bot-menu-btn';
+    button.textContent = !ready
+      ? '🔜 เร็ว ๆ นี้'
+      : unlocked
+        ? '⬇️ ดาวน์โหลด'
+        : '🔒 ต้องมีวันใช้งาน';
+    if (unlocked) {
+      button.href = item.url;
+      button.target = '_blank';
+      button.rel = 'noopener noreferrer';
+    } else {
+      button.href = '#';
+      button.classList.add('disabled');
+      button.setAttribute('aria-disabled', 'true');
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.showToast(
+          ready ? 'ต้องมีวันใช้งานคงเหลือก่อนดาวน์โหลด' : 'ผู้ดูแลยังไม่ได้ใส่ลิงก์ของบอทตัวนี้',
+          'error'
+        );
+      });
+    }
+
+    card.append(icon, title, note, button);
+    return card;
+  }));
+}
+
+function renderDownloadItemsEditor(settings = getSystemSettings()) {
+  const editor = document.getElementById('download-items-editor');
+  if (!editor) return;
+
+  editor.replaceChildren(...downloadItemsOf(settings).map((item) => {
+    const row = document.createElement('div');
+    row.className = 'download-item-row';
+    row.dataset.itemId = item.id;
+
+    const heading = document.createElement('div');
+    heading.className = 'download-item-heading';
+    heading.textContent = `${item.icon} ${item.label}`;
+
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.className = 'admin-input download-item-label';
+    labelInput.maxLength = 60;
+    labelInput.placeholder = 'ชื่อที่แสดงบนหน้าเว็บ';
+    labelInput.value = item.label;
+    labelInput.addEventListener('input', () => {
+      heading.textContent = `${item.icon} ${labelInput.value.trim() || item.label}`;
+    });
+
+    const descriptionInput = document.createElement('input');
+    descriptionInput.type = 'text';
+    descriptionInput.className = 'admin-input download-item-description';
+    descriptionInput.maxLength = 120;
+    descriptionInput.placeholder = 'คำอธิบายสั้น ๆ ใต้ชื่อ';
+    descriptionInput.value = item.description;
+
+    const urlInput = document.createElement('input');
+    urlInput.type = 'url';
+    urlInput.className = 'admin-input download-item-url';
+    urlInput.placeholder = 'https://ลิงก์ดาวน์โหลด';
+    urlInput.value = item.url;
+
+    row.append(heading, labelInput, descriptionInput, urlInput);
+    return row;
+  }));
+}
+
+window.saveDownloadItems = async function() {
+  const rows = [...document.querySelectorAll('#download-items-editor .download-item-row')];
+  if (!rows.length) return;
+
+  const downloadItems = rows.map((row) => ({
+    id: row.dataset.itemId,
+    label: row.querySelector('.download-item-label')?.value.trim() || '',
+    description: row.querySelector('.download-item-description')?.value.trim() || '',
+    url: row.querySelector('.download-item-url')?.value.trim() || ''
+  }));
+
+  const badLink = downloadItems.find((item) => item.url && !item.url.startsWith('https://'));
+  if (badLink) {
+    window.showToast(`ลิงก์ของ "${badLink.label}" ต้องขึ้นต้นด้วย https://`, 'error');
+    return;
+  }
+
+  try {
+    await axios.post(`${API_BASE_URL}/admin/settings`, { downloadItems }, adminApiConfig());
+    await loadSystemSettings(true);
+    window.showToast('บันทึกเมนูดาวน์โหลดแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'บันทึกเมนูดาวน์โหลดไม่สำเร็จ'), 'error');
+  }
+};
 
 window.startDownload = function(event) {
   const settings = getSystemSettings();
@@ -1718,7 +1864,57 @@ window.massCompensation = async function() {
   }
 };
 
-// 9. DOM READY INITIALIZATION
+// 9. REALTIME PRESENCE COUNTER
+const PRESENCE_PING_MS = 20_000;
+const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+let presenceTimer = null;
+
+function visitorId() {
+  const saved = localStorage.getItem('visitorId');
+  if (VISITOR_ID_PATTERN.test(String(saved))) return saved;
+
+  const generated = (crypto.randomUUID?.() || `v${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .replace(/[^A-Za-z0-9_-]/g, '')
+    .slice(0, 64);
+  localStorage.setItem('visitorId', generated);
+  return generated;
+}
+
+function renderLiveUsers(online, live) {
+  const card = document.getElementById('live-users-card');
+  const count = document.getElementById('live-users-count');
+  const hint = document.getElementById('live-users-hint');
+
+  if (count) count.textContent = live && Number.isFinite(online) ? String(online) : '–';
+  if (card) card.classList.toggle('offline', !live);
+  if (hint) {
+    hint.textContent = live
+      ? 'อัปเดตสดทุก 20 วินาที'
+      : 'ยังเชื่อมต่อข้อมูลสดไม่ได้';
+  }
+}
+
+async function pingPresence() {
+  try {
+    const { data } = await axios.post(`${API_BASE_URL}/presence/ping`, { visitorId: visitorId() });
+    renderLiveUsers(Number(data?.online), Boolean(data?.live));
+  } catch (error) {
+    renderLiveUsers(null, false);
+  }
+}
+
+function startPresence() {
+  pingPresence();
+  clearInterval(presenceTimer);
+  presenceTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') pingPresence();
+  }, PRESENCE_PING_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pingPresence();
+  });
+}
+
+// 10. DOM READY INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tab-login')?.addEventListener('click', () => window.switchTab('login'));
   document.getElementById('tab-register')?.addEventListener('click', () => window.switchTab('register'));
@@ -1732,6 +1928,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   initThreeJS();
   loadSystemSettings(false);
+  startPresence();
 
   let token = localStorage.getItem('token');
   let user = localStorage.getItem('user');
