@@ -871,10 +871,6 @@ function initDashboard(skipRefresh = false) {
     return;
   }
 
-  // Check in straight away so a member with active days is counted on login
-  // instead of waiting for the next scheduled ping.
-  pingPresence();
-
   // Update Topbar Username & Diamonds
   const usernameEl = document.getElementById('topbar-username');
   const diamondsEl = document.getElementById('topbar-diamonds');
@@ -1848,62 +1844,7 @@ window.massCompensation = async function() {
   }
 };
 
-// 9. REALTIME COUNTER OF MEMBERS WITH ACTIVE BOT DAYS
-// Only a signed-in member whose licence has not expired is counted, so the
-// number reflects paying users currently on the site, not casual visitors.
-const PRESENCE_PING_MS = 20_000;
-const PRESENCE_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
-let presenceTimer = null;
-
-function activeMemberPresenceId() {
-  if (!licenseIsActive()) return '';
-  const memberCode = String(currentUser?.memberCode || currentUser?.id || '').trim();
-  if (!memberCode) return '';
-
-  const id = `m-${memberCode}`.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
-  return PRESENCE_ID_PATTERN.test(id) ? id : '';
-}
-
-function renderLiveUsers(online, live) {
-  const card = document.getElementById('live-users-card');
-  const count = document.getElementById('live-users-count');
-  const hint = document.getElementById('live-users-hint');
-
-  if (count) count.textContent = live && Number.isFinite(online) ? String(online) : '–';
-  if (card) card.classList.toggle('offline', !live);
-  if (hint) {
-    hint.textContent = live
-      ? 'นับเฉพาะสมาชิกที่มีวันใช้งานคงเหลือ'
-      : 'ยังเชื่อมต่อข้อมูลสดไม่ได้';
-  }
-}
-
-async function pingPresence() {
-  const presenceId = activeMemberPresenceId();
-
-  try {
-    // Members with active days check in; everyone else only reads the total.
-    const { data } = presenceId
-      ? await axios.post(`${API_BASE_URL}/presence/ping`, { visitorId: presenceId })
-      : await axios.get(`${API_BASE_URL}/presence`);
-    renderLiveUsers(Number(data?.online), Boolean(data?.live));
-  } catch (error) {
-    renderLiveUsers(null, false);
-  }
-}
-
-function startPresence() {
-  pingPresence();
-  clearInterval(presenceTimer);
-  presenceTimer = setInterval(() => {
-    if (document.visibilityState === 'visible') pingPresence();
-  }, PRESENCE_PING_MS);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') pingPresence();
-  });
-}
-
-// 10. DOM READY INITIALIZATION
+// 9. DOM READY INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tab-login')?.addEventListener('click', () => window.switchTab('login'));
   document.getElementById('tab-register')?.addEventListener('click', () => window.switchTab('register'));
@@ -1917,7 +1858,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   initThreeJS();
   loadSystemSettings(false);
-  startPresence();
 
   let token = localStorage.getItem('token');
   let user = localStorage.getItem('user');

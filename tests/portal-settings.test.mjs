@@ -27,11 +27,10 @@ function adminRequest(path, body) {
   });
 }
 
-// Minimal in-memory stand-in for the Upstash REST API, covering only the
-// commands the portal store and the presence counter use.
+// Minimal in-memory stand-in for the Upstash REST API, covering only the two
+// commands the portal store uses.
 function fakeRedis() {
   const strings = new Map();
-  const sortedSets = new Map();
 
   function run(command) {
     const [name, key, ...args] = command.map(String);
@@ -41,29 +40,6 @@ function fakeRedis() {
       case 'SET':
         strings.set(key, args[0]);
         return 'OK';
-      case 'ZADD': {
-        const members = sortedSets.get(key) || new Map();
-        members.set(args[1], Number(args[0]));
-        sortedSets.set(key, members);
-        return 1;
-      }
-      case 'ZREMRANGEBYSCORE': {
-        const members = sortedSets.get(key) || new Map();
-        const max = Number(args[1]);
-        let removed = 0;
-        for (const [member, score] of [...members]) {
-          if (score <= max) {
-            members.delete(member);
-            removed += 1;
-          }
-        }
-        sortedSets.set(key, members);
-        return removed;
-      }
-      case 'ZCARD':
-        return (sortedSets.get(key) || new Map()).size;
-      case 'EXPIRE':
-        return 1;
       default:
         throw new Error(`Unsupported redis command: ${name}`);
     }
@@ -206,30 +182,5 @@ test('rejects a download menu link that is not https', async () => {
     }));
     assert.equal(response.status, 400);
     assert.match((await response.json()).error, /https:\/\//);
-  });
-});
-
-test('counts each visitor once in the realtime online total', async () => {
-  await withStubbedBackends(async () => {
-    const first = await (await proxy.fetch(adminRequest('presence/ping', {
-      visitorId: 'visitor-aaaaaaaa'
-    }))).json();
-    assert.deepEqual(first, { online: 1, live: true });
-
-    await proxy.fetch(adminRequest('presence/ping', { visitorId: 'visitor-aaaaaaaa' }));
-    const second = await (await proxy.fetch(adminRequest('presence/ping', {
-      visitorId: 'visitor-bbbbbbbb'
-    }))).json();
-    assert.deepEqual(second, { online: 2, live: true });
-
-    const status = await (await proxy.fetch(apiRequest('presence'))).json();
-    assert.deepEqual(status, { online: 2, live: true });
-  });
-});
-
-test('rejects a malformed visitor id', async () => {
-  await withStubbedBackends(async () => {
-    const response = await proxy.fetch(adminRequest('presence/ping', { visitorId: 'nope!' }));
-    assert.equal(response.status, 400);
   });
 });

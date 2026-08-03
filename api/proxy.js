@@ -16,11 +16,8 @@ import {
 } from './code-store.js';
 import { lineSlipPlan, lineSlipPlanSummary } from './line-slip-plans.js';
 import {
-  countPresence,
   portalStorageConfigured,
   readStoredPortalConfig,
-  touchPresence,
-  validVisitorId,
   writeStoredPortalConfig
 } from './portal-store.js';
 import { slip2GoAuthorization } from './slip2go-auth.js';
@@ -1330,32 +1327,6 @@ async function publicSettings(request) {
   });
 }
 
-async function presencePing(request) {
-  const payload = await readJson(request);
-  const visitorId = validVisitorId(payload.visitorId);
-  if (!visitorId) return json({ error: 'รหัสผู้เข้าชมไม่ถูกต้อง' }, 400);
-
-  try {
-    const online = await touchPresence(visitorId);
-    if (online === null) return json({ online: 0, live: false });
-    return json({ online, live: true });
-  } catch (error) {
-    console.error('[Presence] ping failed:', error?.message || error);
-    return json({ online: 0, live: false });
-  }
-}
-
-async function presenceStatus() {
-  try {
-    const online = await countPresence();
-    if (online === null) return json({ online: 0, live: false });
-    return json({ online, live: true });
-  } catch (error) {
-    console.error('[Presence] count failed:', error?.message || error);
-    return json({ online: 0, live: false });
-  }
-}
-
 async function massCompensation(request) {
   const payload = await readJson(request);
   const days = Number(payload.days);
@@ -1580,12 +1551,6 @@ export default {
       }
       if (path === 'settings' && request.method === 'GET') {
         return publicSettings(request);
-      }
-      if (path === 'presence' && request.method === 'GET') {
-        return presenceStatus();
-      }
-      if (path === 'presence/ping' && request.method === 'POST') {
-        return presencePing(request);
       }
       if (path === 'admin/users' && request.method === 'GET') {
         return adminUsers(request);

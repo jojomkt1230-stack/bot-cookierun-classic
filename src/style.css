@@ -1102,59 +1102,9 @@ body {
 }
 
 .home-grid.access-code-grid {
-  grid-template-columns: minmax(190px, 230px) minmax(190px, 230px) minmax(290px, 400px);
+  grid-template-columns: minmax(220px, 280px) minmax(300px, 410px);
   justify-content: center;
   align-items: stretch;
-}
-
-/* ─── Realtime Online Counter ───────────────────────────────────── */
-.live-users-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border-color: rgba(0, 255, 170, 0.7);
-  box-shadow: 0 0 14px rgba(0, 255, 170, 0.28), inset 0 0 22px rgba(0, 255, 170, 0.06);
-}
-
-.live-users-value {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-}
-
-.live-users-card .stat-value { color: var(--accent); }
-
-.live-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--accent);
-  animation: livePulse 1.6s ease-in-out infinite;
-}
-
-.live-users-hint {
-  margin-top: 6px;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
-.live-users-card.offline {
-  border-color: rgba(255, 170, 0, 0.6);
-  box-shadow: 0 0 12px rgba(255, 170, 0, 0.2);
-}
-
-.live-users-card.offline .stat-value { color: var(--warning); }
-.live-users-card.offline .live-dot {
-  background: var(--warning);
-  box-shadow: 0 0 8px var(--warning);
-  animation: none;
-}
-
-@keyframes livePulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(0.75); }
 }
 
 /* ─── Bot Menu Editor (admin) ───────────────────────────────────── */
@@ -2511,13 +2461,6 @@ body {
   color: #fff;
   box-shadow: 0 0 25px var(--danger);
   transform: translateY(-2px);
-}
-
-@media (max-width: 980px) {
-  .home-grid.access-code-grid {
-    grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr);
-  }
-  .home-grid.access-code-grid .access-code-card { grid-column: 1 / -1; }
 }
 
 @media (max-width: 700px) {
