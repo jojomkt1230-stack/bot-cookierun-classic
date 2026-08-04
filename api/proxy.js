@@ -52,13 +52,14 @@ const DEFAULT_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=1Wy
 // label, description and link of each entry; the id and icon stay fixed so the
 // cards keep a consistent look no matter what the admin types.
 const DEFAULT_DOWNLOAD_ITEMS = [
-  { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', url: '' },
-  { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '' },
-  { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', url: '' },
-  { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', url: '' }
+  { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', url: '', tutorialUrl: '' },
+  { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '', tutorialUrl: '' },
+  { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', url: '', tutorialUrl: 'https://youtu.be/hBXOy-5lAyQ' },
+  { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' }
 ];
 const DOWNLOAD_ITEM_LABEL_MAX = 60;
 const DOWNLOAD_ITEM_DESCRIPTION_MAX = 160;
+const DOWNLOAD_ITEM_TUTORIAL_URL_MAX = 500;
 
 // Wording from earlier releases. A stored entry still carrying one of these
 // strings was never edited by the admin, so it is refreshed to the current
@@ -113,13 +114,15 @@ function normalizeDownloadItems(value, previous) {
     const label = String(patch.label ?? prior.label ?? preset.label).trim();
     const description = String(patch.description ?? prior.description ?? preset.description).trim();
     const url = String(patch.url ?? prior.url ?? '').trim();
+    const tutorialUrl = String(patch.tutorialUrl ?? prior.tutorialUrl ?? preset.tutorialUrl ?? '').trim();
 
     return {
       id: preset.id,
       icon: preset.icon,
       label: (label || preset.label).slice(0, DOWNLOAD_ITEM_LABEL_MAX),
       description: description.slice(0, DOWNLOAD_ITEM_DESCRIPTION_MAX),
-      url
+      url,
+      tutorialUrl
     };
   });
 }
@@ -131,6 +134,12 @@ function invalidDownloadItem(items) {
     }
     if (item.url.length > 500) {
       return `ลิงก์ของ "${item.label}" ยาวเกินไป`;
+    }
+    if (item.tutorialUrl && !item.tutorialUrl.startsWith('https://')) {
+      return `ลิงก์คลิปสอนของ "${item.label}" ต้องขึ้นต้นด้วย https://`;
+    }
+    if (item.tutorialUrl.length > DOWNLOAD_ITEM_TUTORIAL_URL_MAX) {
+      return `ลิงก์คลิปสอนของ "${item.label}" ยาวเกินไป`;
     }
   }
   return '';
@@ -481,9 +490,9 @@ async function redeemAccessCode(request) {
   if (!claimed.record || !claimed.claimId) return json({ error: 'ไม่สามารถตรวจสอบโค้ดได้' }, 500);
 
   const durationMinutes = Number(claimed.record.durationMinutes);
-  if (!Number.isInteger(durationMinutes) || durationMinutes % 1440 !== 0) {
+  if (!validCodeDuration(durationMinutes)) {
     await releaseAccessCode(code, claimed.claimId);
-    return json({ error: 'โค้ดระยะเวลา 1 ชั่วโมงยังใช้กับฐานสมาชิกเดิมไม่ได้ กรุณาติดต่อแอดมิน' }, 409);
+    return json({ error: 'ระยะเวลาในโค้ดไม่ถูกต้อง กรุณาติดต่อแอดมิน' }, 409);
   }
 
   const adminToken = await getAdminServiceToken();
@@ -498,7 +507,7 @@ async function redeemAccessCode(request) {
     body: JSON.stringify({
       memberCode,
       action: 'activate',
-      days: durationMinutes / 1440
+      durationMinutes
     })
   });
   if (!response.ok) {

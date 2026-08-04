@@ -217,6 +217,15 @@
             </div>
           </div>
 
+          <!-- Bot Tutorial Links -->
+          <div class="home-tutorial-box card-panel">
+            <div class="home-tutorial-header">
+              <h3>📖 วิธีใช้งานบอท</h3>
+              <p>บอทตัวไหนมีคลิปสอน กดดูได้จากปุ่มด้านขวา</p>
+            </div>
+            <div id="home-tutorial-list" class="home-tutorial-list"></div>
+          </div>
+
           <!-- Countdown Timer -->
           <div class="countdown-card" id="countdown-card">
             <h3>⏰ เวลาการใช้งานที่เหลือ</h3>
@@ -467,12 +476,15 @@
                 <h4>สร้างโค้ดหลายโค้ดพร้อมกัน</h4>
                 <p class="admin-field-hint">แต่ละโค้ดใช้ได้ครั้งเดียวและไม่มีวันหมดอายุก่อนนำไปใช้ โค้ดจากสลิปจะถูกสร้างอัตโนมัติ ไม่ต้องสร้างเก็บไว้ล่วงหน้า</p>
                 <div class="input-row access-code-admin-controls">
-                  <input id="admin-code-count" type="number" min="1" max="500" value="1" class="admin-input" aria-label="จำนวนโค้ด" />
-                  <select id="admin-code-duration" class="admin-select" aria-label="ระยะเวลาโค้ด">
-                    <option value="1440">1 วัน</option>
-                    <option value="10080">7 วัน</option>
-                    <option value="43200">30 วัน</option>
-                  </select>
+                  <label class="access-code-admin-field">จำนวนโค้ด
+                    <input id="admin-code-count" type="number" min="1" max="500" value="1" class="admin-input" aria-label="จำนวนโค้ด" />
+                  </label>
+                  <label class="access-code-admin-field">จำนวนวัน
+                    <input id="admin-code-days" type="number" min="0" max="365" value="1" class="admin-input" aria-label="จำนวนวัน" />
+                  </label>
+                  <label class="access-code-admin-field">จำนวนชั่วโมง
+                    <input id="admin-code-hours" type="number" min="0" max="23" value="0" class="admin-input" aria-label="จำนวนชั่วโมง" />
+                  </label>
                   <button id="admin-code-create" class="btn-primary" type="button" onclick="createAdminAccessCodes()">สร้างโค้ด</button>
                 </div>
                 <div id="admin-generated-codes" class="generated-code-box hidden"></div>
@@ -524,8 +536,9 @@
                   <div id="download-items-editor" class="download-items-editor"></div>
                   <div class="admin-field-hint">
                     ชื่อและคำอธิบายจะขึ้นที่การ์ดหน้าแรกทันทีหลังบันทึก
-                    ส่วนช่องลิงก์ระบบเก็บไว้ให้ แต่ตอนนี้หน้าแรกเป็นการ์ดโชว์อย่างเดียวจึงยังไม่มีปุ่มกด
+                    ช่องลิงก์แรก (https://ลิงก์ดาวน์โหลด) ระบบเก็บไว้ให้แต่ยังไม่มีปุ่มกดบนการ์ด
                     (ลิงก์ที่ใช้ดาวน์โหลดจริงอยู่ที่ช่อง “ข้อมูลดาวน์โหลดบอท”)
+                    ส่วนช่องลิงก์คลิปสอน ถ้าใส่ไว้จะขึ้นเป็นปุ่ม “คลิกดูคลิปวิธีใช้งาน” ในกล่อง “วิธีใช้งานบอท” หน้าแรกทันที ปล่อยว่างได้ถ้าบอทตัวนั้นยังไม่มีคลิป
                   </div>
                   <button class="btn-primary" onclick="saveDownloadItems()" style="margin-top:12px;">
                     💾 บันทึกเมนูบอทหน้าแรก

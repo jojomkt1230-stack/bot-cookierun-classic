@@ -1,7 +1,8 @@
 const KEY_PREFIX = 'ckrcs:access-code:v1';
 const CODE_INDEX_KEY = `${KEY_PREFIX}:index`;
 const ADMIN_TOKEN_KEY = `${KEY_PREFIX}:admin-token`;
-const VALID_DURATIONS = new Set([60, 1440, 10080, 43200]);
+const MIN_CODE_DURATION_MINUTES = 60;
+const MAX_CODE_DURATION_MINUTES = 365 * 1440;
 
 function storageConfig() {
   const url = String(
@@ -76,7 +77,12 @@ export function normalizeAccessCode(value) {
 
 export function validCodeDuration(value) {
   const durationMinutes = Number(value);
-  return VALID_DURATIONS.has(durationMinutes) ? durationMinutes : 0;
+  return Number.isInteger(durationMinutes)
+    && durationMinutes >= MIN_CODE_DURATION_MINUTES
+    && durationMinutes <= MAX_CODE_DURATION_MINUTES
+    && durationMinutes % 60 === 0
+    ? durationMinutes
+    : 0;
 }
 
 export function makeAccessCode() {

@@ -174,10 +174,10 @@ const DEFAULT_SETTINGS = {
   siteName: 'CKRCS BOT',
   botUrl: 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq',
   downloadItems: [
-    { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', url: '' },
-    { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '' },
-    { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', url: '' },
-    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', url: '' }
+    { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', url: '', tutorialUrl: '' },
+    { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '', tutorialUrl: '' },
+    { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', url: '', tutorialUrl: 'https://youtu.be/hBXOy-5lAyQ' },
+    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' }
   ],
   plans: {
     day1: { label: '1 วัน', days: 1, price: 15 },
@@ -361,6 +361,7 @@ function updateDownloadPanel(settings = getSystemSettings()) {
   }
 
   renderHomeBotMenu(settings);
+  renderHomeTutorialList(settings);
   renderDownloadItemsEditor(settings);
 }
 
@@ -377,7 +378,8 @@ function downloadItemsOf(settings = getSystemSettings()) {
       icon: preset.icon,
       label: String(item.label || preset.label),
       description: String(item.description ?? preset.description),
-      url: String(item.url || '')
+      url: String(item.url || ''),
+      tutorialUrl: String(item.tutorialUrl || preset.tutorialUrl || '')
     };
   });
 }
@@ -418,6 +420,35 @@ function renderHomeBotMenu(settings = getSystemSettings()) {
   }));
 }
 
+// Home page tutorial box: lists the same four bots with a link button for
+// whichever ones the admin attached a tutorial clip to.
+function renderHomeTutorialList(settings = getSystemSettings()) {
+  const list = document.getElementById('home-tutorial-list');
+  if (!list) return;
+
+  list.replaceChildren(...downloadItemsOf(settings).map((item) => {
+    const row = document.createElement('div');
+    row.className = 'home-tutorial-row';
+
+    const label = document.createElement('span');
+    label.className = 'home-tutorial-label';
+    label.textContent = `${item.icon} ${item.label}`;
+    row.append(label);
+
+    if (item.tutorialUrl) {
+      const link = document.createElement('a');
+      link.className = 'home-tutorial-link';
+      link.href = item.tutorialUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = '🎬 คลิกดูคลิปวิธีใช้งาน';
+      row.append(link);
+    }
+
+    return row;
+  }));
+}
+
 function renderDownloadItemsEditor(settings = getSystemSettings()) {
   const editor = document.getElementById('download-items-editor');
   if (!editor) return;
@@ -454,7 +485,13 @@ function renderDownloadItemsEditor(settings = getSystemSettings()) {
     urlInput.placeholder = 'https://ลิงก์ดาวน์โหลด';
     urlInput.value = item.url;
 
-    row.append(heading, labelInput, descriptionInput, urlInput);
+    const tutorialUrlInput = document.createElement('input');
+    tutorialUrlInput.type = 'url';
+    tutorialUrlInput.className = 'admin-input download-item-tutorial-url';
+    tutorialUrlInput.placeholder = 'ลิงก์คลิปสอน (ไม่บังคับ) เช่น https://youtu.be/...';
+    tutorialUrlInput.value = item.tutorialUrl;
+
+    row.append(heading, labelInput, descriptionInput, urlInput, tutorialUrlInput);
     return row;
   }));
 }
@@ -467,12 +504,18 @@ window.saveDownloadItems = async function() {
     id: row.dataset.itemId,
     label: row.querySelector('.download-item-label')?.value.trim() || '',
     description: row.querySelector('.download-item-description')?.value.trim() || '',
-    url: row.querySelector('.download-item-url')?.value.trim() || ''
+    url: row.querySelector('.download-item-url')?.value.trim() || '',
+    tutorialUrl: row.querySelector('.download-item-tutorial-url')?.value.trim() || ''
   }));
 
   const badLink = downloadItems.find((item) => item.url && !item.url.startsWith('https://'));
   if (badLink) {
     window.showToast(`ลิงก์ของ "${badLink.label}" ต้องขึ้นต้นด้วย https://`, 'error');
+    return;
+  }
+  const badTutorialLink = downloadItems.find((item) => item.tutorialUrl && !item.tutorialUrl.startsWith('https://'));
+  if (badTutorialLink) {
+    window.showToast(`ลิงก์คลิปสอนของ "${badTutorialLink.label}" ต้องขึ้นต้นด้วย https://`, 'error');
     return;
   }
 
@@ -1328,11 +1371,12 @@ window.switchAdminTab = function(tabName) {
 
 function accessCodeDurationLabel(minutes) {
   const value = Number(minutes);
-  if (value === 60) return '1 ชั่วโมง';
-  if (value === 1440) return '1 วัน';
-  if (value === 10080) return '7 วัน';
-  if (value === 43200) return '30 วัน';
-  return `${value} นาที`;
+  if (!Number.isInteger(value) || value < 60) return '-';
+  const days = Math.floor(value / 1440);
+  const hours = Math.floor((value % 1440) / 60);
+  if (days && hours) return `${days} วัน ${hours} ชั่วโมง`;
+  if (days) return `${days} วัน`;
+  return `${hours} ชั่วโมง`;
 }
 
 function accessCodeStatusLabel(status) {
@@ -1389,10 +1433,18 @@ window.loadAdminAccessCodes = async function() {
 
 window.createAdminAccessCodes = async function() {
   const count = Number(document.getElementById('admin-code-count')?.value);
-  const durationMinutes = Number(document.getElementById('admin-code-duration')?.value);
+  const days = Number(document.getElementById('admin-code-days')?.value);
+  const hours = Number(document.getElementById('admin-code-hours')?.value);
+  const durationMinutes = (days * 1440) + (hours * 60);
   const button = document.getElementById('admin-code-create');
   if (!Number.isInteger(count) || count < 1 || count > 500) {
     window.showToast('กรุณาเลือกจำนวนโค้ด 1–500 โค้ด', 'error');
+    return;
+  }
+  if (!Number.isInteger(days) || days < 0 || days > 365
+    || !Number.isInteger(hours) || hours < 0 || hours > 23
+    || durationMinutes < 60 || durationMinutes > 525600) {
+    window.showToast('กรุณากำหนดเวลาอย่างน้อย 1 ชั่วโมง และรวมไม่เกิน 365 วัน', 'error');
     return;
   }
   if (button) {

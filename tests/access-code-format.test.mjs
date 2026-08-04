@@ -3,7 +3,8 @@ import test from 'node:test';
 
 import {
   makeAccessCode,
-  normalizeAccessCode
+  normalizeAccessCode,
+  validCodeDuration
 } from '../api/code-store.js';
 
 test('creates unique access codes with an 11-letter suffix', () => {
@@ -21,3 +22,11 @@ test('rejects old seven-letter and malformed formats', () => {
   assert.equal(normalizeAccessCode(''), '');
 });
 
+test('accepts whole-hour access-code durations up to 365 days', () => {
+  assert.equal(validCodeDuration(60), 60);
+  assert.equal(validCodeDuration((2 * 1440) + (6 * 60)), 3240);
+  assert.equal(validCodeDuration(365 * 1440), 365 * 1440);
+  assert.equal(validCodeDuration(59), 0);
+  assert.equal(validCodeDuration(90), 0);
+  assert.equal(validCodeDuration((365 * 1440) + 60), 0);
+});
