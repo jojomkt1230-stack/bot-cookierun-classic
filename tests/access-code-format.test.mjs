@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  codeDurationToDays,
   makeAccessCode,
   normalizeAccessCode,
   validCodeDuration
@@ -29,4 +30,13 @@ test('accepts whole-hour access-code durations up to 365 days', () => {
   assert.equal(validCodeDuration(59), 0);
   assert.equal(validCodeDuration(90), 0);
   assert.equal(validCodeDuration((365 * 1440) + 60), 0);
+});
+
+test('converts code duration minutes to the whole days the legacy API expects', () => {
+  assert.equal(codeDurationToDays(60), 1);
+  assert.equal(codeDurationToDays(1440), 1);
+  assert.equal(codeDurationToDays(1440 * 7), 7);
+  assert.equal(codeDurationToDays((1440 * 2) + 60), 3);
+  assert.equal(codeDurationToDays(1440 * 365), 365);
+  assert.equal(codeDurationToDays((1440 * 365) + 60), 365);
 });

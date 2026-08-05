@@ -1,5 +1,6 @@
 import {
   claimAccessCode,
+  codeDurationToDays,
   codeStorageConfigured,
   createAccessCodes,
   finishAccessCode,
@@ -507,6 +508,7 @@ async function redeemAccessCode(request) {
     body: JSON.stringify({
       memberCode,
       action: 'activate',
+      days: codeDurationToDays(durationMinutes),
       durationMinutes
     })
   });

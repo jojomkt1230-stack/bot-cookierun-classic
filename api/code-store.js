@@ -85,6 +85,15 @@ export function validCodeDuration(value) {
     : 0;
 }
 
+// The legacy member API only grants whole days, not minutes. Round up so a
+// sub-day code (e.g. a 1-hour code) still clears its `days >= 1` check
+// instead of the request being rejected outright.
+export function codeDurationToDays(durationMinutes) {
+  const minutes = Number(durationMinutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) return 1;
+  return Math.min(365, Math.max(1, Math.ceil(minutes / 1440)));
+}
+
 export function makeAccessCode() {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const bytes = crypto.getRandomValues(new Uint8Array(13));
