@@ -66,15 +66,20 @@ function escapeHtml(value) {
 // certain in-app webviews) throw a SecurityError just from touching
 // `window.localStorage`. Every call site goes through these so a blocked
 // browser degrades to a session that doesn't persist instead of crashing
-// the login/dashboard flow outright.
+// the login/dashboard flow outright. When it's blocked, reads/writes fall
+// back to this in-memory object -- otherwise a blocked write (e.g. the
+// token right after login) silently vanishes, the very next authed request
+// goes out with no Authorization header, and the 401 gets misread as an
+// expired session seconds after logging in.
 let storageBlocked = false;
+const memoryStorage = {};
 
 function safeStorageGet(key) {
   try {
     return localStorage.getItem(key);
   } catch {
     storageBlocked = true;
-    return null;
+    return Object.hasOwn(memoryStorage, key) ? memoryStorage[key] : null;
   }
 }
 
@@ -84,6 +89,7 @@ function safeStorageSet(key, value) {
     return true;
   } catch {
     storageBlocked = true;
+    memoryStorage[key] = String(value);
     return false;
   }
 }
@@ -93,6 +99,7 @@ function safeStorageRemove(key) {
     localStorage.removeItem(key);
   } catch {
     storageBlocked = true;
+    delete memoryStorage[key];
   }
 }
 
@@ -101,6 +108,7 @@ function safeStorageClear() {
     localStorage.clear();
   } catch {
     storageBlocked = true;
+    for (const key of Object.keys(memoryStorage)) delete memoryStorage[key];
   }
 }
 
