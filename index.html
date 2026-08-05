@@ -193,12 +193,20 @@
             <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
           </div>
           <div class="home-grid access-code-grid">
-            <div class="stat-card centered-stat">
-              <div class="stat-icon">🤖</div>
-              <div class="stat-value" id="home-bot-status">-</div>
-              <div class="stat-label">สถานะบอท</div>
+            <!-- Bot Tutorial Links -->
+            <div class="home-tutorial-box card-panel home-tutorial-box--compact">
+              <div class="home-tutorial-header">
+                <h3>📖 วิธีใช้งานบอท</h3>
+                <p>บอทตัวไหนมีคลิปสอน กดดูได้จากปุ่มด้านขวา</p>
+              </div>
+              <div id="home-tutorial-list" class="home-tutorial-list"></div>
             </div>
+
             <div class="stat-card access-code-card access-code-glow">
+              <div class="access-code-status-row">
+                <span class="access-code-status-icon" aria-hidden="true">🤖</span>
+                <span class="access-code-status-text">สถานะบอท: <strong id="home-bot-status">-</strong></span>
+              </div>
               <div class="stat-icon access-code-icon">🔑</div>
               <div class="stat-label access-code-title">ใส่โค้ดวันใช้งาน</div>
               <form id="access-code-form" class="access-code-form" onsubmit="redeemAccessCode(event)">
@@ -215,15 +223,6 @@
               </form>
               <div id="access-code-message" class="admin-field-hint" role="status"></div>
             </div>
-          </div>
-
-          <!-- Bot Tutorial Links -->
-          <div class="home-tutorial-box card-panel">
-            <div class="home-tutorial-header">
-              <h3>📖 วิธีใช้งานบอท</h3>
-              <p>บอทตัวไหนมีคลิปสอน กดดูได้จากปุ่มด้านขวา</p>
-            </div>
-            <div id="home-tutorial-list" class="home-tutorial-list"></div>
           </div>
 
           <!-- Countdown Timer -->

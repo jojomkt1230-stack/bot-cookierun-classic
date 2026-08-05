@@ -756,11 +756,6 @@ body {
   margin-bottom: 24px;
 }
 
-.stat-card.centered-stat {
-  max-width: 320px;
-  width: 100%;
-}
-
 .stat-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1102,17 +1097,19 @@ body {
 }
 
 .home-grid.access-code-grid {
-  grid-template-columns: minmax(220px, 280px) minmax(300px, 410px);
+  grid-template-columns: minmax(280px, 400px) minmax(300px, 410px);
   justify-content: center;
-  align-items: stretch;
+  align-items: start;
 }
 
-/* ─── Home Tutorial Links ────────────────────────────────────────── */
-.home-tutorial-box { margin-bottom: 24px; }
+/* ─── Home Tutorial Links (compact card in the status/redeem row) ─── */
+.home-tutorial-box--compact {
+  padding: 18px 20px;
+}
 
 .home-tutorial-header h3 {
   font-family: var(--font-cyber);
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   color: var(--primary);
   text-shadow: 0 0 10px var(--primary-glow);
   letter-spacing: 1px;
@@ -1120,15 +1117,15 @@ body {
 
 .home-tutorial-header p {
   margin-top: 5px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
 }
 
 .home-tutorial-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .home-tutorial-row {
@@ -1136,8 +1133,8 @@ body {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 9px 12px;
   background: rgba(1, 8, 24, 0.75);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1145,7 +1142,7 @@ body {
 
 .home-tutorial-label {
   font-family: var(--font-cyber);
-  font-size: 0.92rem;
+  font-size: 0.86rem;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
@@ -1154,11 +1151,11 @@ body {
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
+  gap: 5px;
+  padding: 6px 12px;
   border-radius: 999px;
   font-family: var(--font-ui);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 700;
   color: #ff8a8a;
   background: rgba(255, 51, 102, 0.1);
@@ -1171,6 +1168,30 @@ body {
 .home-tutorial-link:focus-visible {
   border-color: #ff6b96;
   box-shadow: 0 0 12px var(--danger-glow);
+}
+
+/* ─── Bot Status (moved inside the access-code card) ───────────────── */
+.access-code-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.access-code-status-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px var(--primary-glow));
+}
+
+.access-code-status-text strong {
+  color: var(--text-primary);
+  font-weight: 700;
 }
 
 /* ─── Bot Menu Editor (admin) ───────────────────────────────────── */
@@ -2546,7 +2567,6 @@ body {
   .section-header.card-panel.welcome-panel { width: auto; max-width: none; }
   .section-header.card-panel.welcome-panel h2,
   .section-header.card-panel.welcome-panel p { white-space: normal; }
-  .stat-card.centered-stat { max-width: none; }
   .access-code-form { flex-direction: column; }
   .access-code-form .access-code-confirm { width: 100%; }
   .access-code-admin-controls > * { width: 100% !important; }
