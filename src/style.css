@@ -977,7 +977,6 @@ body {
 .download-warning.hidden { display: none !important; }
 
 /* ─── Tutorial ──────────────────────────────────────────────────── */
-/* The welcome panel hugs its own text and is centred over the cards below. */
 .section-header.card-panel.welcome-panel {
   display: flex;
   flex-direction: column;
@@ -994,6 +993,50 @@ body {
 
 .section-header.card-panel.welcome-panel h2,
 .section-header.card-panel.welcome-panel p { white-space: nowrap; }
+
+/* ─── Home top row: welcome (left) + compact countdown ─────────────── */
+.home-top-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.home-top-row .section-header.card-panel.welcome-panel {
+  align-items: flex-start;
+  text-align: left;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+}
+
+.countdown-card--compact {
+  margin-bottom: 0;
+  padding: 14px 20px;
+  text-align: left;
+  box-shadow: none;
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.countdown-card--compact h3 {
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+}
+
+.countdown-card--compact .countdown-display { justify-content: flex-start; gap: 6px; }
+
+.countdown-card--compact .countdown-unit {
+  padding: 6px 10px;
+  min-width: 44px;
+}
+
+.countdown-card--compact .countdown-unit span { font-size: 1.1rem; }
+.countdown-card--compact .countdown-unit label { font-size: 0.6rem; }
+.countdown-card--compact .countdown-sep { font-size: 1rem; }
 
 /* ─── Home Bot Showcase (read-only) ─────────────────────────────── */
 .home-bot-menu { margin-bottom: 24px; }
@@ -2266,6 +2309,8 @@ body {
   .countdown-display { gap: 4px; }
   .countdown-unit { min-width: 60px; padding: 8px 12px; }
   .countdown-unit span { font-size: 1.4rem; }
+  .countdown-card--compact .countdown-unit { min-width: 38px; padding: 5px 8px; }
+  .countdown-card--compact .countdown-unit span { font-size: 0.95rem; }
   .packages-grid { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding: 10px 16px; }
   .topbar-center { display: none; }
@@ -2564,6 +2609,7 @@ body {
 
 @media (max-width: 700px) {
   .home-grid.access-code-grid { grid-template-columns: 1fr; }
+  .home-top-row { flex-direction: column; }
   .section-header.card-panel.welcome-panel { width: auto; max-width: none; }
   .section-header.card-panel.welcome-panel h2,
   .section-header.card-panel.welcome-panel p { white-space: normal; }

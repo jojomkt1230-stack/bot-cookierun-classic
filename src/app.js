@@ -1599,6 +1599,7 @@ function renderAdminUsersTable() {
       <thead>
         <tr style="border-bottom:1px solid var(--border-bright); text-align:left; color:var(--primary);">
           <th style="padding:10px;">ชื่อผู้ใช้</th>
+          <th style="padding:10px;">วันที่สมัคร</th>
           <th style="padding:10px;">สิทธิ์</th>
           <th style="padding:10px;">เพชร 💎</th>
           <th style="padding:10px;">วันหมดอายุ</th>
@@ -1612,6 +1613,7 @@ function renderAdminUsersTable() {
               ${escapeHtml(u.username)}
               <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(u.memberCode)}</div>
             </td>
+            <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${u.createdAt ? new Date(u.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</td>
             <td style="padding:12px;"><span style="padding:4px 8px; border-radius:12px; font-size:0.8rem; background:${u.role === 'admin' ? 'rgba(255,170,0,0.2)' : 'rgba(0,212,255,0.2)'}; color:${u.role === 'admin' ? '#ffcc00' : 'var(--primary)'}">${u.role === 'admin' ? '👑 แอดมิน' : '👤 สมาชิก'}</span></td>
             <td style="padding:12px; color:var(--accent); font-weight:700;">${u.diamonds || 0}</td>
             <td style="padding:12px; font-size:0.85rem;">${u.botExpiry ? new Date(u.botExpiry).toLocaleString('th-TH') : 'ยังไม่ได้เช่า'}</td>

@@ -188,9 +188,25 @@
             <div id="home-bot-menu-grid" class="home-bot-menu-grid"></div>
           </div>
 
-          <div class="section-header card-panel welcome-panel">
-            <h2>🏠 ยินดีต้อนรับ</h2>
-            <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
+          <div class="home-top-row">
+            <div class="section-header card-panel welcome-panel welcome-panel--left">
+              <h2>🏠 ยินดีต้อนรับ</h2>
+              <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
+            </div>
+
+            <!-- Countdown Timer -->
+            <div class="countdown-card countdown-card--compact" id="countdown-card">
+              <h3>⏰ เวลาการใช้งานที่เหลือ</h3>
+              <div class="countdown-display" id="countdown-display">
+                <div class="countdown-unit"><span id="cd-days">00</span><label>วัน</label></div>
+                <div class="countdown-sep">:</div>
+                <div class="countdown-unit"><span id="cd-hours">00</span><label>ชั่วโมง</label></div>
+                <div class="countdown-sep">:</div>
+                <div class="countdown-unit"><span id="cd-mins">00</span><label>นาที</label></div>
+                <div class="countdown-sep">:</div>
+                <div class="countdown-unit"><span id="cd-secs">00</span><label>วินาที</label></div>
+              </div>
+            </div>
           </div>
           <div class="home-grid access-code-grid">
             <!-- Bot Tutorial Links -->
@@ -222,20 +238,6 @@
                 <button id="access-code-submit" class="access-code-confirm" type="submit">ยืนยันใช้โค้ด</button>
               </form>
               <div id="access-code-message" class="admin-field-hint" role="status"></div>
-            </div>
-          </div>
-
-          <!-- Countdown Timer -->
-          <div class="countdown-card" id="countdown-card">
-            <h3>⏰ เวลาการใช้งานที่เหลือ</h3>
-            <div class="countdown-display" id="countdown-display">
-              <div class="countdown-unit"><span id="cd-days">00</span><label>วัน</label></div>
-              <div class="countdown-sep">:</div>
-              <div class="countdown-unit"><span id="cd-hours">00</span><label>ชั่วโมง</label></div>
-              <div class="countdown-sep">:</div>
-              <div class="countdown-unit"><span id="cd-mins">00</span><label>นาที</label></div>
-              <div class="countdown-sep">:</div>
-              <div class="countdown-unit"><span id="cd-secs">00</span><label>วินาที</label></div>
             </div>
           </div>
         </section>
