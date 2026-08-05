@@ -62,8 +62,50 @@ function escapeHtml(value) {
   })[character]);
 }
 
+// Some mobile browsers (cookies blocked, private-mode storage partitioning,
+// certain in-app webviews) throw a SecurityError just from touching
+// `window.localStorage`. Every call site goes through these so a blocked
+// browser degrades to a session that doesn't persist instead of crashing
+// the login/dashboard flow outright.
+let storageBlocked = false;
+
+function safeStorageGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    storageBlocked = true;
+    return null;
+  }
+}
+
+function safeStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    storageBlocked = true;
+    return false;
+  }
+}
+
+function safeStorageRemove(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    storageBlocked = true;
+  }
+}
+
+function safeStorageClear() {
+  try {
+    localStorage.clear();
+  } catch {
+    storageBlocked = true;
+  }
+}
+
 function getAuthHeaders() {
-  const token = localStorage.getItem('token');
+  const token = safeStorageGet('token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -198,7 +240,7 @@ const DEFAULT_SETTINGS = {
 let systemSettings = { ...DEFAULT_SETTINGS };
 
 function getSystemSettings() {
-  const saved = localStorage.getItem('systemSettings');
+  const saved = safeStorageGet('systemSettings');
   if (saved) {
     try {
       systemSettings = { ...systemSettings, ...JSON.parse(saved) };
@@ -209,7 +251,7 @@ function getSystemSettings() {
 
 function saveSystemSettings(settings) {
   systemSettings = { ...systemSettings, ...settings };
-  localStorage.setItem('systemSettings', JSON.stringify(systemSettings));
+  safeStorageSet('systemSettings', JSON.stringify(systemSettings));
   applySystemSettingsToUI();
 }
 
@@ -625,7 +667,7 @@ function renderTutorialSteps(steps, color = getSystemSettings().tutorialColor ||
 let currentUser = null;
 
 function getRegisteredUsers() {
-  const saved = localStorage.getItem('registeredUsers');
+  const saved = safeStorageGet('registeredUsers');
   if (saved) {
     try {
       return JSON.parse(saved).map(({ password, ...user }) => user);
@@ -695,7 +737,7 @@ window.previewTutorialColor = function() {
 };
 
 function saveRegisteredUsers(users) {
-  localStorage.setItem('registeredUsers', JSON.stringify(users));
+  safeStorageSet('registeredUsers', JSON.stringify(users));
 }
 
 // 4. TOAST AND MODAL HELPERS
@@ -800,13 +842,18 @@ window.handleLogin = async function(event) {
     if (!token || !user) throw new Error('เซิร์ฟเวอร์ส่งข้อมูลการเข้าสู่ระบบไม่ครบถ้วน');
 
     currentUser = user;
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('authSessionVersion', 'legacy-admin-v2');
+    safeStorageSet('token', token);
+    safeStorageSet('user', JSON.stringify(user));
+    safeStorageSet('authSessionVersion', 'legacy-admin-v2');
     if (passwordEl) passwordEl.value = '';
     window.showPage('dashboard-page');
     initDashboard();
-    window.showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.username} 🎉`, 'success');
+    window.showToast(
+      storageBlocked
+        ? `เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.username} 🎉 (เบราว์เซอร์บล็อกการจำข้อมูล อาจต้องเข้าสู่ระบบใหม่ทุกครั้งที่เปิดเว็บ)`
+        : `เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.username} 🎉`,
+      'success'
+    );
   } catch (error) {
     console.log('[AUTH] Login request error:', {
       message: error.message,
@@ -888,8 +935,8 @@ window.handleRegister = async function(event) {
 // ── Logout ────────────────────────────────────────────────────────────────────
 window.handleLogout = function() {
   console.log('[AUTH] handleLogout triggered');
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  safeStorageRemove('token');
+  safeStorageRemove('user');
   currentUser = null;
   if (typeof liveCountdownInterval !== 'undefined' && liveCountdownInterval) {
     clearInterval(liveCountdownInterval);
@@ -905,7 +952,7 @@ let liveCountdownInterval = null;
 let pendingRedeem = null;
 
 function initDashboard(skipRefresh = false) {
-  const userStr = localStorage.getItem('user');
+  const userStr = safeStorageGet('user');
   if (userStr) {
     try { currentUser = JSON.parse(userStr); } catch (e) {}
   }
@@ -953,13 +1000,13 @@ function initDashboard(skipRefresh = false) {
     axios.get(`${API_BASE_URL}/users/me`, { headers: getAuthHeaders() })
       .then((response) => {
         currentUser = { ...currentUser, ...response.data };
-        localStorage.setItem('user', JSON.stringify(currentUser));
+        safeStorageSet('user', JSON.stringify(currentUser));
         initDashboard(true);
       })
       .catch((error) => {
         if (error?.response?.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          safeStorageRemove('token');
+          safeStorageRemove('user');
           currentUser = null;
           window.showPage('auth-page');
           window.showToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่', 'error');
@@ -972,19 +1019,19 @@ async function refreshCurrentMember() {
   if (!currentUser || currentUser.role === 'admin') return currentUser;
   const response = await axios.get(`${API_BASE_URL}/users/me`, { headers: getAuthHeaders() });
   currentUser = { ...currentUser, ...response.data };
-  localStorage.setItem('user', JSON.stringify(currentUser));
+  safeStorageSet('user', JSON.stringify(currentUser));
   updateHomeCountdownDisplay();
   return currentUser;
 }
 
 function accessCodeDeviceId() {
   const key = 'ckrcs_access_code_device';
-  let value = localStorage.getItem(key) || '';
+  let value = safeStorageGet(key) || '';
   if (!/^[A-Za-z0-9_-]{12,120}$/.test(value)) {
     value = typeof crypto?.randomUUID === 'function'
       ? crypto.randomUUID()
       : `device_${Date.now()}_${Math.random().toString(36).slice(2, 14)}`;
-    localStorage.setItem(key, value);
+    safeStorageSet(key, value);
   }
   return value;
 }
@@ -1085,7 +1132,7 @@ window.confirmRedeemBot = async function() {
       botExpiry: data.botExpiry || data.expiresAt || currentUser.botExpiry,
       expiresAt: data.expiresAt || data.botExpiry || currentUser.expiresAt
     };
-    localStorage.setItem('user', JSON.stringify(currentUser));
+    safeStorageSet('user', JSON.stringify(currentUser));
     pendingRedeem = null;
     window.closeModal('confirm-modal');
     initDashboard();
@@ -1243,7 +1290,7 @@ window.handleSlipSubmit = async function(event) {
 
     if (verifyRes.data && verifyRes.data.status === 'approved') {
       currentUser.diamonds = verifyRes.data.diamonds || ((currentUser.diamonds || 0) + (orderRes.data.creditToReceive || 100));
-      localStorage.setItem('user', JSON.stringify(currentUser));
+      safeStorageSet('user', JSON.stringify(currentUser));
 
       window.removeSlip();
       if (amountEl) amountEl.value = '';
@@ -1272,7 +1319,7 @@ window.handleSlipSubmit = async function(event) {
 };
 
 function getTopupHistory() {
-  const saved = localStorage.getItem('topupHistory');
+  const saved = safeStorageGet('topupHistory');
   if (saved) {
     try { return JSON.parse(saved); } catch (e) {}
   }
@@ -1280,7 +1327,7 @@ function getTopupHistory() {
 }
 
 function saveTopupHistory(history) {
-  localStorage.setItem('topupHistory', JSON.stringify(history));
+  safeStorageSet('topupHistory', JSON.stringify(history));
 }
 
 function renderActivityHistory() {
@@ -1323,7 +1370,7 @@ let adminAccessCodes = [];
 let latestGeneratedAccessCodes = [];
 
 function adminApiConfig() {
-  const token = localStorage.getItem('token');
+  const token = safeStorageGet('token');
   return { headers: { Authorization: `Bearer ${token}` } };
 }
 
@@ -1905,23 +1952,23 @@ document.addEventListener('DOMContentLoaded', () => {
   window.switchTab(currentAuthView);
 
   // Remove plaintext passwords left by older local-preview versions.
-  if (localStorage.getItem('registeredUsers')) {
+  if (safeStorageGet('registeredUsers')) {
     saveRegisteredUsers(getRegisteredUsers());
   }
   initThreeJS();
   loadSystemSettings(false);
 
-  let token = localStorage.getItem('token');
-  let user = localStorage.getItem('user');
+  let token = safeStorageGet('token');
+  let user = safeStorageGet('user');
 
   if (token && user) {
     try {
       const savedUser = JSON.parse(user);
       const staleAdminSession = savedUser?.role === 'admin'
-        && localStorage.getItem('authSessionVersion') !== 'legacy-admin-v2';
+        && safeStorageGet('authSessionVersion') !== 'legacy-admin-v2';
       if (staleAdminSession) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        safeStorageRemove('token');
+        safeStorageRemove('user');
         token = null;
         user = null;
       }
@@ -1934,8 +1981,8 @@ document.addEventListener('DOMContentLoaded', () => {
       window.showPage('dashboard-page');
       initDashboard();
     } catch (e) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      safeStorageRemove('token');
+      safeStorageRemove('user');
       window.showPage('auth-page');
     }
   } else {
