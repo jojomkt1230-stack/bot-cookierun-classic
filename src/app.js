@@ -855,7 +855,10 @@ window.handleLogin = async function(event) {
     safeStorageSet('authSessionVersion', 'legacy-admin-v2');
     if (passwordEl) passwordEl.value = '';
     window.showPage('dashboard-page');
-    initDashboard();
+    // We already have fresh user data from the login response itself --
+    // skip the immediate re-fetch so a slow/cold backend on this first
+    // request right after login can't misfire a false "session expired".
+    initDashboard(true);
     window.showToast(
       storageBlocked
         ? `เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.username} 🎉 (เบราว์เซอร์บล็อกการจำข้อมูล อาจต้องเข้าสู่ระบบใหม่ทุกครั้งที่เปิดเว็บ)`
@@ -1143,7 +1146,7 @@ window.confirmRedeemBot = async function() {
     safeStorageSet('user', JSON.stringify(currentUser));
     pendingRedeem = null;
     window.closeModal('confirm-modal');
-    initDashboard();
+    initDashboard(true);
     window.showToast(data.message || `เช่าบอท ${days} วันสำเร็จ 🎉`, 'success');
   } catch (error) {
     window.showToast(error.response?.data?.error || error.message || 'ไม่สามารถเช่าบอทได้', 'error');
@@ -1302,7 +1305,7 @@ window.handleSlipSubmit = async function(event) {
 
       window.removeSlip();
       if (amountEl) amountEl.value = '';
-      initDashboard();
+      initDashboard(true);
       if (msgEl) {
         msgEl.textContent = verifyRes.data.message || 'เติมเงินสำเร็จ';
         msgEl.style.color = 'var(--accent)';
