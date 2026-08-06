@@ -1489,6 +1489,34 @@ body {
   box-shadow: 0 0 14px rgba(255, 48, 85, 0.1);
 }
 
+.phone-model-guide {
+  border-color: rgba(255, 204, 54, 0.58);
+  background: linear-gradient(145deg, rgba(66, 43, 0, 0.2), rgba(4, 15, 37, 0.76));
+  box-shadow: inset 0 0 20px rgba(255, 205, 54, 0.06);
+}
+
+.phone-model-warning {
+  margin: 0 0 18px;
+  font-size: 1rem;
+}
+
+.phone-model-values {
+  list-style: none;
+  padding-left: 0 !important;
+}
+
+.phone-model-summary {
+  margin-top: 18px;
+  padding: 15px 17px;
+  border: 1px solid rgba(95, 229, 165, 0.44);
+  border-radius: 12px;
+  background: rgba(17, 92, 64, 0.2);
+}
+
+.phone-model-summary h5 { color: #9bffd1; }
+.phone-model-restart { margin-top: 18px; }
+.phone-model-restart ol { margin-bottom: 0; }
+
 .powder-section {
   border-color: rgba(204, 117, 255, 0.4);
   box-shadow: inset 0 0 18px rgba(175, 73, 255, 0.05);
