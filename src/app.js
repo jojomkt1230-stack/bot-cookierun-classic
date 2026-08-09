@@ -27,6 +27,7 @@ window.showSection = function(sectionId) {
   document.getElementById(`menu-${sectionId}`)?.classList.add('active');
 
   if (sectionId === 'activity') renderActivityHistory();
+  if (sectionId === 'farm') loadFarmData();
   if (sectionId === 'admin') initAdminPanel();
   if (sectionId === 'tutorial') renderTutorialSteps(getSystemSettings().steps || []);
   if (sectionId === 'topup') loadSystemSettings(false);
@@ -1373,6 +1374,56 @@ function renderActivityHistory() {
     </div>
   `).join('');
 }
+
+function farmDeviceLabel(deviceId) {
+  const match = /(\d{1,2})\s*$/.exec(String(deviceId || '').trim());
+  return match ? `หมายเลข ${match[1].padStart(2, '0')}` : (deviceId ? escapeHtml(deviceId) : 'ไม่ระบุ');
+}
+
+async function loadFarmData() {
+  const body = document.getElementById('farm-device-table-body');
+  if (body) body.innerHTML = '<tr><td colspan="7" class="empty-state">⟳ กำลังโหลด...</td></tr>';
+
+  try {
+    const response = await axios.get(`${API_BASE_URL}/member/farm`, { headers: getAuthHeaders() });
+    const data = response.data || {};
+    const summaries = Array.isArray(data.summaries) ? data.summaries : [];
+    const deviceSummaries = Array.isArray(data.deviceSummaries) ? data.deviceSummaries : [];
+
+    const totalCoins = summaries.reduce((sum, row) => sum + Number(row.coins || 0), 0);
+    const totalExp = summaries.reduce((sum, row) => sum + Number(row.exp || 0), 0);
+    const totalPowder = summaries.reduce((sum, row) => sum + Number(row.powder || 0), 0);
+    const totalRounds = summaries.reduce((sum, row) => sum + Number(row.rounds || 0), 0);
+
+    const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    set('farm-total-coins', totalCoins.toLocaleString('th-TH'));
+    set('farm-total-exp', totalExp.toLocaleString('th-TH'));
+    set('farm-total-powder', totalPowder.toLocaleString('th-TH'));
+    set('farm-total-rounds', totalRounds.toLocaleString('th-TH'));
+    set('farm-latest-version', data.latestVersion || '-');
+
+    if (!body) return;
+    if (!deviceSummaries.length) {
+      body.innerHTML = '<tr><td colspan="7" class="empty-state">ยังไม่มีข้อมูล เมื่อบอทฟาร์มสำเร็จ ข้อมูลจะปรากฏที่นี่อัตโนมัติ</td></tr>';
+      return;
+    }
+    body.innerHTML = deviceSummaries.map((row) => `
+      <tr>
+        <td>${farmDeviceLabel(row.device_id)}</td>
+        <td>${row.bot_type === 'coin' ? 'บอทเหรียญ' : 'บอทย่อยผง'}</td>
+        <td>${Number(row.rounds || 0).toLocaleString('th-TH')}</td>
+        <td>${Number(row.coins || 0).toLocaleString('th-TH')}</td>
+        <td>${Number(row.exp || 0).toLocaleString('th-TH')}</td>
+        <td>${Number(row.powder || 0).toLocaleString('th-TH')}</td>
+        <td><small>${row.last_at ? new Date(row.last_at).toLocaleString('th-TH') : '-'}</small></td>
+      </tr>
+    `).join('');
+  } catch (error) {
+    if (body) body.innerHTML = '<tr><td colspan="7" class="empty-state">โหลดข้อมูลฟาร์มไม่สำเร็จ ลองกด "อัปเดตข้อมูล" อีกครั้ง</td></tr>';
+    window.showToast(getApiErrorMessage(error, 'โหลดข้อมูลฟาร์มไม่สำเร็จ'), 'error');
+  }
+}
+window.loadFarmData = loadFarmData;
 
 // 8. ADMIN PANEL AND USER MANAGEMENT
 let adminUsers = [];

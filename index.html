@@ -162,6 +162,10 @@
             <span class="menu-icon">📋</span>
             <span class="menu-text">ประวัติกิจกรรม</span>
           </button>
+          <button class="menu-item" onclick="showSection('farm')" id="menu-farm">
+            <span class="menu-icon">📊</span>
+            <span class="menu-text">ข้อมูลฟาร์ม</span>
+          </button>
           <!-- Admin only -->
           <button class="menu-item admin-only hidden" onclick="showSection('admin')" id="menu-admin">
             <span class="menu-icon">👑</span>
@@ -438,6 +442,35 @@
           </div>
           <div id="activity-list" class="activity-list">
             <div class="loading-spinner">⟳</div>
+          </div>
+        </section>
+
+        <!-- ── FARM DATA SECTION ───────────────────── -->
+        <section id="section-farm" class="content-section hidden">
+          <div class="section-header farm-titlebar">
+            <div>
+              <h2>📊 ข้อมูลฟาร์ม</h2>
+              <p>แยกยอดตามหมายเลขไอดีที่ตั้งไว้ตอนล็อกอินบอท · เวอร์ชันล่าสุดที่รายงาน: <span id="farm-latest-version">-</span></p>
+            </div>
+            <button class="refresh-farm-btn" onclick="loadFarmData()">🔄 อัปเดตข้อมูล</button>
+          </div>
+          <div class="farm-summary-grid">
+            <article><span>🪙 เหรียญรวม</span><strong id="farm-total-coins">0</strong></article>
+            <article><span>🔷 EXP รวม</span><strong id="farm-total-exp">0</strong></article>
+            <article><span>🧪 ย่อยผงรวม</span><strong id="farm-total-powder">0</strong></article>
+            <article><span>🎯 จำนวนรอบทั้งหมด</span><strong id="farm-total-rounds">0</strong></article>
+          </div>
+          <div class="data-panel">
+            <div class="table-container">
+              <table class="pro-table">
+                <thead>
+                  <tr><th>หมายเลขไอดี</th><th>บอท</th><th>รอบ</th><th>เหรียญ</th><th>EXP</th><th>ย่อยผง</th><th>ล่าสุด</th></tr>
+                </thead>
+                <tbody id="farm-device-table-body">
+                  <tr><td colspan="7" class="empty-state">⟳ กำลังโหลด...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 

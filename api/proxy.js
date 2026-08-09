@@ -1395,6 +1395,13 @@ async function memberMe(request) {
   });
 }
 
+async function memberFarm(request) {
+  const upstream = await legacyFetch(request, '/api/member/farm', { method: 'GET' });
+  const data = await responseData(upstream);
+  if (!upstream.ok) return json(data, upstream.status);
+  return json(data);
+}
+
 function planForDays(days) {
   return ({
     1: 'day1',
@@ -1547,6 +1554,9 @@ export default {
       }
       if ((path === 'users/me' || path === 'member/me') && request.method === 'GET') {
         return memberMe(request);
+      }
+      if (path === 'member/farm' && request.method === 'GET') {
+        return memberFarm(request);
       }
       if (path === 'users/rent' && request.method === 'POST') {
         return purchaseLegacyPlan(request);
