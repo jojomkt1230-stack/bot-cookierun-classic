@@ -1405,12 +1405,44 @@ async function loadFarmData() {
 }
 window.loadFarmData = loadFarmData;
 
+function farmColumnsFor(tab) {
+  const id = { key: 'id', label: 'หมายเลขไอดี' };
+  const rounds = { key: 'rounds', label: 'รอบ' };
+  const last = { key: 'last', label: 'ล่าสุด' };
+  if (tab === 'coin') {
+    return [id, rounds, { key: 'coins', label: 'เหรียญ' }, { key: 'exp', label: 'EXP' }, last];
+  }
+  if (tab === 'powder') {
+    return [id, rounds, { key: 'powder', label: 'ย่อยผง' }, last];
+  }
+  return [
+    id, { key: 'bot', label: 'บอท' }, rounds,
+    { key: 'coins', label: 'เหรียญ' }, { key: 'exp', label: 'EXP' }, { key: 'powder', label: 'ย่อยผง' },
+    last
+  ];
+}
+
+function farmCellValue(key, row) {
+  switch (key) {
+    case 'id': return farmDeviceLabel(row.device_id);
+    case 'bot': return row.bot_type === 'coin' ? 'บอทเหรียญ' : 'บอทย่อยผง';
+    case 'rounds': return Number(row.rounds || 0).toLocaleString('th-TH');
+    case 'coins': return Number(row.coins || 0).toLocaleString('th-TH');
+    case 'exp': return Number(row.exp || 0).toLocaleString('th-TH');
+    case 'powder': return Number(row.powder || 0).toLocaleString('th-TH');
+    case 'last': return `<small>${row.last_at ? new Date(row.last_at).toLocaleString('th-TH') : '-'}</small>`;
+    default: return '';
+  }
+}
+
 function renderFarmData() {
+  const head = document.getElementById('farm-device-table-head');
   const body = document.getElementById('farm-device-table-body');
   if (!farmDataCache) return;
 
   const tab = currentFarmTab;
   const matchesTab = (botType) => tab === 'all' || botType === tab;
+  const columns = farmColumnsFor(tab);
 
   const summaries = (Array.isArray(farmDataCache.summaries) ? farmDataCache.summaries : [])
     .filter((row) => matchesTab(row.bot_type));
@@ -1429,21 +1461,14 @@ function renderFarmData() {
   set('farm-total-rounds', totalRounds.toLocaleString('th-TH'));
   set('farm-latest-version', farmDataCache.latestVersion || '-');
 
+  if (head) head.innerHTML = `<tr>${columns.map((c) => `<th>${c.label}</th>`).join('')}</tr>`;
   if (!body) return;
   if (!deviceSummaries.length) {
-    body.innerHTML = '<tr><td colspan="7" class="empty-state">ยังไม่มีข้อมูล เมื่อบอทฟาร์มสำเร็จ ข้อมูลจะปรากฏที่นี่อัตโนมัติ</td></tr>';
+    body.innerHTML = `<tr><td colspan="${columns.length}" class="empty-state">ยังไม่มีข้อมูล เมื่อบอทฟาร์มสำเร็จ ข้อมูลจะปรากฏที่นี่อัตโนมัติ</td></tr>`;
     return;
   }
   body.innerHTML = deviceSummaries.map((row) => `
-    <tr>
-      <td>${farmDeviceLabel(row.device_id)}</td>
-      <td>${row.bot_type === 'coin' ? 'บอทเหรียญ' : 'บอทย่อยผง'}</td>
-      <td>${Number(row.rounds || 0).toLocaleString('th-TH')}</td>
-      <td>${Number(row.coins || 0).toLocaleString('th-TH')}</td>
-      <td>${Number(row.exp || 0).toLocaleString('th-TH')}</td>
-      <td>${Number(row.powder || 0).toLocaleString('th-TH')}</td>
-      <td><small>${row.last_at ? new Date(row.last_at).toLocaleString('th-TH') : '-'}</small></td>
-    </tr>
+    <tr>${columns.map((c) => `<td>${farmCellValue(c.key, row)}</td>`).join('')}</tr>
   `).join('');
 }
 
