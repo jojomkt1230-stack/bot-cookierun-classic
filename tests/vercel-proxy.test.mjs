@@ -176,6 +176,39 @@ test('sends the slip image to the legacy Slip2Go verification route', async () =
   }
 });
 
+test('returns detailed topup history only after authenticating the current member', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    if (url.endsWith('/api/member/me')) {
+      return Response.json({ memberCode: 'CKRCS-1234', username: 'codex_user' });
+    }
+    if (url.endsWith('/api/member/topups')) {
+      return Response.json({ topups: [{
+        id: 'topup-1', member_code: 'CKRCS-1234', amount: 50, credits: 50,
+        status: 'verified', slip_reference: 'REF-123', created_at: '2026-08-09T01:00:00.000Z',
+        verified_at: '2026-08-09T01:01:00.000Z'
+      }] });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  try {
+    const response = await proxy.fetch(apiRequest('users/activity', {
+      headers: { Authorization: 'Bearer member-token' }
+    }));
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(calls[0].url, 'https://legacy.example/api/member/me');
+    assert.equal(calls[1].url, 'https://legacy.example/api/member/topups');
+    assert.equal(data.items.length, 1);
+    assert.equal(data.items[0].type, 'topup');
+    assert.equal(data.items[0].reference, 'REF-123');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('does not forward browser origin, cookies, or referer to Render', async () => {
   const originalFetch = globalThis.fetch;
   let captured;

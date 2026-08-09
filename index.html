@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CKRCS Bot Rental - ระบบเช่าบอท Cyberpunk</title>
   <meta name="description" content="ระบบเช่าบอทเกม Cookie Run Kingdom - บอทเหรียญ บอทเพิ่มเพื่อน บอทย่อยผง ราคาถูก ใช้งานง่าย" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍪</text></svg>" />
+  <link rel="icon" type="image/png" href="ckrcs-logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet" />
@@ -110,7 +110,10 @@
     <!-- Topbar -->
     <header class="topbar">
       <div class="topbar-left">
-        <div class="topbar-logo">🍪 CKRCS BOT</div>
+        <div class="topbar-logo">
+          <img src="ckrcs-logo.png" alt="CKRCS BOT" class="topbar-logo-image" />
+          <span>CKRCS BOT</span>
+        </div>
       </div>
       <div class="topbar-center">
         <!-- Bot Status Badge -->
@@ -148,19 +151,19 @@
           </button>
           <button class="menu-item" onclick="showSection('download')" id="menu-download">
             <span class="menu-icon">⬇️</span>
-            <span class="menu-text">ดาวน์โหลด</span>
-          </button>
-          <button class="menu-item" onclick="showSection('tutorial')" id="menu-tutorial">
-            <span class="menu-icon settings-gear" aria-hidden="true">&#9881;</span>
-            <span class="menu-text">วิธีตั้งค่า</span>
+            <span class="menu-text">ดาวน์โหลดและวิธีตั้งค่า</span>
           </button>
           <button class="menu-item" onclick="showSection('topup')" id="menu-topup">
             <span class="menu-icon">💰</span>
             <span class="menu-text">เติมเงิน</span>
           </button>
+          <button class="menu-item" onclick="showSection('farm-history')" id="menu-farm-history">
+            <span class="menu-icon">💰</span>
+            <span class="menu-text">ประวัติการฟาร์ม</span>
+          </button>
           <button class="menu-item" onclick="showSection('activity')" id="menu-activity">
             <span class="menu-icon">📋</span>
-            <span class="menu-text">ประวัติกิจกรรม</span>
+            <span class="menu-text">ประวัติการใช้งาน</span>
           </button>
           <!-- Admin only -->
           <button class="menu-item admin-only hidden" onclick="showSection('admin')" id="menu-admin">
@@ -180,22 +183,25 @@
 
         <!-- ── HOME SECTION ────────────────────────── -->
         <section id="section-home" class="content-section active">
-          <div class="home-bot-menu">
-            <div class="home-bot-menu-header">
-              <h3>🧩 บอทที่เปิดให้ใช้งาน</h3>
-              <p>แต่ละตัวทำงานแยกกัน เปิดพร้อมกันคนละจอได้</p>
-            </div>
-            <div id="home-bot-menu-grid" class="home-bot-menu-grid"></div>
-          </div>
-
-          <div class="home-top-row">
-            <div class="section-header card-panel welcome-panel welcome-panel--left">
-              <h2>🏠 ยินดีต้อนรับ</h2>
-              <p class="subtitle font-cyber">💬 มีปัญหาติดต่อ ไลน์: <span class="highlight-line">@715ybpdq</span></p>
+          <div class="home-hero card-panel">
+            <div class="home-hero-brand">
+              <div class="home-logo-frame">
+                <img src="ckrcs-logo.png" alt="โลโก้ CKRCS BOT" class="home-logo-image" />
+              </div>
+              <div class="home-hero-copy">
+                <span class="home-eyebrow">CKRCS BOT CONTROL CENTER</span>
+                <h1>ศูนย์ควบคุมบอท Cookie Run</h1>
+                <p>จัดการบอท ดาวน์โหลดโปรแกรม และตรวจสอบวันใช้งานของคุณได้จากที่เดียว</p>
+                <div class="home-contact-row">
+                  <span class="home-welcome-chip">🏠 ยินดีต้อนรับ</span>
+                  <span>💬 ติดต่อไลน์ <strong>@715ybpdq</strong></span>
+                </div>
+              </div>
             </div>
 
             <!-- Countdown Timer -->
-            <div class="countdown-card countdown-card--compact" id="countdown-card">
+            <div class="countdown-card countdown-card--compact home-hero-countdown" id="countdown-card">
+              <span class="countdown-kicker">สิทธิ์การใช้งานของคุณ</span>
               <h3>⏰ เวลาการใช้งานที่เหลือ</h3>
               <div class="countdown-display" id="countdown-display">
                 <div class="countdown-unit"><span id="cd-days">00</span><label>วัน</label></div>
@@ -207,6 +213,17 @@
                 <div class="countdown-unit"><span id="cd-secs">00</span><label>วินาที</label></div>
               </div>
             </div>
+          </div>
+
+          <div class="home-bot-menu">
+            <div class="home-bot-menu-header">
+              <div>
+                <span class="home-section-kicker">บริการของเรา</span>
+                <h2>🧩 บอทที่เปิดให้ใช้งาน</h2>
+              </div>
+              <p>แต่ละตัวทำงานแยกกัน และสามารถเปิดพร้อมกันคนละจอได้</p>
+            </div>
+            <div id="home-bot-menu-grid" class="home-bot-menu-grid"></div>
           </div>
           <div class="home-grid access-code-grid">
             <!-- Bot Tutorial Links -->
@@ -244,10 +261,11 @@
 
         <!-- ── DOWNLOAD SECTION ───────────────────── -->
         <section id="section-download" class="content-section hidden">
-          <div class="section-header card-panel">
-            <h2>⬇️ ดาวน์โหลดบอท</h2>
+          <div class="section-header card-panel combined-page-header">
+            <span class="combined-page-eyebrow">CKRCS BOT • DOWNLOAD &amp; SETUP</span>
+            <h2>⬇️ ดาวน์โหลดบอทและวิธีตั้งค่า</h2>
           </div>
-          <div class="download-card">
+          <div class="download-card combined-download-card">
             <div class="bot-info-display">
               <div class="bot-info-row">
                 <span class="info-label">🤖 ชื่อบอท:</span>
@@ -263,11 +281,10 @@
               </p>
             </div>
           </div>
-        </section>
 
-        <!-- ── TUTORIAL SECTION ───────────────────── -->
-        <section id="section-tutorial" class="content-section hidden">
-          <div class="section-header card-panel">
+          <!-- ── ORIGINAL SETUP GUIDE (text preserved verbatim) ── -->
+          <div id="combined-setup-guide" class="combined-setup-guide">
+          <div class="section-header card-panel combined-setup-header">
             <h2><span class="section-settings-gear" aria-hidden="true">&#9881;</span> การตั้งค่า LDPlayer และ MuMu</h2>
           </div>
           <div id="tutorial-video-box" class="tutorial-video-wrapper hidden">
@@ -385,6 +402,7 @@
               <p>สูงสุด 16 กล่องต่อรอบ จะพอดีกับหน้าย่อยผง</p>
             </section>
           </article>
+          </div>
         </section>
 
         <!-- ── TOPUP SECTION ──────────────────────── -->
@@ -431,10 +449,95 @@
           </div>
         </section>
 
+        <!-- ── FARM HISTORY SECTION ──────────────── -->
+        <section id="section-farm-history" class="content-section hidden">
+          <div class="farm-history-shell card-panel">
+            <header class="farm-history-header">
+              <div class="farm-history-title-group">
+                <div class="farm-history-symbol" aria-hidden="true">💰</div>
+                <div>
+                  <span class="farm-history-kicker">COIN BOT TELEMETRY</span>
+                  <h2>ประวัติการฟาร์ม</h2>
+                  <p>ข้อมูลจากบอทเหรียญของไอดีที่ล็อกอินอยู่เท่านั้น</p>
+                </div>
+              </div>
+              <div class="farm-history-meta">
+                <label class="farm-date-control">
+                  <span>📅</span>
+                  <input id="farm-history-date" type="date" aria-label="เลือกวันที่ดูประวัติการฟาร์ม" />
+                </label>
+                <span id="farm-history-refresh" class="farm-refresh-chip">อัปเดตทุก 1 นาที</span>
+              </div>
+            </header>
+
+            <div class="farm-period-tabs" role="tablist" aria-label="ช่วงเวลาประวัติการฟาร์ม">
+              <button class="farm-period-tab active" type="button" data-farm-period="daily" onclick="setFarmHistoryPeriod('daily')">▣ รายวัน</button>
+              <button class="farm-period-tab" type="button" data-farm-period="weekly" onclick="setFarmHistoryPeriod('weekly')">▣ รายสัปดาห์</button>
+              <button class="farm-period-tab" type="button" data-farm-period="monthly" onclick="setFarmHistoryPeriod('monthly')">▣ รายเดือน</button>
+            </div>
+
+            <div class="farm-summary-grid" aria-live="polite">
+              <article class="farm-summary-card farm-summary-card--coins">
+                <span class="farm-summary-icon">🪙</span>
+                <div><span>เหรียญที่ได้รับ</span><strong id="farm-total-coins">0</strong></div>
+              </article>
+              <article class="farm-summary-card farm-summary-card--exp">
+                <span class="farm-summary-icon">EXP</span>
+                <div><span>EXP ที่ได้รับ</span><strong id="farm-total-exp">0</strong></div>
+              </article>
+              <article class="farm-summary-card farm-summary-card--rounds">
+                <span class="farm-summary-icon">⟳</span>
+                <div><span>จำนวนรอบ</span><strong id="farm-total-rounds">0</strong></div>
+              </article>
+              <article class="farm-summary-card farm-summary-card--time">
+                <span class="farm-summary-icon">◷</span>
+                <div><span>เวลาในการฟาร์ม</span><strong id="farm-total-time">0 นาที</strong></div>
+              </article>
+            </div>
+
+            <div class="farm-details-panel">
+              <div class="farm-details-heading">
+                <div>
+                  <h3 id="farm-details-title">รายละเอียดการฟาร์ม (รายวัน)</h3>
+                  <p id="farm-details-subtitle">ข้อมูลจะปรากฏหลังบอทเหรียญจบรอบ</p>
+                </div>
+                <span id="farm-bot-version" class="farm-version-badge">เวอร์ชัน: -</span>
+              </div>
+              <div class="farm-table-wrap">
+                <table class="farm-history-table">
+                  <thead>
+                    <tr>
+                      <th>เวลาเริ่มต้น</th>
+                      <th>เวลาสิ้นสุด</th>
+                      <th>เหรียญที่ได้รับ</th>
+                      <th>EXP ที่ได้รับ</th>
+                      <th>รอบที่</th>
+                      <th>เวอร์ชัน</th>
+                      <th>สถานะ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="farm-history-rows">
+                    <tr><td colspan="7" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- ── ACTIVITY SECTION ───────────────────── -->
         <section id="section-activity" class="content-section hidden">
-          <div class="section-header">
-            <h2>📋 ประวัติกิจกรรม</h2>
+          <div class="section-header card-panel usage-history-header">
+            <div>
+              <span class="usage-history-kicker">ACCOUNT HISTORY</span>
+              <h2>📋 ประวัติการใช้งาน</h2>
+              <p>รายละเอียดการเติมเงินและการใช้โค้ดของบัญชีนี้</p>
+            </div>
+            <div class="usage-filter-tabs" role="group" aria-label="กรองประวัติการใช้งาน">
+              <button type="button" class="usage-filter active" data-usage-filter="all" onclick="setUsageHistoryFilter('all')">ทั้งหมด</button>
+              <button type="button" class="usage-filter" data-usage-filter="topup" onclick="setUsageHistoryFilter('topup')">เติมเงิน</button>
+              <button type="button" class="usage-filter" data-usage-filter="code" onclick="setUsageHistoryFilter('code')">ใช้โค้ด</button>
+            </div>
           </div>
           <div id="activity-list" class="activity-list">
             <div class="loading-spinner">⟳</div>

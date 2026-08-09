@@ -15,6 +15,7 @@ import {
   reserveSlipAccessCodes,
   validCodeDuration
 } from './code-store.js';
+import { listFarmEvents, storeFarmEvent } from './farm-store.js';
 import { lineSlipPlan, lineSlipPlanSummary } from './line-slip-plans.js';
 import {
   portalStorageConfigured,
@@ -188,6 +189,22 @@ async function readJson(request) {
 
 function sitesToken() {
   return String(process.env.COOKIEBOT_SITES_TOKEN || '').trim();
+}
+
+function sameText(left, right) {
+  const a = String(left || '');
+  const b = String(right || '');
+  if (!a || a.length !== b.length) return false;
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) {
+    difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+function validBotTelemetryRequest(request) {
+  const authorization = String(request.headers.get('oai-sites-authorization') || '');
+  return sameText(authorization, `Bearer ${sitesToken()}`);
 }
 
 function legacyHeaders(request, { includeContentType = true, memberToken = '' } = {}) {
@@ -1395,6 +1412,134 @@ async function memberMe(request) {
   });
 }
 
+async function authenticatedMember(request) {
+  const { response, data } = await legacyJson(request, '/api/member/me', {
+    method: 'GET',
+    includeContentType: false
+  });
+  if (!response.ok) return { errorResponse: json(data, response.status) };
+
+  const authorization = String(request.headers.get('authorization') || '');
+  const token = authorization.replace(/^Bearer\s+/i, '').trim();
+  const memberCode = String(data.memberCode || await getMemberCodeForSession(token) || '').trim();
+  if (!memberCode) {
+    return { errorResponse: json({ error: 'ไม่พบรหัสสมาชิก กรุณาเข้าสู่ระบบใหม่' }, 401) };
+  }
+  return { memberCode, member: data };
+}
+
+async function receiveFarmEvent(request) {
+  if (!sitesToken() || !validBotTelemetryRequest(request)) {
+    return json({ error: 'ไม่อนุญาตให้ส่งข้อมูลการฟาร์ม' }, 401);
+  }
+  if (!codeStorageConfigured()) {
+    return json({ error: 'ระบบบันทึกประวัติการฟาร์มยังไม่พร้อม' }, 503);
+  }
+  try {
+    const result = await storeFarmEvent(await readJson(request));
+    return json({ ok: true, duplicate: result.duplicate }, result.duplicate ? 200 : 202);
+  } catch (error) {
+    const reason = String(error?.message || 'INVALID_FARM_EVENT');
+    if (reason === 'FARM_STORAGE_NOT_CONFIGURED') {
+      return json({ error: 'ระบบบันทึกประวัติการฟาร์มยังไม่พร้อม' }, 503);
+    }
+    return json({ error: 'ข้อมูลผลการฟาร์มไม่ถูกต้อง' }, 400);
+  }
+}
+
+async function memberFarmHistory(request) {
+  const identity = await authenticatedMember(request);
+  if (identity.errorResponse) return identity.errorResponse;
+  const events = await listFarmEvents(identity.memberCode, 2000);
+  return json({
+    events,
+    refreshIntervalSeconds: 60,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function normalizedMemberTopups(value) {
+  const list = Array.isArray(value)
+    ? value
+    : Array.isArray(value?.topups)
+      ? value.topups
+      : Array.isArray(value?.history)
+        ? value.history
+        : [];
+  return list.map(mapTopup);
+}
+
+async function memberTopupRecords(request, memberCode) {
+  for (const pathname of ['/api/member/topups', '/api/member/topup/history']) {
+    try {
+      const { response, data } = await legacyJson(request, pathname, {
+        method: 'GET',
+        includeContentType: false
+      });
+      if (response.ok) return normalizedMemberTopups(data);
+      if (response.status !== 404 && response.status !== 405) break;
+    } catch {}
+  }
+
+  const adminToken = await getAdminServiceToken();
+  if (!adminToken) return [];
+  try {
+    const { response, data } = await legacyJson(request, '/api/admin/overview', {
+      method: 'GET',
+      memberToken: adminToken,
+      includeContentType: false
+    });
+    if (!response.ok) return [];
+    return (data.topups || [])
+      .filter((topup) => String(topup?.member_code || '') === memberCode)
+      .map(mapTopup);
+  } catch {
+    return [];
+  }
+}
+
+async function memberUsageHistory(request) {
+  const identity = await authenticatedMember(request);
+  if (identity.errorResponse) return identity.errorResponse;
+
+  const [topups, allCodes] = await Promise.all([
+    memberTopupRecords(request, identity.memberCode),
+    codeStorageConfigured() ? listAccessCodes(500) : Promise.resolve([])
+  ]);
+
+  const topupItems = topups.map((topup) => ({
+    id: `topup:${topup.id || topup.orderId}`,
+    type: 'topup',
+    title: 'เติมเงิน',
+    amount: topup.amount,
+    credits: topup.credits,
+    reference: topup.slipRef || topup.orderId || '-',
+    status: topup.status,
+    createdAt: topup.createdAt,
+    completedAt: topup.verifiedAt
+  }));
+  const codeItems = allCodes
+    .filter((code) => code.status === 'used' && String(code.memberCode || '') === identity.memberCode)
+    .map((code) => ({
+      id: `code:${code.code}`,
+      type: 'code',
+      title: 'ใช้โค้ดวันใช้งาน',
+      code: code.code,
+      durationMinutes: Number(code.durationMinutes || 0),
+      source: code.source || 'admin',
+      paymentReference: code.paymentReference || '',
+      redeemedAt: code.redeemedAt,
+      expiresAt: code.expiresAt,
+      createdAt: code.redeemedAt || code.claimedAt || code.createdAt,
+      status: 'approved'
+    }));
+
+  const items = [...topupItems, ...codeItems].sort((left, right) => (
+    Date.parse(String(right.createdAt || '')) - Date.parse(String(left.createdAt || ''))
+  ));
+  return json({ items, updatedAt: new Date().toISOString() });
+}
+
 function planForDays(days) {
   return ({
     1: 'day1',
@@ -1535,6 +1680,9 @@ export default {
       if (path === 'line/webhook' && request.method === 'POST') {
         return lineWebhook(request);
       }
+      if (path === 'bot/farm-event' && request.method === 'POST') {
+        return receiveFarmEvent(request);
+      }
 
       if (path === 'auth/register' && request.method === 'POST') {
         return registerWithLegacy(request);
@@ -1547,6 +1695,12 @@ export default {
       }
       if ((path === 'users/me' || path === 'member/me') && request.method === 'GET') {
         return memberMe(request);
+      }
+      if (path === 'users/farm-history' && request.method === 'GET') {
+        return memberFarmHistory(request);
+      }
+      if (path === 'users/activity' && request.method === 'GET') {
+        return memberUsageHistory(request);
       }
       if (path === 'users/rent' && request.method === 'POST') {
         return purchaseLegacyPlan(request);

@@ -18,6 +18,8 @@ window.showPage = function(pageId) {
 };
 
 window.showSection = function(sectionId) {
+  // The old setup route now opens the combined download + setup page.
+  if (sectionId === 'tutorial') sectionId = 'download';
   document.querySelectorAll('.content-section').forEach((section) => {
     const isTarget = section.id === `section-${sectionId}`;
     section.classList.toggle('hidden', !isTarget);
@@ -27,8 +29,9 @@ window.showSection = function(sectionId) {
   document.getElementById(`menu-${sectionId}`)?.classList.add('active');
 
   if (sectionId === 'activity') renderActivityHistory();
+  if (sectionId === 'farm-history') startFarmHistoryUpdates();
+  else stopFarmHistoryUpdates();
   if (sectionId === 'admin') initAdminPanel();
-  if (sectionId === 'tutorial') renderTutorialSteps(getSystemSettings().steps || []);
   if (sectionId === 'topup') loadSystemSettings(false);
   if (sectionId === 'download') {
     refreshCurrentMember().catch(() => {}).finally(() => applySystemSettingsToUI());
@@ -949,6 +952,7 @@ window.handleLogout = function() {
   safeStorageRemove('token');
   safeStorageRemove('user');
   currentUser = null;
+  stopFarmHistoryUpdates();
   if (typeof liveCountdownInterval !== 'undefined' && liveCountdownInterval) {
     clearInterval(liveCountdownInterval);
   }
@@ -1329,49 +1333,222 @@ window.handleSlipSubmit = async function(event) {
   }
 };
 
-function getTopupHistory() {
-  const saved = safeStorageGet('topupHistory');
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
+let farmHistoryEvents = [];
+let farmHistoryPeriod = 'daily';
+let farmHistoryTimer = null;
+let farmDateListenerReady = false;
+let usageHistoryItems = [];
+let usageHistoryFilter = 'all';
+
+function thailandDateKey(value = new Date()) {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date(value));
+}
+
+function thaiDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).format(date);
+}
+
+function numberText(value) {
+  return new Intl.NumberFormat('th-TH').format(Number(value) || 0);
+}
+
+function durationText(totalSeconds) {
+  const seconds = Math.max(0, Number(totalSeconds) || 0);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  if (hours) return `${hours} ชม. ${minutes} นาที`;
+  if (minutes) return `${minutes} นาที ${remainingSeconds} วินาที`;
+  return `${remainingSeconds} วินาที`;
+}
+
+function codeDurationText(minutesValue) {
+  const minutes = Math.max(0, Number(minutesValue) || 0);
+  if (minutes % 1440 === 0) return `${minutes / 1440} วัน`;
+  if (minutes % 60 === 0) return `${minutes / 60} ชั่วโมง`;
+  return `${minutes} นาที`;
+}
+
+function farmEventsForSelection() {
+  const dateInput = document.getElementById('farm-history-date');
+  const selected = dateInput?.value || thailandDateKey();
+  if (farmHistoryPeriod === 'daily') {
+    return farmHistoryEvents.filter((event) => thailandDateKey(event.occurredAt) === selected);
   }
-  return [];
+  if (farmHistoryPeriod === 'monthly') {
+    return farmHistoryEvents.filter((event) => thailandDateKey(event.occurredAt).slice(0, 7) === selected.slice(0, 7));
+  }
+
+  const selectedDate = new Date(`${selected}T12:00:00+07:00`);
+  const weekday = selectedDate.getUTCDay();
+  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
+  const monday = new Date(selectedDate.getTime() + mondayOffset * 86_400_000);
+  const sunday = new Date(monday.getTime() + 6 * 86_400_000);
+  const startKey = thailandDateKey(monday);
+  const endKey = thailandDateKey(sunday);
+  return farmHistoryEvents.filter((event) => {
+    const key = thailandDateKey(event.occurredAt);
+    return key >= startKey && key <= endKey;
+  });
 }
 
-function saveTopupHistory(history) {
-  safeStorageSet('topupHistory', JSON.stringify(history));
-}
+function renderFarmHistory() {
+  const rows = document.getElementById('farm-history-rows');
+  if (!rows) return;
+  const events = farmEventsForSelection();
+  const coins = events.reduce((sum, event) => sum + (Number(event.coins) || 0), 0);
+  const exp = events.reduce((sum, event) => sum + (Number(event.exp) || 0), 0);
+  const seconds = events.reduce((sum, event) => sum + (Number(event.durationSeconds) || 0), 0);
+  const versions = [...new Set(events.map((event) => event.botVersion).filter(Boolean))];
+  const periodLabels = { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน' };
 
-function renderActivityHistory() {
-  const listEl = document.getElementById('activity-list');
-  if (!listEl) return;
+  document.getElementById('farm-total-coins').textContent = numberText(coins);
+  document.getElementById('farm-total-exp').textContent = numberText(exp);
+  document.getElementById('farm-total-rounds').textContent = numberText(events.length);
+  document.getElementById('farm-total-time').textContent = durationText(seconds);
+  document.getElementById('farm-details-title').textContent = `รายละเอียดการฟาร์ม (${periodLabels[farmHistoryPeriod]})`;
+  document.getElementById('farm-bot-version').textContent = `เวอร์ชัน: ${versions.join(', ') || '-'}`;
 
-  if (!currentUser) return;
-  const history = getTopupHistory().filter(t => t.username === currentUser.username);
-
-  if (history.length === 0) {
-    listEl.innerHTML = `
-      <div class="empty-state card-panel" style="text-align:center; padding:40px 20px;">
-        <div style="font-size:3rem; margin-bottom:10px;">📋</div>
-        <h3 style="color:var(--text-secondary);">ยังไม่มีประวัติกิจกรรม</h3>
-        <p style="color:var(--text-muted); font-size:0.9rem; margin-top:5px;">รายการเติมเงินและเช่าบอทของคุณจะแสดงที่นี่</p>
-      </div>
-    `;
+  if (!events.length) {
+    rows.innerHTML = '<tr><td colspan="7" class="farm-empty-cell"><span>💤</span> ยังไม่มีข้อมูลการฟาร์มในช่วงเวลานี้</td></tr>';
     return;
   }
 
-  listEl.innerHTML = history.map(item => `
-    <div class="activity-card card-panel" style="display:flex; justify-content:space-between; align-items:center; padding:16px; margin-bottom:12px; border-radius:10px;">
-      <div>
-        <div style="font-weight:700; color:var(--primary); font-size:1.05rem;">💰 เติมเงิน ${item.amount} บาท (+${item.diamonds} 💎)</div>
-        <div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">เลขอ้างอิง: ${item.transRef} | เวลา: ${item.createdAt}</div>
-      </div>
-      <div>
-        <span class="status-badge ${item.status === 'approved' ? 'success' : 'danger'}" style="padding:6px 12px; border-radius:20px; font-weight:700; font-size:0.85rem; background:${item.status === 'approved' ? 'rgba(0,255,170,0.2)' : 'rgba(255,51,102,0.2)'}; color:${item.status === 'approved' ? 'var(--accent)' : 'var(--danger)'}; border:1px solid ${item.status === 'approved' ? 'var(--accent)' : 'var(--danger)'};">
-          ${item.status === 'approved' ? '✅ สำเร็จ' : '❌ ไม่สำเร็จ'}
+  rows.innerHTML = events.map((event) => {
+    const finishedAt = new Date(event.occurredAt);
+    const startedAt = new Date(finishedAt.getTime() - (Number(event.durationSeconds) || 0) * 1000);
+    return `
+      <tr>
+        <td data-label="เวลาเริ่มต้น">${escapeHtml(thaiDateTime(startedAt))}</td>
+        <td data-label="เวลาสิ้นสุด">${escapeHtml(thaiDateTime(finishedAt))}</td>
+        <td data-label="เหรียญที่ได้รับ"><strong class="farm-value-coins">🪙 ${numberText(event.coins)}</strong></td>
+        <td data-label="EXP ที่ได้รับ"><strong class="farm-value-exp">EXP ${numberText(event.exp)}</strong></td>
+        <td data-label="รอบที่">${numberText(event.runRound)}</td>
+        <td data-label="เวอร์ชัน"><span class="farm-table-version">${escapeHtml(event.botVersion || '-')}</span></td>
+        <td data-label="สถานะ"><span class="farm-complete-badge"><i></i> เสร็จสิ้น</span></td>
+      </tr>`;
+  }).join('');
+}
+
+async function loadFarmHistory() {
+  const refreshEl = document.getElementById('farm-history-refresh');
+  if (refreshEl) refreshEl.textContent = 'กำลังอัปเดต...';
+  try {
+    const response = await axios.get(`${API_BASE_URL}/users/farm-history`, { headers: getAuthHeaders() });
+    farmHistoryEvents = Array.isArray(response.data?.events) ? response.data.events : [];
+    renderFarmHistory();
+    if (refreshEl) refreshEl.textContent = `อัปเดตล่าสุด ${new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }).format(new Date())}`;
+  } catch (error) {
+    const rows = document.getElementById('farm-history-rows');
+    if (rows) rows.innerHTML = `<tr><td colspan="7" class="farm-empty-cell farm-load-error">${escapeHtml(getApiErrorMessage(error, 'โหลดประวัติการฟาร์มไม่สำเร็จ'))}</td></tr>`;
+    if (refreshEl) refreshEl.textContent = 'ลองใหม่ใน 1 นาที';
+  }
+}
+
+window.setFarmHistoryPeriod = function(period) {
+  if (!['daily', 'weekly', 'monthly'].includes(period)) return;
+  farmHistoryPeriod = period;
+  document.querySelectorAll('.farm-period-tab').forEach((button) => {
+    button.classList.toggle('active', button.dataset.farmPeriod === period);
+  });
+  renderFarmHistory();
+};
+
+function startFarmHistoryUpdates() {
+  const dateInput = document.getElementById('farm-history-date');
+  if (dateInput && !dateInput.value) dateInput.value = thailandDateKey();
+  if (dateInput && !farmDateListenerReady) {
+    dateInput.addEventListener('change', renderFarmHistory);
+    farmDateListenerReady = true;
+  }
+  stopFarmHistoryUpdates();
+  loadFarmHistory();
+  farmHistoryTimer = setInterval(() => {
+    if (document.getElementById('section-farm-history')?.classList.contains('active')) loadFarmHistory();
+  }, 60_000);
+}
+
+function stopFarmHistoryUpdates() {
+  if (farmHistoryTimer) clearInterval(farmHistoryTimer);
+  farmHistoryTimer = null;
+}
+
+function renderUsageHistoryItems() {
+  const listEl = document.getElementById('activity-list');
+  if (!listEl) return;
+  const items = usageHistoryFilter === 'all'
+    ? usageHistoryItems
+    : usageHistoryItems.filter((item) => item.type === usageHistoryFilter);
+
+  if (!items.length) {
+    listEl.innerHTML = `
+      <div class="usage-empty-state card-panel">
+        <span>📋</span>
+        <h3>ยังไม่มีประวัติการใช้งาน</h3>
+        <p>รายการเติมเงินและการใช้โค้ดของบัญชีนี้จะแสดงที่นี่</p>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map((item) => {
+    const isTopup = item.type === 'topup';
+    const approved = item.status === 'approved';
+    const details = isTopup
+      ? `
+        <span><b>ยอดเงิน</b>${numberText(item.amount)} บาท</span>
+        <span><b>เครดิตที่ได้รับ</b>${numberText(item.credits)}</span>
+        <span><b>เลขอ้างอิง</b>${escapeHtml(item.reference || '-')}</span>
+        <span><b>เสร็จสิ้นเมื่อ</b>${escapeHtml(thaiDateTime(item.completedAt || item.createdAt))}</span>`
+      : `
+        <span><b>โค้ด</b><code>${escapeHtml(item.code || '-')}</code></span>
+        <span><b>ระยะเวลาที่ได้รับ</b>${escapeHtml(codeDurationText(item.durationMinutes))}</span>
+        <span><b>แหล่งที่มา</b>${item.source === 'line-slip' ? 'ตรวจสลิปผ่าน LINE' : 'โค้ดจากผู้ดูแล'}</span>
+        <span><b>วันหมดอายุหลังใช้โค้ด</b>${escapeHtml(thaiDateTime(item.expiresAt))}</span>`;
+    return `
+      <article class="usage-history-card card-panel usage-history-card--${item.type}">
+        <div class="usage-history-icon">${isTopup ? '💰' : '🔑'}</div>
+        <div class="usage-history-content">
+          <div class="usage-history-card-head">
+            <div><span>${isTopup ? 'TOP UP' : 'ACCESS CODE'}</span><h3>${escapeHtml(item.title)}</h3></div>
+            <time>${escapeHtml(thaiDateTime(item.createdAt))}</time>
+          </div>
+          <div class="usage-history-details">${details}</div>
+        </div>
+        <span class="usage-status ${approved ? 'is-success' : item.status === 'pending' ? 'is-pending' : 'is-failed'}">
+          ${approved ? '● สำเร็จ' : item.status === 'pending' ? '● รอตรวจสอบ' : '● ไม่สำเร็จ'}
         </span>
-      </div>
-    </div>
-  `).join('');
+      </article>`;
+  }).join('');
+}
+
+window.setUsageHistoryFilter = function(filter) {
+  if (!['all', 'topup', 'code'].includes(filter)) return;
+  usageHistoryFilter = filter;
+  document.querySelectorAll('.usage-filter').forEach((button) => {
+    button.classList.toggle('active', button.dataset.usageFilter === filter);
+  });
+  renderUsageHistoryItems();
+};
+
+async function renderActivityHistory() {
+  const listEl = document.getElementById('activity-list');
+  if (!listEl || !currentUser) return;
+  listEl.innerHTML = '<div class="usage-loading card-panel"><span>⟳</span> กำลังโหลดประวัติการใช้งาน...</div>';
+  try {
+    const response = await axios.get(`${API_BASE_URL}/users/activity`, { headers: getAuthHeaders() });
+    usageHistoryItems = Array.isArray(response.data?.items) ? response.data.items : [];
+    renderUsageHistoryItems();
+  } catch (error) {
+    listEl.innerHTML = `<div class="usage-empty-state card-panel is-error"><span>!</span><h3>โหลดข้อมูลไม่สำเร็จ</h3><p>${escapeHtml(getApiErrorMessage(error, 'กรุณาลองใหม่อีกครั้ง'))}</p></div>`;
+  }
 }
 
 // 8. ADMIN PANEL AND USER MANAGEMENT
