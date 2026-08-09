@@ -110,6 +110,11 @@
     <!-- Topbar -->
     <header class="topbar">
       <div class="topbar-left">
+        <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarDrawer()" aria-label="เปิดเมนู" aria-expanded="false" aria-controls="dashboard-sidebar">
+          <span class="sidebar-toggle-bar"></span>
+          <span class="sidebar-toggle-bar"></span>
+          <span class="sidebar-toggle-bar"></span>
+        </button>
         <div class="topbar-logo">
           <img src="ckrcs-logo.png" alt="CKRCS BOT" class="topbar-logo-image" />
           <span>CKRCS BOT</span>
@@ -142,36 +147,39 @@
 
     <!-- Main Layout -->
     <div class="dashboard-layout">
+      <!-- Mobile drawer backdrop -->
+      <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebarDrawer()"></div>
+
       <!-- Sidebar -->
-      <nav class="sidebar">
+      <nav class="sidebar" id="dashboard-sidebar">
         <div class="sidebar-menu">
-          <button class="menu-item active" onclick="showSection('home')" id="menu-home">
+          <a class="menu-item active" href="/dashboard" data-route id="menu-home">
             <span class="menu-icon">🏠</span>
             <span class="menu-text">หน้าหลัก</span>
-          </button>
-          <button class="menu-item" onclick="showSection('download')" id="menu-download">
+          </a>
+          <a class="menu-item" href="/downloads" data-route id="menu-download">
             <span class="menu-icon">⬇️</span>
             <span class="menu-text">ดาวน์โหลดและวิธีตั้งค่า</span>
-          </button>
-          <button class="menu-item" onclick="showSection('topup')" id="menu-topup">
+          </a>
+          <a class="menu-item" href="/top-up" data-route id="menu-topup">
             <span class="menu-icon">💰</span>
             <span class="menu-text">เติมเงิน</span>
-          </button>
-          <button class="menu-item" onclick="showSection('farm-history')" id="menu-farm-history">
+          </a>
+          <a class="menu-item" href="/farm-history" data-route id="menu-farm-history">
             <span class="menu-icon">💰</span>
             <span class="menu-text">ประวัติการฟาร์ม</span>
-          </button>
-          <button class="menu-item" onclick="showSection('activity')" id="menu-activity">
+          </a>
+          <a class="menu-item" href="/usage-history" data-route id="menu-activity">
             <span class="menu-icon">📋</span>
             <span class="menu-text">ประวัติการใช้งาน</span>
-          </button>
+          </a>
           <!-- Admin only -->
-          <button class="menu-item admin-only hidden" onclick="showSection('admin')" id="menu-admin">
+          <a class="menu-item admin-only hidden" href="/admin" data-route id="menu-admin">
             <span class="menu-icon">👑</span>
             <span class="menu-text">แผงผู้ดูแลระบบ</span>
-          </button>
+          </a>
           <!-- Soft Orange Logout Button at bottom of sidebar (Rule 1) -->
-          <button class="menu-item menu-logout" onclick="handleLogout()">
+          <button type="button" class="menu-item menu-logout" onclick="handleLogout()">
             <span class="menu-icon">🚪</span>
             <span class="menu-text">ออกจากระบบ</span>
           </button>
@@ -213,6 +221,11 @@
                 <div class="countdown-unit"><span id="cd-secs">00</span><label>วินาที</label></div>
               </div>
             </div>
+          </div>
+
+          <div class="home-notice-banner" role="note">
+            <span class="home-notice-icon" aria-hidden="true">⚠️</span>
+            <span>หากต้องการเติมวันใช้งานหรือดูวิธีใช้งานบอทแต่ละตัว เลื่อนลงไปดูได้ที่ด้านล่างของหน้านี้</span>
           </div>
 
           <div class="home-bot-menu">
@@ -488,19 +501,19 @@
                 <div><span>เหรียญที่ได้รับ</span><strong id="farm-total-coins">0</strong></div>
               </article>
               <article class="farm-summary-card farm-summary-card--exp" id="farm-summary-exp">
-                <span class="farm-summary-icon">EXP</span>
+                <span class="farm-summary-icon">⭐</span>
                 <div><span>EXP ที่ได้รับ</span><strong id="farm-total-exp">0</strong></div>
               </article>
               <article class="farm-summary-card farm-summary-card--powder" id="farm-summary-powder">
                 <span class="farm-summary-icon">🧪</span>
-                <div><span>ย่อยผงที่ได้รับ</span><strong id="farm-total-powder">0</strong></div>
+                <div><span>ได้รับผงจากการย่อย</span><strong id="farm-total-powder">0</strong></div>
               </article>
               <article class="farm-summary-card farm-summary-card--rounds">
-                <span class="farm-summary-icon">⟳</span>
+                <span class="farm-summary-icon">🔁</span>
                 <div><span>จำนวนรอบ</span><strong id="farm-total-rounds">0</strong></div>
               </article>
               <article class="farm-summary-card farm-summary-card--time">
-                <span class="farm-summary-icon">◷</span>
+                <span class="farm-summary-icon">⏱️</span>
                 <div><span>เวลาในการฟาร์ม</span><strong id="farm-total-time">0 นาที</strong></div>
               </article>
               <div id="farm-device-chips" class="farm-device-chips"></div>
@@ -523,7 +536,7 @@
                       <th>เวลา</th>
                       <th>เหรียญที่ได้รับ</th>
                       <th>EXP ที่ได้รับ</th>
-                      <th>ย่อยผงที่ได้รับ</th>
+                      <th>ได้รับผงจากการย่อย</th>
                       <th>รอบที่</th>
                       <th>เวอร์ชัน</th>
                       <th>สถานะ</th>
@@ -749,6 +762,23 @@
         </section>
 
       </main>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 404 NOT FOUND PAGE -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="notfound-page" class="page hidden">
+    <div class="notfound-container">
+      <div class="notfound-logo">
+        <img src="ckrcs-logo.png" alt="CKRCS BOT" class="notfound-logo-image" />
+      </div>
+      <div class="notfound-code">404</div>
+      <h1>ไม่พบหน้านี้</h1>
+      <p>ลิงก์นี้อาจถูกย้ายหรือไม่มีอยู่จริง ลองกลับไปที่หน้าหลักดูอีกครั้ง</p>
+      <a href="/dashboard" data-route class="btn-primary notfound-home-btn">
+        <span class="btn-icon">🏠</span> กลับหน้าหลัก
+      </a>
     </div>
   </div>
 

@@ -1,3 +1,5 @@
+import { initRouter, navigateTo, consumePostLoginRedirect } from './router.js';
+
 window.showPage = function(pageId) {
   document.querySelectorAll('.page').forEach((page) => {
     const isTarget = page.id === pageId;
@@ -780,6 +782,17 @@ window.closeModal = function(modalId, event) {
   if (modal) modal.classList.add('hidden');
 };
 
+// Mobile off-canvas sidebar drawer (hamburger toggle in the topbar).
+window.toggleSidebarDrawer = function() {
+  const isOpen = document.body.classList.toggle('sidebar-open');
+  document.getElementById('sidebar-toggle-btn')?.setAttribute('aria-expanded', String(isOpen));
+};
+
+window.closeSidebarDrawer = function() {
+  document.body.classList.remove('sidebar-open');
+  document.getElementById('sidebar-toggle-btn')?.setAttribute('aria-expanded', 'false');
+};
+
 window.togglePassword = function(inputId, btn) {
   const input = document.getElementById(inputId);
   if (!input) return;
@@ -857,11 +870,11 @@ window.handleLogin = async function(event) {
     safeStorageSet('user', JSON.stringify(user));
     safeStorageSet('authSessionVersion', 'legacy-admin-v2');
     if (passwordEl) passwordEl.value = '';
-    window.showPage('dashboard-page');
     // We already have fresh user data from the login response itself --
     // skip the immediate re-fetch so a slow/cold backend on this first
     // request right after login can't misfire a false "session expired".
-    initDashboard(true);
+    skipNextDashboardBootRefresh = true;
+    navigateTo(consumePostLoginRedirect() || '/dashboard', { replace: true });
     window.showToast(
       storageBlocked
         ? `เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.username} 🎉 (เบราว์เซอร์บล็อกการจำข้อมูล อาจต้องเข้าสู่ระบบใหม่ทุกครั้งที่เปิดเว็บ)`
@@ -952,12 +965,13 @@ window.handleLogout = function() {
   safeStorageRemove('token');
   safeStorageRemove('user');
   currentUser = null;
+  dashboardBooted = false;
   stopFarmHistoryUpdates();
   if (typeof liveCountdownInterval !== 'undefined' && liveCountdownInterval) {
     clearInterval(liveCountdownInterval);
   }
-  window.showPage('auth-page');
   window.switchTab('login');
+  navigateTo('/login', { replace: true });
   window.showToast('ออกจากระบบเรียบร้อยแล้ว 👋', 'info');
 };
 
@@ -965,6 +979,23 @@ window.handleLogout = function() {
 // 6. DASHBOARD AND RENTAL SYSTEM
 let liveCountdownInterval = null;
 let pendingRedeem = null;
+let dashboardBooted = false;
+let skipNextDashboardBootRefresh = false;
+
+// Called by the router every time it lands on dashboard-page. initDashboard()
+// only needs to run once per login session (it sets up the topbar, admin
+// menu visibility and the /users/me refresh) -- switching between sidebar
+// sections afterwards only needs showSection(), not a full re-boot.
+function handleRouteEnter(route) {
+  window.closeSidebarDrawer();
+  window.showPage(route.page);
+  if (route.page === 'dashboard-page' && !dashboardBooted) {
+    dashboardBooted = true;
+    initDashboard(skipNextDashboardBootRefresh);
+    skipNextDashboardBootRefresh = false;
+  }
+  if (route.section) window.showSection(route.section);
+}
 
 function initDashboard(skipRefresh = false) {
   const userStr = safeStorageGet('user');
@@ -972,7 +1003,8 @@ function initDashboard(skipRefresh = false) {
     try { currentUser = JSON.parse(userStr); } catch (e) {}
   }
   if (!currentUser) {
-    window.showPage('auth-page');
+    dashboardBooted = false;
+    navigateTo('/login', { replace: true });
     return;
   }
 
@@ -1023,7 +1055,8 @@ function initDashboard(skipRefresh = false) {
           safeStorageRemove('token');
           safeStorageRemove('user');
           currentUser = null;
-          window.showPage('auth-page');
+          dashboardBooted = false;
+          navigateTo('/login', { replace: true });
           window.showToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่', 'error');
         }
       });
@@ -1451,9 +1484,9 @@ function farmHistoryColumns() {
     return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, version, status];
   }
   if (farmBotTypeFilter === 'powder') {
-    return [id, time, { key: 'powder', label: 'ย่อยผงที่ได้รับ' }, round, version, status];
+    return [id, time, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, version, status];
   }
-  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ย่อยผงที่ได้รับ' }, round, version, status];
+  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, version, status];
 }
 
 function farmHistoryClockTime(value) {
@@ -2241,6 +2274,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-form')?.addEventListener('submit', window.handleLogin);
   document.getElementById('register-form')?.addEventListener('submit', window.handleRegister);
   window.switchTab(currentAuthView);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') window.closeSidebarDrawer();
+  });
 
   // Remove plaintext passwords left by older local-preview versions.
   if (safeStorageGet('registeredUsers')) {
@@ -2269,14 +2305,18 @@ document.addEventListener('DOMContentLoaded', () => {
   if (token && user) {
     try {
       currentUser = JSON.parse(user);
-      window.showPage('dashboard-page');
-      initDashboard();
     } catch (e) {
       safeStorageRemove('token');
       safeStorageRemove('user');
-      window.showPage('auth-page');
+      currentUser = null;
     }
-  } else {
-    window.showPage('auth-page');
   }
+
+  initRouter({
+    isAuthed: () => Boolean(currentUser),
+    isAdmin: () => currentUser?.role === 'admin',
+    onNavigate: handleRouteEnter,
+    onNotFound: () => window.showPage('notfound-page'),
+    onForbidden: () => window.showToast('คุณไม่มีสิทธิ์เข้าหน้านี้', 'error')
+  });
 });
