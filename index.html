@@ -456,9 +456,9 @@
               <div class="farm-history-title-group">
                 <div class="farm-history-symbol" aria-hidden="true">💰</div>
                 <div>
-                  <span class="farm-history-kicker">COIN BOT TELEMETRY</span>
+                  <span class="farm-history-kicker">BOT TELEMETRY</span>
                   <h2>ประวัติการฟาร์ม</h2>
-                  <p>ข้อมูลจากบอทเหรียญของไอดีที่ล็อกอินอยู่เท่านั้น</p>
+                  <p>ข้อมูลจากบอทเหรียญและบอทย่อยผงของไอดีที่ล็อกอินอยู่เท่านั้น</p>
                 </div>
               </div>
               <div class="farm-history-meta">
@@ -470,6 +470,12 @@
               </div>
             </header>
 
+            <div class="farm-period-tabs" role="tablist" aria-label="ประเภทบอทประวัติการฟาร์ม">
+              <button class="farm-bottype-tab active" type="button" data-farm-bottype="all" onclick="setFarmBotType('all')">📦 รวมทั้งหมด</button>
+              <button class="farm-bottype-tab" type="button" data-farm-bottype="coin" onclick="setFarmBotType('coin')">🪙 ข้อมูลเหรียญ</button>
+              <button class="farm-bottype-tab" type="button" data-farm-bottype="powder" onclick="setFarmBotType('powder')">🧪 ข้อมูลย่อยผง</button>
+            </div>
+
             <div class="farm-period-tabs" role="tablist" aria-label="ช่วงเวลาประวัติการฟาร์ม">
               <button class="farm-period-tab active" type="button" data-farm-period="daily" onclick="setFarmHistoryPeriod('daily')">▣ รายวัน</button>
               <button class="farm-period-tab" type="button" data-farm-period="weekly" onclick="setFarmHistoryPeriod('weekly')">▣ รายสัปดาห์</button>
@@ -477,13 +483,17 @@
             </div>
 
             <div class="farm-summary-grid" aria-live="polite">
-              <article class="farm-summary-card farm-summary-card--coins">
+              <article class="farm-summary-card farm-summary-card--coins" id="farm-summary-coins">
                 <span class="farm-summary-icon">🪙</span>
                 <div><span>เหรียญที่ได้รับ</span><strong id="farm-total-coins">0</strong></div>
               </article>
-              <article class="farm-summary-card farm-summary-card--exp">
+              <article class="farm-summary-card farm-summary-card--exp" id="farm-summary-exp">
                 <span class="farm-summary-icon">EXP</span>
                 <div><span>EXP ที่ได้รับ</span><strong id="farm-total-exp">0</strong></div>
+              </article>
+              <article class="farm-summary-card farm-summary-card--powder" id="farm-summary-powder">
+                <span class="farm-summary-icon">🧪</span>
+                <div><span>ย่อยผงที่ได้รับ</span><strong id="farm-total-powder">0</strong></div>
               </article>
               <article class="farm-summary-card farm-summary-card--rounds">
                 <span class="farm-summary-icon">⟳</span>
@@ -505,19 +515,22 @@
               </div>
               <div class="farm-table-wrap">
                 <table class="farm-history-table">
-                  <thead>
+                  <thead id="farm-history-head">
                     <tr>
+                      <th>หมายเลขไอดี</th>
+                      <th>บอท</th>
                       <th>เวลาเริ่มต้น</th>
                       <th>เวลาสิ้นสุด</th>
                       <th>เหรียญที่ได้รับ</th>
                       <th>EXP ที่ได้รับ</th>
+                      <th>ย่อยผงที่ได้รับ</th>
                       <th>รอบที่</th>
                       <th>เวอร์ชัน</th>
                       <th>สถานะ</th>
                     </tr>
                   </thead>
                   <tbody id="farm-history-rows">
-                    <tr><td colspan="7" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
+                    <tr><td colspan="10" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
                   </tbody>
                 </table>
               </div>

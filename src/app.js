@@ -1337,6 +1337,12 @@ let farmHistoryEvents = [];
 let farmHistoryPeriod = 'daily';
 let farmHistoryTimer = null;
 let farmDateListenerReady = false;
+let farmBotTypeFilter = 'all';
+
+function farmDeviceLabel(deviceId) {
+  const match = /(\d{1,2})\s*$/.exec(String(deviceId || '').trim());
+  return match ? `หมายเลข ${match[1].padStart(2, '0')}` : (deviceId ? escapeHtml(deviceId) : 'ไม่ระบุ');
+}
 let usageHistoryItems = [];
 let usageHistoryFilter = 'all';
 
@@ -1380,11 +1386,13 @@ function codeDurationText(minutesValue) {
 function farmEventsForSelection() {
   const dateInput = document.getElementById('farm-history-date');
   const selected = dateInput?.value || thailandDateKey();
+  const byBotType = (event) => farmBotTypeFilter === 'all' || event.botType === farmBotTypeFilter;
+
   if (farmHistoryPeriod === 'daily') {
-    return farmHistoryEvents.filter((event) => thailandDateKey(event.occurredAt) === selected);
+    return farmHistoryEvents.filter((event) => byBotType(event) && thailandDateKey(event.occurredAt) === selected);
   }
   if (farmHistoryPeriod === 'monthly') {
-    return farmHistoryEvents.filter((event) => thailandDateKey(event.occurredAt).slice(0, 7) === selected.slice(0, 7));
+    return farmHistoryEvents.filter((event) => byBotType(event) && thailandDateKey(event.occurredAt).slice(0, 7) === selected.slice(0, 7));
   }
 
   const selectedDate = new Date(`${selected}T12:00:00+07:00`);
@@ -1396,45 +1404,88 @@ function farmEventsForSelection() {
   const endKey = thailandDateKey(sunday);
   return farmHistoryEvents.filter((event) => {
     const key = thailandDateKey(event.occurredAt);
-    return key >= startKey && key <= endKey;
+    return byBotType(event) && key >= startKey && key <= endKey;
   });
+}
+
+window.setFarmBotType = function(type) {
+  if (!['all', 'coin', 'powder'].includes(type)) return;
+  farmBotTypeFilter = type;
+  document.querySelectorAll('.farm-bottype-tab').forEach((button) => {
+    button.classList.toggle('active', button.dataset.farmBottype === type);
+  });
+  renderFarmHistory();
+};
+
+function farmHistoryColumns() {
+  const id = { key: 'id', label: 'หมายเลขไอดี' };
+  const bot = { key: 'bot', label: 'บอท' };
+  const start = { key: 'start', label: 'เวลาเริ่มต้น' };
+  const end = { key: 'end', label: 'เวลาสิ้นสุด' };
+  const round = { key: 'round', label: 'รอบที่' };
+  const version = { key: 'version', label: 'เวอร์ชัน' };
+  const status = { key: 'status', label: 'สถานะ' };
+  if (farmBotTypeFilter === 'coin') {
+    return [id, start, end, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, version, status];
+  }
+  if (farmBotTypeFilter === 'powder') {
+    return [id, start, end, { key: 'powder', label: 'ย่อยผงที่ได้รับ' }, round, version, status];
+  }
+  return [id, bot, start, end, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ย่อยผงที่ได้รับ' }, round, version, status];
+}
+
+function farmHistoryCell(key, event, startedAt, finishedAt) {
+  switch (key) {
+    case 'id': return farmDeviceLabel(event.deviceId);
+    case 'bot': return event.botType === 'coin' ? 'บอทเหรียญ' : 'บอทย่อยผง';
+    case 'start': return escapeHtml(thaiDateTime(startedAt));
+    case 'end': return escapeHtml(thaiDateTime(finishedAt));
+    case 'coins': return `<strong class="farm-value-coins">🪙 ${numberText(event.coins)}</strong>`;
+    case 'exp': return `<strong class="farm-value-exp">EXP ${numberText(event.exp)}</strong>`;
+    case 'powder': return `<strong class="farm-value-powder">🧪 ${numberText(event.powder)}</strong>`;
+    case 'round': return numberText(event.runRound);
+    case 'version': return `<span class="farm-table-version">${escapeHtml(event.botVersion || '-')}</span>`;
+    case 'status': return '<span class="farm-complete-badge"><i></i> เสร็จสิ้น</span>';
+    default: return '';
+  }
 }
 
 function renderFarmHistory() {
   const rows = document.getElementById('farm-history-rows');
+  const head = document.getElementById('farm-history-head');
   if (!rows) return;
   const events = farmEventsForSelection();
   const coins = events.reduce((sum, event) => sum + (Number(event.coins) || 0), 0);
   const exp = events.reduce((sum, event) => sum + (Number(event.exp) || 0), 0);
+  const powder = events.reduce((sum, event) => sum + (Number(event.powder) || 0), 0);
   const seconds = events.reduce((sum, event) => sum + (Number(event.durationSeconds) || 0), 0);
   const versions = [...new Set(events.map((event) => event.botVersion).filter(Boolean))];
   const periodLabels = { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน' };
 
   document.getElementById('farm-total-coins').textContent = numberText(coins);
   document.getElementById('farm-total-exp').textContent = numberText(exp);
+  document.getElementById('farm-total-powder').textContent = numberText(powder);
   document.getElementById('farm-total-rounds').textContent = numberText(events.length);
   document.getElementById('farm-total-time').textContent = durationText(seconds);
   document.getElementById('farm-details-title').textContent = `รายละเอียดการฟาร์ม (${periodLabels[farmHistoryPeriod]})`;
   document.getElementById('farm-bot-version').textContent = `เวอร์ชัน: ${versions.join(', ') || '-'}`;
 
+  document.getElementById('farm-summary-coins')?.classList.toggle('hidden', farmBotTypeFilter === 'powder');
+  document.getElementById('farm-summary-exp')?.classList.toggle('hidden', farmBotTypeFilter === 'powder');
+  document.getElementById('farm-summary-powder')?.classList.toggle('hidden', farmBotTypeFilter === 'coin');
+
+  const columns = farmHistoryColumns();
+  if (head) head.innerHTML = `<tr>${columns.map((c) => `<th>${c.label}</th>`).join('')}</tr>`;
+
   if (!events.length) {
-    rows.innerHTML = '<tr><td colspan="7" class="farm-empty-cell"><span>💤</span> ยังไม่มีข้อมูลการฟาร์มในช่วงเวลานี้</td></tr>';
+    rows.innerHTML = `<tr><td colspan="${columns.length}" class="farm-empty-cell"><span>💤</span> ยังไม่มีข้อมูลการฟาร์มในช่วงเวลานี้</td></tr>`;
     return;
   }
 
   rows.innerHTML = events.map((event) => {
     const finishedAt = new Date(event.occurredAt);
     const startedAt = new Date(finishedAt.getTime() - (Number(event.durationSeconds) || 0) * 1000);
-    return `
-      <tr>
-        <td data-label="เวลาเริ่มต้น">${escapeHtml(thaiDateTime(startedAt))}</td>
-        <td data-label="เวลาสิ้นสุด">${escapeHtml(thaiDateTime(finishedAt))}</td>
-        <td data-label="เหรียญที่ได้รับ"><strong class="farm-value-coins">🪙 ${numberText(event.coins)}</strong></td>
-        <td data-label="EXP ที่ได้รับ"><strong class="farm-value-exp">EXP ${numberText(event.exp)}</strong></td>
-        <td data-label="รอบที่">${numberText(event.runRound)}</td>
-        <td data-label="เวอร์ชัน"><span class="farm-table-version">${escapeHtml(event.botVersion || '-')}</span></td>
-        <td data-label="สถานะ"><span class="farm-complete-badge"><i></i> เสร็จสิ้น</span></td>
-      </tr>`;
+    return `<tr>${columns.map((c) => `<td data-label="${c.label}">${farmHistoryCell(c.key, event, startedAt, finishedAt)}</td>`).join('')}</tr>`;
   }).join('');
 }
 
@@ -1448,7 +1499,7 @@ async function loadFarmHistory() {
     if (refreshEl) refreshEl.textContent = `อัปเดตล่าสุด ${new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }).format(new Date())}`;
   } catch (error) {
     const rows = document.getElementById('farm-history-rows');
-    if (rows) rows.innerHTML = `<tr><td colspan="7" class="farm-empty-cell farm-load-error">${escapeHtml(getApiErrorMessage(error, 'โหลดประวัติการฟาร์มไม่สำเร็จ'))}</td></tr>`;
+    if (rows) rows.innerHTML = `<tr><td colspan="${farmHistoryColumns().length}" class="farm-empty-cell farm-load-error">${escapeHtml(getApiErrorMessage(error, 'โหลดประวัติการฟาร์มไม่สำเร็จ'))}</td></tr>`;
     if (refreshEl) refreshEl.textContent = 'ลองใหม่ใน 1 นาที';
   }
 }

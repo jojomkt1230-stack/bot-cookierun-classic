@@ -41,7 +41,7 @@ export function normalizeFarmEvent(payload = {}) {
 
   if (!/^[A-Za-z0-9-]{8,80}$/.test(eventId)) throw new Error('INVALID_EVENT_ID');
   if (!memberCode || memberCode.length > 180) throw new Error('INVALID_MEMBER_CODE');
-  if (botType !== 'coin') throw new Error('INVALID_BOT_TYPE');
+  if (botType !== 'coin' && botType !== 'powder') throw new Error('INVALID_BOT_TYPE');
   if (Number.isNaN(occurredAtDate.getTime())) throw new Error('INVALID_EVENT_TIME');
 
   const now = Date.now();
