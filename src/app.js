@@ -1443,30 +1443,61 @@ function renderFarmDeviceChips() {
 function farmHistoryColumns() {
   const id = { key: 'id', label: 'หมายเลขไอดี' };
   const bot = { key: 'bot', label: 'บอท' };
-  const duration = { key: 'duration', label: 'ระยะเวลาที่ใช้ต่อรอบ' };
+  const time = { key: 'time', label: 'เวลา' };
   const round = { key: 'round', label: 'รอบที่' };
+  const version = { key: 'version', label: 'เวอร์ชัน' };
   const status = { key: 'status', label: 'สถานะ' };
   if (farmBotTypeFilter === 'coin') {
-    return [id, duration, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, status];
+    return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, version, status];
   }
   if (farmBotTypeFilter === 'powder') {
-    return [id, duration, { key: 'powder', label: 'ย่อยผงที่ได้รับ' }, round, status];
+    return [id, time, { key: 'powder', label: 'ย่อยผงที่ได้รับ' }, round, version, status];
   }
-  return [id, bot, duration, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ย่อยผงที่ได้รับ' }, round, status];
+  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ย่อยผงที่ได้รับ' }, round, version, status];
 }
 
-function farmHistoryCell(key, event, startedAt, finishedAt) {
+function farmHistoryClockTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).format(date);
+}
+
+function farmHistoryCell(key, event, roundNumber) {
   switch (key) {
     case 'id': return farmDeviceLabel(event.deviceId);
     case 'bot': return event.botType === 'coin' ? 'บอทเหรียญ' : 'บอทย่อยผง';
-    case 'duration': return escapeHtml(durationText(event.durationSeconds));
+    case 'time': return escapeHtml(farmHistoryClockTime(event.occurredAt));
     case 'coins': return `<strong class="farm-value-coins">🪙 ${numberText(event.coins)}</strong>`;
     case 'exp': return `<strong class="farm-value-exp">EXP ${numberText(event.exp)}</strong>`;
     case 'powder': return `<strong class="farm-value-powder">🧪 ${numberText(event.powder)}</strong>`;
-    case 'round': return numberText(event.runRound);
+    case 'round': return numberText(roundNumber);
+    case 'version': return `<span class="farm-table-version">${escapeHtml(event.botVersion || '-')}</span>`;
     case 'status': return '<span class="farm-complete-badge"><i></i> เสร็จสิ้น</span>';
     default: return '';
   }
+}
+
+function farmDailyRoundNumbers(events) {
+  // Round numbers reset every midnight (Bangkok time) instead of using the
+  // bot's own session counter, which restarts at 1 on every bot launch and
+  // otherwise shows confusing duplicate round numbers side by side when
+  // multiple sessions/days are listed together.
+  const byDay = new Map();
+  for (const event of events) {
+    const dayKey = thailandDateKey(event.occurredAt);
+    if (!byDay.has(dayKey)) byDay.set(dayKey, []);
+    byDay.get(dayKey).push(event);
+  }
+  const numbers = new Map();
+  for (const dayEvents of byDay.values()) {
+    dayEvents
+      .slice()
+      .sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
+      .forEach((event, index) => numbers.set(event, index + 1));
+  }
+  return numbers;
 }
 
 function renderFarmHistory() {
@@ -1502,10 +1533,9 @@ function renderFarmHistory() {
     return;
   }
 
+  const roundNumbers = farmDailyRoundNumbers(events);
   rows.innerHTML = events.map((event) => {
-    const finishedAt = new Date(event.occurredAt);
-    const startedAt = new Date(finishedAt.getTime() - (Number(event.durationSeconds) || 0) * 1000);
-    return `<tr>${columns.map((c) => `<td data-label="${c.label}">${farmHistoryCell(c.key, event, startedAt, finishedAt)}</td>`).join('')}</tr>`;
+    return `<tr>${columns.map((c) => `<td data-label="${c.label}">${farmHistoryCell(c.key, event, roundNumbers.get(event))}</td>`).join('')}</tr>`;
   }).join('');
 }
 
