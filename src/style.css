@@ -3055,17 +3055,25 @@ button, input, select, textarea { font: inherit; }
 .farm-date-control { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border: 1px solid rgba(0, 212, 255, .65); border-radius: 12px; background: rgba(2, 13, 35, .82); box-shadow: inset 0 0 20px rgba(0, 177, 255, .05); }
 .farm-date-control input { color: #d9e9ff; color-scheme: dark; border: 0; outline: 0; background: transparent; font: 600 .88rem 'Sarabun', sans-serif; }
 .farm-refresh-chip { padding: 8px 11px; border: 1px solid rgba(51, 255, 169, .28); border-radius: 999px; color: #62eeb0; background: rgba(0, 255, 145, .07); font-size: .72rem; white-space: nowrap; }
-.farm-period-tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin: clamp(18px, 1.8vw, 26px) 0; border-block: 1px solid rgba(0, 212, 255, .25); }
-.farm-period-tab { min-height: clamp(48px, 4vw, 62px); border: 0; border-right: 1px solid rgba(0, 212, 255, .14); color: #a9b8d2; background: transparent; font: 700 clamp(.82rem, .5vw + .7rem, 1.05rem) 'Sarabun', sans-serif; cursor: pointer; transition: .2s ease; }
-.farm-period-tab:last-child { border-right: 0; }
-.farm-period-tab:hover { color: #e8faff; background: rgba(0, 212, 255, .07); }
-.farm-period-tab.active { color: #7cecff; background: linear-gradient(180deg, rgba(0, 180, 255, .24), rgba(0, 97, 210, .12)); box-shadow: inset 0 -2px #04d9ff, 0 0 26px rgba(0, 182, 255, .13); }
+.farm-period-tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin: clamp(18px, 1.8vw, 26px) 0; border: 1px solid rgba(0, 212, 255, .25); border-radius: 14px; overflow: hidden; background: rgba(2, 13, 35, .6); }
+.farm-period-tabs + .farm-period-tabs { margin-top: 0; }
+.farm-bottype-tab, .farm-period-tab { min-height: clamp(48px, 4vw, 62px); border: 0; border-right: 1px solid rgba(0, 212, 255, .14); color: #a9b8d2; background: transparent; font: 700 clamp(.82rem, .5vw + .7rem, 1.05rem) 'Sarabun', sans-serif; cursor: pointer; transition: .2s ease; }
+.farm-bottype-tab:last-child, .farm-period-tab:last-child { border-right: 0; }
+.farm-bottype-tab:hover, .farm-period-tab:hover { color: #e8faff; background: rgba(0, 212, 255, .07); text-shadow: 0 0 12px rgba(0, 212, 255, .5); }
+.farm-bottype-tab.active, .farm-period-tab.active { color: #7cecff; background: linear-gradient(180deg, rgba(0, 180, 255, .24), rgba(0, 97, 210, .12)); box-shadow: inset 0 -3px #04d9ff, 0 0 26px rgba(0, 182, 255, .18); text-shadow: 0 0 14px rgba(70, 220, 255, .85); }
 .farm-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1.25vw, 18px); }
 .farm-summary-card { display: flex; align-items: center; gap: clamp(10px, 1vw, 15px); min-width: 0; min-height: clamp(112px, 9vw, 145px); padding: clamp(14px, 1.4vw, 21px); border: 1px solid var(--farm-card-color); border-radius: 16px; background: linear-gradient(145deg, color-mix(in srgb, var(--farm-card-color) 12%, #051027), rgba(2, 10, 30, .92)); box-shadow: inset 0 0 28px color-mix(in srgb, var(--farm-card-color) 7%, transparent), 0 12px 28px rgba(0, 0, 0, .2); }
 .farm-summary-card--coins { --farm-card-color: #ffa900; }
 .farm-summary-card--exp { --farm-card-color: #a94cff; }
+.farm-summary-card--powder { --farm-card-color: #2dd4bf; }
 .farm-summary-card--rounds { --farm-card-color: #00c9ff; }
 .farm-summary-card--time { --farm-card-color: #1cdb70; }
+.farm-device-chips { display: contents; }
+.farm-device-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: clamp(112px, 9vw, 145px); padding: clamp(14px, 1.4vw, 21px); border: 1px solid rgba(0, 212, 255, .35); border-radius: 16px; background: linear-gradient(145deg, rgba(0, 194, 255, .1), rgba(2, 10, 30, .92)); color: #8fb4d6; font: 700 .8rem 'Sarabun', sans-serif; cursor: pointer; transition: .18s ease; }
+.farm-device-chip strong { font: 800 clamp(1.05rem, 1vw + .6rem, 1.5rem) 'Orbitron', sans-serif; color: #d9f2ff; }
+.farm-device-chip:hover { border-color: rgba(0, 212, 255, .65); background: linear-gradient(145deg, rgba(0, 194, 255, .18), rgba(2, 10, 30, .92)); }
+.farm-device-chip.active { border-color: #04d9ff; color: #7cecff; box-shadow: 0 0 24px rgba(0, 182, 255, .35), inset 0 0 20px rgba(0, 182, 255, .12); }
+.farm-device-chip.active strong { color: #7cecff; text-shadow: 0 0 14px rgba(70, 220, 255, .85); }
 .farm-summary-icon { display: grid; place-items: center; width: clamp(42px, 3.8vw, 56px); aspect-ratio: 1; flex: 0 0 auto; border-radius: 50%; color: #fff; background: color-mix(in srgb, var(--farm-card-color) 34%, #071025); box-shadow: 0 0 22px color-mix(in srgb, var(--farm-card-color) 35%, transparent); font: 800 clamp(.7rem, .8vw, 1rem) 'Orbitron', sans-serif; }
 .farm-summary-card div { min-width: 0; }
 .farm-summary-card div span { display: block; color: color-mix(in srgb, var(--farm-card-color) 75%, white); font-weight: 700; font-size: clamp(.74rem, .35vw + .67rem, .92rem); }
@@ -3078,8 +3086,8 @@ button, input, select, textarea { font: inherit; }
 .farm-table-wrap { width: 100%; overflow-x: auto; }
 .farm-history-table { width: 100%; border-collapse: collapse; min-width: 880px; }
 .farm-history-table th, .farm-history-table td { padding: clamp(12px, 1.1vw, 17px) clamp(10px, 1.15vw, 18px); text-align: left; border-bottom: 1px solid rgba(117, 151, 196, .18); }
-.farm-history-table th { color: #acc0dc; background: rgba(0, 15, 41, .55); font-size: clamp(.72rem, .25vw + .67rem, .84rem); white-space: nowrap; }
-.farm-history-table td { color: #dce8f8; font-size: clamp(.76rem, .27vw + .7rem, .88rem); }
+.farm-history-table th { color: #acc0dc; background: rgba(0, 15, 41, .55); font-size: clamp(.82rem, .3vw + .74rem, .95rem); white-space: nowrap; }
+.farm-history-table td { color: #dce8f8; font-size: clamp(.86rem, .32vw + .78rem, 1rem); }
 .farm-history-table tbody tr { transition: background .18s ease; }
 .farm-history-table tbody tr:hover { background: rgba(0, 190, 255, .055); }
 .farm-history-table tbody tr:last-child td { border-bottom: 0; }
