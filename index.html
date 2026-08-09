@@ -454,6 +454,11 @@
             </div>
             <button class="refresh-farm-btn" onclick="loadFarmData()">🔄 อัปเดตข้อมูล</button>
           </div>
+          <div class="admin-tabs">
+            <button class="admin-tab active" id="farm-tab-all" onclick="switchFarmTab('all')">📦 รวมทั้งหมด</button>
+            <button class="admin-tab" id="farm-tab-coin" onclick="switchFarmTab('coin')">🪙 ข้อมูลเหรียญ</button>
+            <button class="admin-tab" id="farm-tab-powder" onclick="switchFarmTab('powder')">🧪 ข้อมูลย่อยผง</button>
+          </div>
           <div class="farm-summary-grid">
             <article><span>🪙 เหรียญรวม</span><strong id="farm-total-coins">0</strong></article>
             <article><span>🔷 EXP รวม</span><strong id="farm-total-exp">0</strong></article>
