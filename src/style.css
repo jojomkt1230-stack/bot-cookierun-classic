@@ -3197,6 +3197,9 @@ button, input, select, textarea { font: inherit; }
 .farm-history-table tbody tr:last-child td { border-bottom: 0; }
 .farm-value-coins { color: #ffd44f; }
 .farm-value-exp { color: #c979ff; }
+.farm-round-duration { display: inline-flex; align-items: center; color: #7fe0c4; font-weight: 600; white-space: nowrap; }
+.farm-round-duration--gap { color: #ffb454; font-size: .85em; }
+.farm-round-duration--na { color: #5f7794; }
 .farm-complete-badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 999px; color: #52eda0; background: rgba(0, 219, 108, .1); font-weight: 700; white-space: nowrap; }
 .farm-complete-badge i { width: 7px; height: 7px; border-radius: 50%; background: #25e77d; box-shadow: 0 0 10px #25e77d; }
 .farm-empty-cell { height: 150px; color: #748aa9 !important; text-align: center !important; font-size: .95rem !important; }

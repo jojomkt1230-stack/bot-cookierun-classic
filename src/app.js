@@ -1480,15 +1480,16 @@ function farmHistoryColumns() {
   const bot = { key: 'bot', label: 'บอท' };
   const time = { key: 'time', label: 'เวลา' };
   const round = { key: 'round', label: 'รอบที่' };
+  const duration = { key: 'roundDuration', label: 'ระยะเวลารอบ' };
   const version = { key: 'version', label: 'เวอร์ชัน' };
   const status = { key: 'status', label: 'สถานะ' };
   if (farmBotTypeFilter === 'coin') {
-    return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, version, status];
+    return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, duration, version, status];
   }
   if (farmBotTypeFilter === 'powder') {
-    return [id, time, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, version, status];
+    return [id, time, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, duration, version, status];
   }
-  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, version, status];
+  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, duration, version, status];
 }
 
 function farmHistoryClockTime(value) {
@@ -1508,10 +1509,47 @@ function farmHistoryCell(key, event, roundNumber) {
     case 'exp': return `<strong class="farm-value-exp">EXP ${numberText(event.exp)}</strong>`;
     case 'powder': return `<strong class="farm-value-powder">🧪 ${numberText(event.powder)}</strong>`;
     case 'round': return numberText(roundNumber);
+    case 'roundDuration': return formatRoundDurationCell(event.roundDurationSeconds);
     case 'version': return `<span class="farm-table-version">${escapeHtml(event.botVersion || '-')}</span>`;
     case 'status': return '<span class="farm-complete-badge"><i></i> เสร็จสิ้น</span>';
     default: return '';
   }
+}
+
+// The bot has never sent a real per-round duration (always 0), but every
+// event already carries a real occurredAt timestamp. A round's duration is
+// well approximated by the gap since the previous round finished on the
+// *same device running the same bot type* -- so we derive it here instead
+// of waiting on a bot-side fix. A gap over ROUND_GAP_CAP_SECONDS (10 min)
+// means the bot was actually paused/stopped between those two rounds, not
+// that the round itself took that long, so it's excluded and flagged
+// rather than silently inflating the total.
+const ROUND_GAP_CAP_SECONDS = 10 * 60;
+
+function computeRoundDurations(events) {
+  const byDeviceAndType = new Map();
+  for (const event of events) {
+    const key = `${event.deviceId || ''}::${event.botType || ''}`;
+    if (!byDeviceAndType.has(key)) byDeviceAndType.set(key, []);
+    byDeviceAndType.get(key).push(event);
+  }
+  for (const group of byDeviceAndType.values()) {
+    group.sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt));
+    group.forEach((event, index) => {
+      if (index === 0) {
+        event.roundDurationSeconds = 'first';
+        return;
+      }
+      const gapSeconds = Math.round((Date.parse(event.occurredAt) - Date.parse(group[index - 1].occurredAt)) / 1000);
+      event.roundDurationSeconds = gapSeconds > ROUND_GAP_CAP_SECONDS || gapSeconds < 0 ? 'gap' : gapSeconds;
+    });
+  }
+}
+
+function formatRoundDurationCell(value) {
+  if (value === 'gap') return '<span class="farm-round-duration farm-round-duration--gap">⏸ หยุดพัก (เกิน 10 นาที)</span>';
+  if (value === 'first' || typeof value !== 'number') return '<span class="farm-round-duration farm-round-duration--na">-</span>';
+  return `<span class="farm-round-duration">${escapeHtml(durationText(value))}</span>`;
 }
 
 function farmDailyRoundNumbers(events) {
@@ -1543,7 +1581,7 @@ function renderFarmHistory() {
   const coins = events.reduce((sum, event) => sum + (Number(event.coins) || 0), 0);
   const exp = events.reduce((sum, event) => sum + (Number(event.exp) || 0), 0);
   const powder = events.reduce((sum, event) => sum + (Number(event.powder) || 0), 0);
-  const seconds = events.reduce((sum, event) => sum + (Number(event.durationSeconds) || 0), 0);
+  const seconds = events.reduce((sum, event) => sum + (typeof event.roundDurationSeconds === 'number' ? event.roundDurationSeconds : 0), 0);
   const versions = [...new Set(events.map((event) => event.botVersion).filter(Boolean))];
   const periodLabels = { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน' };
 
@@ -1580,6 +1618,7 @@ async function loadFarmHistory() {
   try {
     const response = await axios.get(`${API_BASE_URL}/users/farm-history`, { headers: getAuthHeaders() });
     farmHistoryEvents = Array.isArray(response.data?.events) ? response.data.events : [];
+    computeRoundDurations(farmHistoryEvents);
     renderFarmHistory();
     if (refreshEl) refreshEl.textContent = `อัปเดตล่าสุด ${new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }).format(new Date())}`;
   } catch (error) {
@@ -1971,20 +2010,21 @@ window.openAdminFarmDetail = async function(memberCode, username) {
   document.getElementById('admin-farm-detail-view')?.classList.remove('hidden');
 
   const rows = document.getElementById('admin-farm-history-rows');
-  if (rows) rows.innerHTML = '<tr><td colspan="9" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>';
+  if (rows) rows.innerHTML = '<tr><td colspan="10" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>';
   try {
     const response = await axios.get(
       `${API_BASE_URL}/admin/farm-data/${encodeURIComponent(memberCode)}`,
       adminApiConfig()
     );
     adminFarmDetailEvents = Array.isArray(response.data?.events) ? response.data.events : [];
+    computeRoundDurations(adminFarmDetailEvents);
     renderAdminFarmDetail();
     if (!dateInput?.dataset.adminFarmListenerReady) {
       dateInput?.addEventListener('change', renderAdminFarmDetail);
       if (dateInput) dateInput.dataset.adminFarmListenerReady = 'true';
     }
   } catch (error) {
-    if (rows) rows.innerHTML = `<tr><td colspan="9" class="farm-empty-cell farm-load-error">${escapeHtml(getApiErrorMessage(error, 'โหลดประวัติการฟาร์มของสมาชิกไม่สำเร็จ'))}</td></tr>`;
+    if (rows) rows.innerHTML = `<tr><td colspan="10" class="farm-empty-cell farm-load-error">${escapeHtml(getApiErrorMessage(error, 'โหลดประวัติการฟาร์มของสมาชิกไม่สำเร็จ'))}</td></tr>`;
   }
 };
 
@@ -2045,15 +2085,16 @@ function adminFarmHistoryColumns() {
   const bot = { key: 'bot', label: 'บอท' };
   const time = { key: 'time', label: 'เวลา' };
   const round = { key: 'round', label: 'รอบที่' };
+  const duration = { key: 'roundDuration', label: 'ระยะเวลารอบ' };
   const version = { key: 'version', label: 'เวอร์ชัน' };
   const status = { key: 'status', label: 'สถานะ' };
   if (adminFarmBotTypeFilter === 'coin') {
-    return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, version, status];
+    return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, duration, version, status];
   }
   if (adminFarmBotTypeFilter === 'powder') {
-    return [id, time, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, version, status];
+    return [id, time, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, duration, version, status];
   }
-  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, version, status];
+  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, duration, version, status];
 }
 
 function renderAdminFarmDetail() {
@@ -2064,7 +2105,7 @@ function renderAdminFarmDetail() {
   const coins = events.reduce((sum, event) => sum + (Number(event.coins) || 0), 0);
   const exp = events.reduce((sum, event) => sum + (Number(event.exp) || 0), 0);
   const powder = events.reduce((sum, event) => sum + (Number(event.powder) || 0), 0);
-  const seconds = events.reduce((sum, event) => sum + (Number(event.durationSeconds) || 0), 0);
+  const seconds = events.reduce((sum, event) => sum + (typeof event.roundDurationSeconds === 'number' ? event.roundDurationSeconds : 0), 0);
   const versions = [...new Set(events.map((event) => event.botVersion).filter(Boolean))];
   const periodLabels = { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน' };
 
