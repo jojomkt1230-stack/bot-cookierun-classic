@@ -1927,6 +1927,16 @@ body {
 .input-col { display: flex; flex-direction: column; gap: 8px; }
 
 .admin-search-bar { margin-bottom: 16px; }
+.admin-farm-list-controls { display: flex; flex-wrap: wrap; gap: 10px; }
+.admin-farm-list-controls .admin-input { flex: 2 1 260px; }
+.admin-farm-list-controls .admin-select { flex: 1 1 220px; }
+.admin-farm-back-btn { margin-bottom: 14px; min-height: 44px; }
+.admin-farm-row { cursor: pointer; transition: background .15s ease; }
+.admin-farm-row:hover { background: rgba(0, 212, 255, .08); }
+@media (max-width: 600px) {
+  .admin-farm-list-controls .admin-input,
+  .admin-farm-list-controls .admin-select { flex-basis: 100%; }
+}
 .admin-filter-bar { margin-bottom: 16px; }
 
 .admin-select {

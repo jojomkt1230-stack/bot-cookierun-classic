@@ -166,7 +166,7 @@
             <span class="menu-text">เติมเงิน</span>
           </a>
           <a class="menu-item" href="/farm-history" data-route id="menu-farm-history">
-            <span class="menu-icon">💰</span>
+            <span class="menu-icon">🪙</span>
             <span class="menu-text">ประวัติการฟาร์ม</span>
           </a>
           <a class="menu-item" href="/usage-history" data-route id="menu-activity">
@@ -177,6 +177,14 @@
           <a class="menu-item admin-only hidden" href="/admin" data-route id="menu-admin">
             <span class="menu-icon">👑</span>
             <span class="menu-text">แผงผู้ดูแลระบบ</span>
+          </a>
+          <a class="menu-item admin-only hidden" href="/player-farm-data" data-route id="menu-player-farm-data">
+            <span class="menu-icon">📊</span>
+            <span class="menu-text">ข้อมูลการฟาร์มผู้เล่น</span>
+          </a>
+          <a class="menu-item admin-only hidden" href="/closed-accounts" data-route id="menu-closed-accounts">
+            <span class="menu-icon">🔒</span>
+            <span class="menu-text">บัญชีที่ปิด</span>
           </a>
           <!-- Soft Orange Logout Button at bottom of sidebar (Rule 1) -->
           <button type="button" class="menu-item menu-logout" onclick="handleLogout()">
@@ -761,6 +769,140 @@
           </div>
         </section>
 
+        <!-- ── ADMIN: PLAYER FARM DATA SECTION ────── -->
+        <section id="section-player-farm-data" class="content-section hidden">
+          <div class="section-header card-panel usage-history-header">
+            <div>
+              <span class="usage-history-kicker">ADMIN OVERVIEW</span>
+              <h2>📊 ข้อมูลการฟาร์มผู้เล่น</h2>
+              <p>ภาพรวมการฟาร์มของสมาชิกทุกคนที่เคยใช้งานบอท คลิกแถวเพื่อดูรายละเอียดรายบุคคล</p>
+            </div>
+          </div>
+
+          <!-- List view -->
+          <div id="admin-farm-list-view">
+            <div class="admin-search-bar admin-farm-list-controls">
+              <input type="text" id="admin-farm-search" class="admin-input" placeholder="🔍 ค้นหาชื่อผู้ใช้หรือหมายเลขไอดี..." oninput="renderAdminFarmDataTable()" />
+              <select id="admin-farm-sort" class="admin-select" onchange="renderAdminFarmDataTable()">
+                <option value="lastActive-desc">วันที่ใช้งานล่าสุด: ล่าสุดก่อน</option>
+                <option value="lastActive-asc">วันที่ใช้งานล่าสุด: เก่าสุดก่อน</option>
+                <option value="joined-desc">วันที่สมัคร: ใหม่สุดก่อน</option>
+                <option value="joined-asc">วันที่สมัคร: เก่าสุดก่อน</option>
+                <option value="duration-desc">ระยะเวลาการใช้งานบอท: มาก→น้อย</option>
+                <option value="duration-asc">ระยะเวลาการใช้งานบอท: น้อย→มาก</option>
+              </select>
+            </div>
+            <div id="admin-farm-table-container" class="table-container">
+              <div class="loading-spinner">⟳</div>
+            </div>
+          </div>
+
+          <!-- Detail view (one member, reuses the player farm-history layout) -->
+          <div id="admin-farm-detail-view" class="hidden">
+            <button type="button" class="btn-secondary admin-farm-back-btn" onclick="closeAdminFarmDetail()">← กลับไปรายชื่อสมาชิก</button>
+            <div class="farm-history-shell card-panel">
+              <header class="farm-history-header">
+                <div class="farm-history-title-group">
+                  <div class="farm-history-symbol" aria-hidden="true">🪙</div>
+                  <div>
+                    <span class="farm-history-kicker" id="admin-farm-detail-code">-</span>
+                    <h2 id="admin-farm-detail-username">-</h2>
+                    <p>ข้อมูลจากบอทเหรียญและบอทย่อยผงของสมาชิกคนนี้</p>
+                  </div>
+                </div>
+                <div class="farm-history-meta">
+                  <label class="farm-date-control">
+                    <span>📅</span>
+                    <input id="admin-farm-detail-date" type="date" aria-label="เลือกวันที่ดูประวัติการฟาร์ม" />
+                  </label>
+                </div>
+              </header>
+
+              <div class="farm-period-tabs" role="tablist" aria-label="ประเภทบอทประวัติการฟาร์ม">
+                <button class="farm-bottype-tab active" type="button" data-farm-bottype="all" onclick="setAdminFarmBotType('all')">📦 รวมทั้งหมด</button>
+                <button class="farm-bottype-tab" type="button" data-farm-bottype="coin" onclick="setAdminFarmBotType('coin')">🪙 ข้อมูลเหรียญ</button>
+                <button class="farm-bottype-tab" type="button" data-farm-bottype="powder" onclick="setAdminFarmBotType('powder')">🧪 ข้อมูลย่อยผง</button>
+              </div>
+              <div class="farm-period-tabs" role="tablist" aria-label="ช่วงเวลาประวัติการฟาร์ม">
+                <button class="farm-period-tab active" type="button" data-farm-period="daily" onclick="setAdminFarmPeriod('daily')">▣ รายวัน</button>
+                <button class="farm-period-tab" type="button" data-farm-period="weekly" onclick="setAdminFarmPeriod('weekly')">▣ รายสัปดาห์</button>
+                <button class="farm-period-tab" type="button" data-farm-period="monthly" onclick="setAdminFarmPeriod('monthly')">▣ รายเดือน</button>
+              </div>
+
+              <div class="farm-summary-grid" aria-live="polite">
+                <article class="farm-summary-card farm-summary-card--coins" id="admin-farm-summary-coins">
+                  <span class="farm-summary-icon">🪙</span>
+                  <div><span>เหรียญที่ได้รับ</span><strong id="admin-farm-total-coins">0</strong></div>
+                </article>
+                <article class="farm-summary-card farm-summary-card--exp" id="admin-farm-summary-exp">
+                  <span class="farm-summary-icon">⭐</span>
+                  <div><span>EXP ที่ได้รับ</span><strong id="admin-farm-total-exp">0</strong></div>
+                </article>
+                <article class="farm-summary-card farm-summary-card--powder" id="admin-farm-summary-powder">
+                  <span class="farm-summary-icon">🧪</span>
+                  <div><span>ได้รับผงจากการย่อย</span><strong id="admin-farm-total-powder">0</strong></div>
+                </article>
+                <article class="farm-summary-card farm-summary-card--rounds">
+                  <span class="farm-summary-icon">🔁</span>
+                  <div><span>จำนวนรอบ</span><strong id="admin-farm-total-rounds">0</strong></div>
+                </article>
+                <article class="farm-summary-card farm-summary-card--time">
+                  <span class="farm-summary-icon">⏱️</span>
+                  <div><span>เวลาในการฟาร์ม</span><strong id="admin-farm-total-time">0 นาที</strong></div>
+                </article>
+                <div id="admin-farm-device-chips" class="farm-device-chips"></div>
+              </div>
+
+              <div class="farm-details-panel">
+                <div class="farm-details-heading">
+                  <div>
+                    <h3 id="admin-farm-details-title">รายละเอียดการฟาร์ม (รายวัน)</h3>
+                    <p>ข้อมูลจะปรากฏหลังบอทเหรียญจบรอบ</p>
+                  </div>
+                  <span id="admin-farm-bot-version" class="farm-version-badge">เวอร์ชัน: -</span>
+                </div>
+                <div class="farm-table-wrap">
+                  <table class="farm-history-table">
+                    <thead id="admin-farm-history-head">
+                      <tr>
+                        <th>หมายเลขไอดี</th>
+                        <th>บอท</th>
+                        <th>เวลา</th>
+                        <th>เหรียญที่ได้รับ</th>
+                        <th>EXP ที่ได้รับ</th>
+                        <th>ได้รับผงจากการย่อย</th>
+                        <th>รอบที่</th>
+                        <th>เวอร์ชัน</th>
+                        <th>สถานะ</th>
+                      </tr>
+                    </thead>
+                    <tbody id="admin-farm-history-rows">
+                      <tr><td colspan="9" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── ADMIN: CLOSED ACCOUNTS SECTION ─────── -->
+        <section id="section-closed-accounts" class="content-section hidden">
+          <div class="section-header card-panel usage-history-header">
+            <div>
+              <span class="usage-history-kicker">ADMIN ACCOUNTS</span>
+              <h2>🔒 บัญชีที่ปิด</h2>
+              <p>บัญชีที่ผู้ดูแลปิดการใช้งานไว้ ไม่แสดงในหน้าจัดการผู้ใช้ปกติ และเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานกลับ</p>
+            </div>
+          </div>
+          <div class="admin-search-bar">
+            <input type="text" id="closed-accounts-search" class="admin-input" placeholder="🔍 ค้นหาชื่อผู้ใช้หรือหมายเลขไอดี..." oninput="renderClosedAccountsTable()" />
+          </div>
+          <div id="closed-accounts-table-container" class="table-container">
+            <div class="loading-spinner">⟳</div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -834,6 +976,7 @@
         <button class="btn-primary" onclick="saveEditedUser()" style="flex:1; padding:12px; border-radius:8px; font-weight:700; cursor:pointer;">💾 บันทึกแก้ไข</button>
         <button class="btn-secondary" onclick="resetSelectedDevice()" style="padding:12px 18px; border-radius:8px; font-weight:700; cursor:pointer;">♻️ รีเซ็ตเครื่อง</button>
       </div>
+      <button class="btn-secondary" onclick="disableSelectedUser()" style="width:100%; margin-top:10px; padding:12px; border-radius:8px; font-weight:700; cursor:pointer; background:rgba(255,51,102,0.18); border-color:var(--danger); color:#ff9fb3;">🔒 ปิดบัญชีนี้</button>
     </div>
   </div>
 

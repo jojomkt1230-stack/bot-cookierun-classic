@@ -1,7 +1,7 @@
 import { codeStorageConfigured, redisCommand, redisPipeline } from './code-store.js';
 
 const FARM_PREFIX = 'ckrcs:farm-history:v1';
-const MAX_MEMBER_EVENTS = 5000;
+export const MAX_MEMBER_EVENTS = 5000;
 const EVENT_TTL_SECONDS = 366 * 24 * 60 * 60;
 
 function cleanText(value, maxLength = 120) {
@@ -87,11 +87,18 @@ export async function storeFarmEvent(payload) {
   return { event, duplicate: false };
 }
 
-export async function listFarmEvents(memberCode, limit = 1000) {
+export async function listFarmEvents(memberCode, limit = MAX_MEMBER_EVENTS) {
   if (!codeStorageConfigured()) return [];
   const cleanMemberCode = cleanText(memberCode, 180).toUpperCase();
   if (!cleanMemberCode) return [];
-  const count = Math.max(1, Math.min(cleanInteger(limit, 2000) || 1000, 2000));
+  // V: this used to cap reads at 2000 even though storeFarmEvent() keeps up
+  // to MAX_MEMBER_EVENTS (5000) per member. An active farmer (especially
+  // multi-device) can pass 2000 events within a day or two, which silently
+  // dropped earlier-in-the-week events from the response -- the weekly/
+  // monthly view then had no more real data to sum than the daily view did.
+  // Capping at MAX_MEMBER_EVENTS instead means every event actually kept in
+  // storage is available to the period filters that already run client-side.
+  const count = Math.max(1, Math.min(cleanInteger(limit, MAX_MEMBER_EVENTS) || MAX_MEMBER_EVENTS, MAX_MEMBER_EVENTS));
   const eventIds = await redisCommand(
     'ZREVRANGE', memberIndexKey(cleanMemberCode), '0', String(count - 1)
   );
@@ -100,4 +107,24 @@ export async function listFarmEvents(memberCode, limit = 1000) {
   return values
     .map((item) => parseEvent(item?.result))
     .filter((event) => event?.memberCode === cleanMemberCode);
+}
+
+// Aggregate one member's events for the admin overview table. Kept here
+// next to listFarmEvents so the "rounds/coins/exp/duration" definition stays
+// in exactly one place, shared by both the per-member detail view and the
+// all-members list.
+export function summarizeFarmEvents(events) {
+  let totalCoins = 0;
+  let totalExp = 0;
+  let durationSeconds = 0;
+  let lastActiveAt = null;
+  for (const event of events) {
+    totalCoins += Number(event.coins) || 0;
+    totalExp += Number(event.exp) || 0;
+    durationSeconds += Number(event.durationSeconds) || 0;
+    if (!lastActiveAt || Date.parse(event.occurredAt) > Date.parse(lastActiveAt)) {
+      lastActiveAt = event.occurredAt;
+    }
+  }
+  return { rounds: events.length, totalCoins, totalExp, durationSeconds, lastActiveAt };
 }

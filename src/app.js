@@ -34,6 +34,8 @@ window.showSection = function(sectionId) {
   if (sectionId === 'farm-history') startFarmHistoryUpdates();
   else stopFarmHistoryUpdates();
   if (sectionId === 'admin') initAdminPanel();
+  if (sectionId === 'player-farm-data') loadPlayerFarmDataList();
+  if (sectionId === 'closed-accounts') loadClosedAccounts();
   if (sectionId === 'topup') loadSystemSettings(false);
   if (sectionId === 'download') {
     refreshCurrentMember().catch(() => {}).finally(() => applySystemSettingsToUI());
@@ -1864,6 +1866,234 @@ async function initAdminPanel() {
   applySystemSettingsToUI();
 }
 
+// ── Admin: player farm data (list of every member + per-member detail) ──
+let adminFarmDataList = [];
+let adminFarmDetailEvents = [];
+let adminFarmPeriod = 'daily';
+let adminFarmBotTypeFilter = 'all';
+let adminFarmDeviceFilter = 'all';
+let adminFarmCurrentMember = null;
+
+async function loadPlayerFarmDataList() {
+  document.getElementById('admin-farm-list-view')?.classList.remove('hidden');
+  document.getElementById('admin-farm-detail-view')?.classList.add('hidden');
+  const container = document.getElementById('admin-farm-table-container');
+  if (container) container.innerHTML = '<div class="loading-spinner">⟳</div>';
+  try {
+    const response = await axios.get(`${API_BASE_URL}/admin/farm-data`, adminApiConfig());
+    adminFarmDataList = response.data?.members || [];
+    window.renderAdminFarmDataTable();
+  } catch (error) {
+    const text = getApiErrorMessage(error, 'โหลดข้อมูลการฟาร์มผู้เล่นไม่สำเร็จ');
+    if (container) container.innerHTML = `<p style="padding:16px; color:var(--danger);">${escapeHtml(text)}</p>`;
+    window.showToast(text, 'error');
+  }
+}
+
+window.renderAdminFarmDataTable = function() {
+  const container = document.getElementById('admin-farm-table-container');
+  if (!container) return;
+  const searchVal = (document.getElementById('admin-farm-search')?.value || '').toLowerCase();
+  const [sortKey, sortDir] = (document.getElementById('admin-farm-sort')?.value || 'lastActive-desc').split('-');
+  const sortField = { lastActive: 'lastActiveAt', joined: 'joinedAt', duration: 'durationSeconds' }[sortKey] || 'lastActiveAt';
+
+  const filtered = adminFarmDataList.filter((item) =>
+    String(item.username || '').toLowerCase().includes(searchVal)
+    || String(item.memberCode || '').toLowerCase().includes(searchVal)
+  );
+
+  filtered.sort((left, right) => {
+    const leftValue = sortField === 'durationSeconds' ? Number(left[sortField] || 0) : Date.parse(left[sortField] || '') || 0;
+    const rightValue = sortField === 'durationSeconds' ? Number(right[sortField] || 0) : Date.parse(right[sortField] || '') || 0;
+    return sortDir === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+  });
+
+  if (!filtered.length) {
+    container.innerHTML = `
+      <div class="empty-state" style="text-align:center; padding:30px;">
+        <div style="font-size:2rem;">📊</div>
+        <p style="color:var(--text-muted); margin-top:6px;">${adminFarmDataList.length ? 'ไม่พบสมาชิกที่ตรงกับคำค้นหา' : 'ยังไม่มีสมาชิกที่ใช้งานบอท'}</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="admin-table" style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border-bright); text-align:left; color:var(--primary);">
+          <th style="padding:10px;">ชื่อผู้ใช้</th>
+          <th style="padding:10px;">หมายเลขไอดี</th>
+          <th style="padding:10px;">วันที่สมัคร</th>
+          <th style="padding:10px;">ใช้งานล่าสุด</th>
+          <th style="padding:10px;">จำนวนรอบ</th>
+          <th style="padding:10px;">เหรียญรวม</th>
+          <th style="padding:10px;">EXP รวม</th>
+          <th style="padding:10px;">เวลาที่ใช้บอท</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filtered.map((item) => `
+          <tr class="admin-farm-row" onclick="openAdminFarmDetail('${encodeURIComponent(item.memberCode)}', '${encodeURIComponent(item.username)}')">
+            <td style="padding:12px; font-weight:700;">${escapeHtml(item.username)}</td>
+            <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(item.memberCode)}</td>
+            <td style="padding:12px; font-size:0.85rem;">${item.joinedAt ? escapeHtml(thaiDateTime(item.joinedAt)) : '-'}</td>
+            <td style="padding:12px; font-size:0.85rem;">${item.lastActiveAt ? escapeHtml(thaiDateTime(item.lastActiveAt)) : '-'}</td>
+            <td style="padding:12px;">${numberText(item.rounds)}</td>
+            <td style="padding:12px; color:var(--accent); font-weight:700;">🪙 ${numberText(item.totalCoins)}</td>
+            <td style="padding:12px; color:#c79aff; font-weight:700;">⭐ ${numberText(item.totalExp)}</td>
+            <td style="padding:12px;">${durationText(item.durationSeconds)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+};
+
+window.openAdminFarmDetail = async function(memberCode, username) {
+  memberCode = decodeURIComponent(memberCode);
+  username = decodeURIComponent(username);
+  adminFarmCurrentMember = { memberCode, username };
+  adminFarmPeriod = 'daily';
+  adminFarmBotTypeFilter = 'all';
+  adminFarmDeviceFilter = 'all';
+  document.querySelectorAll('#admin-farm-detail-view .farm-period-tab').forEach((button) => {
+    button.classList.toggle('active', button.dataset.farmPeriod === 'daily');
+  });
+  document.querySelectorAll('#admin-farm-detail-view .farm-bottype-tab').forEach((button) => {
+    button.classList.toggle('active', button.dataset.farmBottype === 'all');
+  });
+  document.getElementById('admin-farm-detail-username').textContent = username;
+  document.getElementById('admin-farm-detail-code').textContent = memberCode;
+  const dateInput = document.getElementById('admin-farm-detail-date');
+  if (dateInput) dateInput.value = thailandDateKey();
+
+  document.getElementById('admin-farm-list-view')?.classList.add('hidden');
+  document.getElementById('admin-farm-detail-view')?.classList.remove('hidden');
+
+  const rows = document.getElementById('admin-farm-history-rows');
+  if (rows) rows.innerHTML = '<tr><td colspan="9" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>';
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/admin/farm-data/${encodeURIComponent(memberCode)}`,
+      adminApiConfig()
+    );
+    adminFarmDetailEvents = Array.isArray(response.data?.events) ? response.data.events : [];
+    renderAdminFarmDetail();
+    if (!dateInput?.dataset.adminFarmListenerReady) {
+      dateInput?.addEventListener('change', renderAdminFarmDetail);
+      if (dateInput) dateInput.dataset.adminFarmListenerReady = 'true';
+    }
+  } catch (error) {
+    if (rows) rows.innerHTML = `<tr><td colspan="9" class="farm-empty-cell farm-load-error">${escapeHtml(getApiErrorMessage(error, 'โหลดประวัติการฟาร์มของสมาชิกไม่สำเร็จ'))}</td></tr>`;
+  }
+};
+
+window.closeAdminFarmDetail = function() {
+  adminFarmCurrentMember = null;
+  document.getElementById('admin-farm-detail-view')?.classList.add('hidden');
+  document.getElementById('admin-farm-list-view')?.classList.remove('hidden');
+};
+
+window.setAdminFarmBotType = function(type) {
+  if (!['all', 'coin', 'powder'].includes(type)) return;
+  adminFarmBotTypeFilter = type;
+  document.querySelectorAll('#admin-farm-detail-view .farm-bottype-tab').forEach((button) => {
+    button.classList.toggle('active', button.dataset.farmBottype === type);
+  });
+  renderAdminFarmDetail();
+};
+
+window.setAdminFarmPeriod = function(period) {
+  if (!['daily', 'weekly', 'monthly'].includes(period)) return;
+  adminFarmPeriod = period;
+  document.querySelectorAll('#admin-farm-detail-view .farm-period-tab').forEach((button) => {
+    button.classList.toggle('active', button.dataset.farmPeriod === period);
+  });
+  renderAdminFarmDetail();
+};
+
+function adminFarmEventsForSelection() {
+  const dateInput = document.getElementById('admin-farm-detail-date');
+  const selected = dateInput?.value || thailandDateKey();
+  const matches = (event) => (
+    (adminFarmBotTypeFilter === 'all' || event.botType === adminFarmBotTypeFilter)
+    && (adminFarmDeviceFilter === 'all' || event.deviceId === adminFarmDeviceFilter)
+  );
+
+  if (adminFarmPeriod === 'daily') {
+    return adminFarmDetailEvents.filter((event) => matches(event) && thailandDateKey(event.occurredAt) === selected);
+  }
+  if (adminFarmPeriod === 'monthly') {
+    return adminFarmDetailEvents.filter((event) => matches(event) && thailandDateKey(event.occurredAt).slice(0, 7) === selected.slice(0, 7));
+  }
+
+  const selectedDate = new Date(`${selected}T12:00:00+07:00`);
+  const weekday = selectedDate.getUTCDay();
+  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
+  const monday = new Date(selectedDate.getTime() + mondayOffset * 86_400_000);
+  const sunday = new Date(monday.getTime() + 6 * 86_400_000);
+  const startKey = thailandDateKey(monday);
+  const endKey = thailandDateKey(sunday);
+  return adminFarmDetailEvents.filter((event) => {
+    const key = thailandDateKey(event.occurredAt);
+    return matches(event) && key >= startKey && key <= endKey;
+  });
+}
+
+function adminFarmHistoryColumns() {
+  const id = { key: 'id', label: 'หมายเลขไอดี' };
+  const bot = { key: 'bot', label: 'บอท' };
+  const time = { key: 'time', label: 'เวลา' };
+  const round = { key: 'round', label: 'รอบที่' };
+  const version = { key: 'version', label: 'เวอร์ชัน' };
+  const status = { key: 'status', label: 'สถานะ' };
+  if (adminFarmBotTypeFilter === 'coin') {
+    return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, version, status];
+  }
+  if (adminFarmBotTypeFilter === 'powder') {
+    return [id, time, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, version, status];
+  }
+  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, version, status];
+}
+
+function renderAdminFarmDetail() {
+  const rows = document.getElementById('admin-farm-history-rows');
+  const head = document.getElementById('admin-farm-history-head');
+  if (!rows || !adminFarmCurrentMember) return;
+  const events = adminFarmEventsForSelection();
+  const coins = events.reduce((sum, event) => sum + (Number(event.coins) || 0), 0);
+  const exp = events.reduce((sum, event) => sum + (Number(event.exp) || 0), 0);
+  const powder = events.reduce((sum, event) => sum + (Number(event.powder) || 0), 0);
+  const seconds = events.reduce((sum, event) => sum + (Number(event.durationSeconds) || 0), 0);
+  const versions = [...new Set(events.map((event) => event.botVersion).filter(Boolean))];
+  const periodLabels = { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน' };
+
+  document.getElementById('admin-farm-total-coins').textContent = numberText(coins);
+  document.getElementById('admin-farm-total-exp').textContent = numberText(exp);
+  document.getElementById('admin-farm-total-powder').textContent = numberText(powder);
+  document.getElementById('admin-farm-total-rounds').textContent = numberText(events.length);
+  document.getElementById('admin-farm-total-time').textContent = durationText(seconds);
+  document.getElementById('admin-farm-details-title').textContent = `รายละเอียดการฟาร์ม (${periodLabels[adminFarmPeriod]})`;
+  document.getElementById('admin-farm-bot-version').textContent = `เวอร์ชัน: ${versions.join(', ') || '-'}`;
+
+  document.getElementById('admin-farm-summary-coins')?.classList.toggle('hidden', adminFarmBotTypeFilter === 'powder');
+  document.getElementById('admin-farm-summary-exp')?.classList.toggle('hidden', adminFarmBotTypeFilter === 'powder');
+  document.getElementById('admin-farm-summary-powder')?.classList.toggle('hidden', adminFarmBotTypeFilter === 'coin');
+
+  const columns = adminFarmHistoryColumns();
+  if (head) head.innerHTML = `<tr>${columns.map((c) => `<th>${c.label}</th>`).join('')}</tr>`;
+
+  if (!events.length) {
+    rows.innerHTML = `<tr><td colspan="${columns.length}" class="farm-empty-cell"><span>💤</span> ยังไม่มีข้อมูลการฟาร์มในช่วงเวลานี้</td></tr>`;
+    return;
+  }
+
+  const roundNumbers = farmDailyRoundNumbers(events);
+  rows.innerHTML = events.map((event) => {
+    return `<tr>${columns.map((c) => `<td data-label="${c.label}">${farmHistoryCell(c.key, event, roundNumbers.get(event))}</td>`).join('')}</tr>`;
+  }).join('');
+}
+
 async function updateAdminPanelStats() {
   const totalUsersEl = document.getElementById('stat-total-users');
   const activeUsersEl = document.getElementById('stat-active-users');
@@ -2031,6 +2261,94 @@ window.resetSelectedDevice = async function() {
     window.showToast('รีเซ็ตเครื่องสมาชิกเรียบร้อยแล้ว', 'success');
   } catch (error) {
     window.showToast(getApiErrorMessage(error, 'รีเซ็ตเครื่องไม่สำเร็จ'), 'error');
+  }
+};
+
+window.disableSelectedUser = async function() {
+  const userId = document.getElementById('edit-user-id')?.value;
+  const username = document.getElementById('edit-user-username')?.value || userId;
+  if (!userId) return;
+  if (!window.confirm(`ปิดบัญชี "${username}" ใช่หรือไม่? บัญชีจะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานกลับที่หน้า "บัญชีที่ปิด"`)) return;
+  try {
+    await axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/disable`, {}, adminApiConfig());
+    await reloadAdminData();
+    renderAdminUsersTable();
+    window.closeModal('user-modal');
+    window.showToast('ปิดบัญชีเรียบร้อยแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'ปิดบัญชีไม่สำเร็จ'), 'error');
+  }
+};
+
+// ── Closed accounts (admin) ──────────────────────────────────────────────
+let closedAccounts = [];
+
+async function loadClosedAccounts() {
+  const container = document.getElementById('closed-accounts-table-container');
+  if (container) container.innerHTML = '<div class="loading-spinner">⟳</div>';
+  try {
+    const response = await axios.get(`${API_BASE_URL}/admin/users/disabled`, adminApiConfig());
+    closedAccounts = response.data?.users || [];
+    renderClosedAccountsTable();
+  } catch (error) {
+    const text = getApiErrorMessage(error, 'โหลดรายชื่อบัญชีที่ปิดไม่สำเร็จ');
+    if (container) container.innerHTML = `<p style="padding:16px; color:var(--danger);">${escapeHtml(text)}</p>`;
+    window.showToast(text, 'error');
+  }
+}
+
+window.renderClosedAccountsTable = function() {
+  const container = document.getElementById('closed-accounts-table-container');
+  if (!container) return;
+  const searchVal = (document.getElementById('closed-accounts-search')?.value || '').toLowerCase();
+  const filtered = closedAccounts.filter((item) =>
+    String(item.username || '').toLowerCase().includes(searchVal)
+    || String(item.memberCode || '').toLowerCase().includes(searchVal)
+  );
+
+  if (!filtered.length) {
+    container.innerHTML = `
+      <div class="empty-state" style="text-align:center; padding:30px;">
+        <div style="font-size:2rem;">🔒</div>
+        <p style="color:var(--text-muted); margin-top:6px;">${closedAccounts.length ? 'ไม่พบบัญชีที่ตรงกับคำค้นหา' : 'ยังไม่มีบัญชีที่ปิดอยู่'}</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="admin-table" style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border-bright); text-align:left; color:var(--primary);">
+          <th style="padding:10px;">ชื่อผู้ใช้</th>
+          <th style="padding:10px;">หมายเลขไอดี</th>
+          <th style="padding:10px;">ปิดเมื่อ</th>
+          <th style="padding:10px; text-align:right;">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filtered.map((item) => `
+          <tr style="border-bottom:1px solid rgba(0,212,255,0.15);">
+            <td style="padding:12px; font-weight:700;">${escapeHtml(item.username)}</td>
+            <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(item.memberCode)}</td>
+            <td style="padding:12px; font-size:0.85rem;">${item.disabledAt ? escapeHtml(thaiDateTime(item.disabledAt)) : '-'}</td>
+            <td style="padding:12px; text-align:right;">
+              <button onclick="reactivateAccount('${encodeURIComponent(item.memberCode)}')" style="background:rgba(0,255,170,0.2); color:var(--accent); border:1px solid var(--accent); padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer;">✅ เปิดใช้งานกลับ</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+};
+
+window.reactivateAccount = async function(memberCode) {
+  memberCode = decodeURIComponent(memberCode);
+  try {
+    await axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(memberCode)}/enable`, {}, adminApiConfig());
+    await loadClosedAccounts();
+    window.showToast('เปิดใช้งานบัญชีกลับเรียบร้อยแล้ว บัญชีนี้กลับไปอยู่ในหน้าจัดการผู้ใช้ปกติแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'เปิดใช้งานบัญชีไม่สำเร็จ'), 'error');
   }
 };
 

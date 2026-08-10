@@ -10,7 +10,9 @@ const ROUTES = [
   { path: '/top-up', page: 'dashboard-page', section: 'topup', title: 'เติมเงิน' },
   { path: '/farm-history', page: 'dashboard-page', section: 'farm-history', title: 'ประวัติการฟาร์ม' },
   { path: '/usage-history', page: 'dashboard-page', section: 'activity', title: 'ประวัติการใช้งาน' },
-  { path: '/admin', page: 'dashboard-page', section: 'admin', title: 'แผงผู้ดูแลระบบ', adminOnly: true }
+  { path: '/admin', page: 'dashboard-page', section: 'admin', title: 'แผงผู้ดูแลระบบ', adminOnly: true },
+  { path: '/player-farm-data', page: 'dashboard-page', section: 'player-farm-data', title: 'ข้อมูลการฟาร์มผู้เล่น', adminOnly: true },
+  { path: '/closed-accounts', page: 'dashboard-page', section: 'closed-accounts', title: 'บัญชีที่ปิด', adminOnly: true }
 ];
 
 const REDIRECT_STORAGE_KEY = 'ckrcs_post_login_redirect';

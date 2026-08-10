@@ -15,8 +15,15 @@ import {
   reserveSlipAccessCodes,
   validCodeDuration
 } from './code-store.js';
-import { listFarmEvents, storeFarmEvent } from './farm-store.js';
+import { listFarmEvents, storeFarmEvent, summarizeFarmEvents } from './farm-store.js';
 import { lineSlipPlan, lineSlipPlanSummary } from './line-slip-plans.js';
+import {
+  disableMember,
+  enableMember,
+  getDisabledMeta,
+  isMemberDisabled,
+  listDisabledMemberCodes
+} from './member-status-store.js';
 import {
   portalStorageConfigured,
   readStoredPortalConfig,
@@ -847,6 +854,10 @@ async function loginWithLegacy(request) {
     if (adminSession) return json(adminSession);
   }
 
+  if (await isMemberDisabled(memberCode)) {
+    return json({ error: 'บัญชีนี้ถูกปิดการใช้งานชั่วคราว กรุณาติดต่อผู้ดูแลระบบ' }, 403);
+  }
+
   try {
     await rememberMemberSession(token, memberCode);
   } catch (error) {
@@ -1041,7 +1052,69 @@ function thailandDate(value = new Date()) {
 async function adminUsers(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
-  return json({ users: (overview.data.members || []).map(mapMember) });
+  const disabledCodes = new Set(await listDisabledMemberCodes());
+  return json({
+    users: (overview.data.members || [])
+      .map(mapMember)
+      .filter((member) => !disabledCodes.has(member.memberCode))
+  });
+}
+
+async function adminDisabledUsers(request) {
+  const overview = await adminOverview(request);
+  if (overview.errorResponse) return overview.errorResponse;
+  const disabledCodes = await listDisabledMemberCodes();
+  if (!disabledCodes.length) return json({ users: [] });
+
+  const membersByCode = new Map(
+    (overview.data.members || []).map((member) => [String(member.member_code || ''), member])
+  );
+  const users = await Promise.all(disabledCodes.map(async (memberCode) => {
+    const legacyMember = membersByCode.get(memberCode);
+    const meta = await getDisabledMeta(memberCode);
+    return {
+      ...mapMember(legacyMember || { member_code: memberCode }),
+      disabledAt: meta?.disabledAt || null
+    };
+  }));
+  return json({ users });
+}
+
+// Members can disappear from the legacy account list (renamed, etc.) while
+// still owning farm-history events -- the aggregate view is built from the
+// farm-history index itself so it can never miss a member who has data,
+// falling back to the raw member code as the display name if the legacy
+// lookup no longer has that member.
+async function adminFarmDataList(request) {
+  const overview = await adminOverview(request);
+  if (overview.errorResponse) return overview.errorResponse;
+  const members = (overview.data.members || []).map(mapMember);
+  const membersByCode = new Map(members.map((member) => [member.memberCode, member]));
+
+  const results = await Promise.all(members.map(async (member) => {
+    const events = await listFarmEvents(member.memberCode);
+    if (!events.length) return null;
+    const summary = summarizeFarmEvents(events);
+    return {
+      username: member.username,
+      memberCode: member.memberCode,
+      joinedAt: member.createdAt || null,
+      ...summary
+    };
+  }));
+
+  return json({ members: results.filter(Boolean) });
+}
+
+async function adminFarmDataDetail(request, memberCode) {
+  const overview = await adminOverview(request);
+  if (overview.errorResponse) return overview.errorResponse;
+  const events = await listFarmEvents(memberCode);
+  return json({
+    events,
+    refreshIntervalSeconds: 60,
+    updatedAt: new Date().toISOString()
+  });
 }
 
 async function adminTopups(request) {
@@ -1072,7 +1145,7 @@ async function adminStats(request) {
 }
 
 async function updateAdminUser(request, path) {
-  const match = path.match(/^admin\/users\/([^/]+)\/(diamonds|days|reset-password|reset-device)$/);
+  const match = path.match(/^admin\/users\/([^/]+)\/(diamonds|days|reset-password|reset-device|disable|enable)$/);
   if (!match) {
     return json({
       error: 'ระบบฐานข้อมูลเดิมไม่รองรับการเปลี่ยนชื่อหรือลบสมาชิกจากหน้าเว็บ'
@@ -1081,6 +1154,26 @@ async function updateAdminUser(request, path) {
 
   const memberCode = decodeURIComponent(match[1]);
   const action = match[2];
+
+  // These two only ever touch this proxy's own disabled-member list -- they
+  // don't call the legacy member API at all, so they're handled before the
+  // admin-overview lookup the other actions need.
+  if (action === 'disable' || action === 'enable') {
+    const overview = await adminOverview(request);
+    if (overview.errorResponse) return overview.errorResponse;
+    try {
+      if (action === 'disable') await disableMember(memberCode);
+      else await enableMember(memberCode);
+      return json({ ok: true, memberCode, disabled: action === 'disable' });
+    } catch (error) {
+      const reason = String(error?.message || '');
+      if (reason === 'MEMBER_STATUS_STORAGE_NOT_CONFIGURED') {
+        return json({ error: 'ระบบจัดเก็บสถานะบัญชียังไม่พร้อมใช้งาน' }, 503);
+      }
+      return json({ error: 'ไม่สามารถเปลี่ยนสถานะบัญชีได้' }, 500);
+    }
+  }
+
   const payload = await readJson(request);
 
   if (action === 'diamonds') {
@@ -1425,6 +1518,12 @@ async function authenticatedMember(request) {
   if (!memberCode) {
     return { errorResponse: json({ error: 'ไม่พบรหัสสมาชิก กรุณาเข้าสู่ระบบใหม่' }, 401) };
   }
+  // Enforced here so every member-authenticated route (farm-history, usage
+  // history, rent, redeem codes, ...) is covered by one check, even for a
+  // session token issued before the account was disabled.
+  if (await isMemberDisabled(memberCode)) {
+    return { errorResponse: json({ error: 'บัญชีนี้ถูกปิดการใช้งานชั่วคราว กรุณาติดต่อผู้ดูแลระบบ' }, 403) };
+  }
   return { memberCode, member: data };
 }
 
@@ -1450,7 +1549,7 @@ async function receiveFarmEvent(request) {
 async function memberFarmHistory(request) {
   const identity = await authenticatedMember(request);
   if (identity.errorResponse) return identity.errorResponse;
-  const events = await listFarmEvents(identity.memberCode, 2000);
+  const events = await listFarmEvents(identity.memberCode);
   return json({
     events,
     refreshIntervalSeconds: 60,
@@ -1719,6 +1818,15 @@ export default {
       }
       if (path === 'admin/users' && request.method === 'GET') {
         return adminUsers(request);
+      }
+      if (path === 'admin/users/disabled' && request.method === 'GET') {
+        return adminDisabledUsers(request);
+      }
+      if (path === 'admin/farm-data' && request.method === 'GET') {
+        return adminFarmDataList(request);
+      }
+      if (path.startsWith('admin/farm-data/') && request.method === 'GET') {
+        return adminFarmDataDetail(request, decodeURIComponent(path.slice('admin/farm-data/'.length)));
       }
       if (path === 'admin/topups' && request.method === 'GET') {
         return adminTopups(request);
