@@ -1373,6 +1373,32 @@ body {
   box-shadow: 0 0 12px rgba(255, 222, 73, 0.48), inset 0 0 12px rgba(255, 213, 64, 0.08);
 }
 
+.access-code-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 67, 93, 0.75);
+  border-radius: 10px;
+  background: rgba(110, 5, 22, 0.24);
+  color: #ff8fa3;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-shadow: 0 0 8px rgba(255, 42, 75, 0.6);
+}
+
+.access-code-warning-icon {
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.access-code-warning-line {
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+
 .access-code-confirm {
   white-space: nowrap;
   border: 1px solid #ffe66d;
@@ -2743,7 +2769,10 @@ body {
   --ui-lg: clamp(20px, 1.8vw, 30px);
   --ui-xl: clamp(26px, 2.8vw, 46px);
   --sidebar-fluid: clamp(208px, 15.5vw, 248px);
-  font-size: clamp(14px, .22vw + 12.5px, 17px);
+  /* Bumped from clamp(14px, .22vw + 12.5px, 17px): the whole site reads off
+     this root size through rem units, and the smaller scale was reading as
+     too small across the board, not just in one section. */
+  font-size: clamp(16px, .24vw + 14px, 19px);
 }
 
 body { line-height: 1.6; }
