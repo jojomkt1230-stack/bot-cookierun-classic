@@ -43,6 +43,8 @@ function fakeRedis() {
           return Response.json({ result: 'OK' });
         case 'GET':
           return Response.json({ result: strings.get(key) ?? null });
+        case 'MGET':
+          return Response.json({ result: [key, ...args].map((eventKey) => strings.get(eventKey) ?? null) });
         case 'DEL':
           strings.delete(key);
           return Response.json({ result: 1 });

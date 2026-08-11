@@ -1,4 +1,4 @@
-import { codeStorageConfigured, redisCommand, redisPipeline } from './code-store.js';
+import { codeStorageConfigured, redisCommand } from './code-store.js';
 
 const FARM_PREFIX = 'ckrcs:farm-history:v1';
 export const MAX_MEMBER_EVENTS = 5000;
@@ -103,9 +103,19 @@ export async function listFarmEvents(memberCode, limit = MAX_MEMBER_EVENTS) {
     'ZREVRANGE', memberIndexKey(cleanMemberCode), '0', String(count - 1)
   );
   if (!Array.isArray(eventIds) || !eventIds.length) return [];
-  const values = await redisPipeline(eventIds.map((eventId) => ['GET', eventKey(eventId)]));
-  return values
-    .map((item) => parseEvent(item?.result))
+  // Live incident: raising MAX_MEMBER_EVENTS from 2000 to 5000 turned every
+  // farm-history page load into a redisPipeline() of up to 5000 individual
+  // GETs. Upstash bills/limits pipelined sub-commands the same as separate
+  // requests, so this endpoint alone was burning through the account's
+  // request quota (Vercel logs: "ERR max requests limit exceeded. Limit:
+  // 500000, Usage: 500000" on every GET /api/users/farm-history, while the
+  // single-command bot POST routes kept working fine). MGET fetches the
+  // same up-to-5000 keys as ONE Redis command instead of 5000, so this
+  // endpoint's quota cost drops from 5000 to 1 per page load without losing
+  // any of the weekly/monthly data the 2000->5000 change was fixing.
+  const values = await redisCommand('MGET', ...eventIds.map((eventId) => eventKey(eventId)));
+  return (Array.isArray(values) ? values : [])
+    .map((value) => parseEvent(value))
     .filter((event) => event?.memberCode === cleanMemberCode);
 }
 

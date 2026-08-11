@@ -59,12 +59,16 @@ test('returns only records belonging to the requested member code', async () => 
     eventId: '87654321-abcd-4abc-8abc-123456789012',
     memberCode: 'CKRCS-OTHER'
   }));
-  globalThis.fetch = async (url, init) => {
+  globalThis.fetch = async (_url, init) => {
     const body = JSON.parse(init.body);
-    if (url.endsWith('/pipeline')) {
-      return Response.json([{ result: matching }, { result: other }]);
-    }
     if (body[0] === 'ZREVRANGE') return Response.json({ result: [sample.eventId, 'other-event'] });
+    // listFarmEvents fetches every event key with one MGET instead of a
+    // redisPipeline() of individual GETs -- pipelined sub-commands each
+    // count against Upstash's request quota the same as separate calls,
+    // which was exhausting it in production on every farm-history page
+    // load (up to MAX_MEMBER_EVENTS = 5000 GETs per request). MGET reads
+    // the same keys as a single command.
+    if (body[0] === 'MGET') return Response.json({ result: [matching, other] });
     throw new Error(`Unexpected Redis command ${body[0]}`);
   };
   try {
