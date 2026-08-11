@@ -16,6 +16,11 @@ import {
   validCodeDuration
 } from './code-store.js';
 import { listFarmEvents, storeFarmEvent, summarizeFarmEvents } from './farm-store.js';
+import {
+  getMemberSessionSummary,
+  setMemberProgramLimit,
+  storeSessionHeartbeat
+} from './session-store.js';
 import { lineSlipPlan, lineSlipPlanSummary } from './line-slip-plans.js';
 import {
   disableMember,
@@ -1053,11 +1058,16 @@ async function adminUsers(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
   const disabledCodes = new Set(await listDisabledMemberCodes());
-  return json({
-    users: (overview.data.members || [])
-      .map(mapMember)
-      .filter((member) => !disabledCodes.has(member.memberCode))
-  });
+  const members = (overview.data.members || [])
+    .map(mapMember)
+    .filter((member) => !disabledCodes.has(member.memberCode));
+  const users = await Promise.all(members.map(async (member) => ({
+    ...member,
+    ...(await getMemberSessionSummary(member.memberCode).catch(() => ({
+      activeScreens: 0, activePrograms: 0, maxPrograms: 4, sessionIp: '', botSessions: []
+    })))
+  })));
+  return json({ users });
 }
 
 async function adminDisabledUsers(request) {
@@ -1145,7 +1155,7 @@ async function adminStats(request) {
 }
 
 async function updateAdminUser(request, path) {
-  const match = path.match(/^admin\/users\/([^/]+)\/(diamonds|days|reset-password|reset-device|disable|enable)$/);
+  const match = path.match(/^admin\/users\/([^/]+)\/(diamonds|days|reset-password|reset-device|disable|enable|program-limit)$/);
   if (!match) {
     return json({
       error: 'ระบบฐานข้อมูลเดิมไม่รองรับการเปลี่ยนชื่อหรือลบสมาชิกจากหน้าเว็บ'
@@ -1175,6 +1185,24 @@ async function updateAdminUser(request, path) {
   }
 
   const payload = await readJson(request);
+
+  if (action === 'program-limit') {
+    const overview = await adminOverview(request);
+    if (overview.errorResponse) return overview.errorResponse;
+    const member = (overview.data.members || [])
+      .find((item) => String(item.member_code) === memberCode);
+    if (!member) return json({ error: 'ไม่พบสมาชิก' }, 404);
+    try {
+      const maxPrograms = await setMemberProgramLimit(memberCode, payload.maxPrograms);
+      return json({ ok: true, memberCode, maxPrograms });
+    } catch (error) {
+      const reason = String(error?.message || '');
+      if (reason === 'INVALID_PROGRAM_LIMIT') {
+        return json({ error: 'จำนวนโปรแกรมต้องเป็นเลขเต็ม 1-100' }, 400);
+      }
+      return json({ error: 'บันทึกจำนวนโปรแกรมสูงสุดไม่สำเร็จ' }, 503);
+    }
+  }
 
   if (action === 'diamonds') {
     const overview = await adminOverview(request);
@@ -1546,6 +1574,31 @@ async function receiveFarmEvent(request) {
   }
 }
 
+async function receiveSessionHeartbeat(request) {
+  if (!sitesToken() || !validBotTelemetryRequest(request)) {
+    return json({ error: 'ไม่อนุญาตให้อัปเดต session ของบอท' }, 401);
+  }
+  if (!codeStorageConfigured()) {
+    return json({ error: 'ระบบ session ของบอทยังไม่พร้อม' }, 503);
+  }
+  try {
+    const forwarded = String(request.headers.get('x-forwarded-for') || '').split(',')[0].trim();
+    const sourceIp = forwarded
+      || String(request.headers.get('x-real-ip') || '').trim()
+      || String(request.headers.get('cf-connecting-ip') || '').trim();
+    const result = await storeSessionHeartbeat(await readJson(request), sourceIp);
+    if (!result.allowed) {
+      return json({ ok: false, ...result }, 409);
+    }
+    return json({ ok: true, ...result }, result.status === 'running' ? 202 : 200);
+  } catch (error) {
+    if (String(error?.message || '') === 'SESSION_STORAGE_NOT_CONFIGURED') {
+      return json({ error: 'ระบบ session ของบอทยังไม่พร้อม' }, 503);
+    }
+    return json({ error: 'ข้อมูล session ของบอทไม่ถูกต้อง' }, 400);
+  }
+}
+
 async function memberFarmHistory(request) {
   const identity = await authenticatedMember(request);
   if (identity.errorResponse) return identity.errorResponse;
@@ -1781,6 +1834,9 @@ export default {
       }
       if (path === 'bot/farm-event' && request.method === 'POST') {
         return receiveFarmEvent(request);
+      }
+      if (path === 'bot/session-heartbeat' && request.method === 'POST') {
+        return receiveSessionHeartbeat(request);
       }
 
       if (path === 'auth/register' && request.method === 'POST') {

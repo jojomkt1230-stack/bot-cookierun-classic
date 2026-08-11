@@ -2164,6 +2164,7 @@ function renderAdminUsersTable() {
   const filtered = users.filter((u) =>
     String(u.username || '').toLowerCase().includes(searchVal)
     || String(u.memberCode || '').toLowerCase().includes(searchVal)
+    || String(u.sessionIp || '').toLowerCase().includes(searchVal)
   );
 
   if (filtered.length === 0) {
@@ -2185,6 +2186,8 @@ function renderAdminUsersTable() {
           <th style="padding:10px;">สิทธิ์</th>
           <th style="padding:10px;">เพชร 💎</th>
           <th style="padding:10px;">วันหมดอายุ</th>
+          <th style="padding:10px;">โปรแกรมที่กำลังใช้งาน</th>
+          <th style="padding:10px;">IP ที่กำลังใช้งาน</th>
           <th style="padding:10px; text-align:right;">จัดการ</th>
         </tr>
       </thead>
@@ -2194,11 +2197,15 @@ function renderAdminUsersTable() {
             <td style="padding:12px; font-weight:700;">
               ${escapeHtml(u.username)}
               <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(u.memberCode)}</div>
+              <div style="font-size:0.78rem; color:var(--primary); margin-top:5px;">โปรแกรมที่ใช้งาน: ${Number(u.activePrograms ?? u.activeScreens ?? 0)} / ${Number(u.maxPrograms || 4)}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">IP ล่าสุด: ${escapeHtml(u.sessionIp || 'ยังไม่มี Heartbeat')}</div>
             </td>
             <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${u.createdAt ? new Date(u.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</td>
             <td style="padding:12px;"><span style="padding:4px 8px; border-radius:12px; font-size:0.8rem; background:${u.role === 'admin' ? 'rgba(255,170,0,0.2)' : 'rgba(0,212,255,0.2)'}; color:${u.role === 'admin' ? '#ffcc00' : 'var(--primary)'}">${u.role === 'admin' ? '👑 แอดมิน' : '👤 สมาชิก'}</span></td>
             <td style="padding:12px; color:var(--accent); font-weight:700;">${u.diamonds || 0}</td>
             <td style="padding:12px; font-size:0.85rem;">${u.botExpiry ? new Date(u.botExpiry).toLocaleString('th-TH') : 'ยังไม่ได้เช่า'}</td>
+            <td style="padding:12px; font-weight:700;">${Number(u.activePrograms ?? u.activeScreens ?? 0)} / ${Number(u.maxPrograms || 4)}</td>
+            <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(u.sessionIp || '-')}</td>
             <td style="padding:12px; text-align:right;">
               <button onclick="openEditUserModal('${encodeURIComponent(u._id)}')" style="background:rgba(0,212,255,0.2); color:var(--primary); border:1px solid var(--primary); padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer;">✏️ จัดการ</button>
             </td>
@@ -2224,6 +2231,7 @@ window.openEditUserModal = function(userId) {
   const passInput = document.getElementById('edit-user-password');
   const diaInput = document.getElementById('edit-user-diamonds');
   const addTimeInput = document.getElementById('edit-user-add-time');
+  const programLimitInput = document.getElementById('edit-user-program-limit');
 
   if (idInput) idInput.value = user._id || user.username;
   if (userInput) {
@@ -2233,6 +2241,7 @@ window.openEditUserModal = function(userId) {
   if (passInput) passInput.value = '';
   if (diaInput) diaInput.value = user.diamonds || 0;
   if (addTimeInput) addTimeInput.value = '';
+  if (programLimitInput) programLimitInput.value = Number(user.maxPrograms || 4);
 
   window.openModal('user-modal');
 };
@@ -2243,6 +2252,7 @@ window.saveEditedUser = async function() {
   const newDiamonds = parseInt(document.getElementById('edit-user-diamonds')?.value || 0);
   const addTime = parseInt(document.getElementById('edit-user-add-time')?.value || 0);
   const newPassword = document.getElementById('edit-user-password')?.value || '';
+  const maxPrograms = parseInt(document.getElementById('edit-user-program-limit')?.value || 4);
 
   if (!userId || !newUsername) return;
   if (!Number.isInteger(newDiamonds) || newDiamonds < 0 || newDiamonds > 1000000) {
@@ -2257,10 +2267,17 @@ window.saveEditedUser = async function() {
     window.showToast('รหัสผ่านใหม่ต้องยาว 8-128 ตัวอักษร', 'error');
     return;
   }
+  if (!Number.isInteger(maxPrograms) || maxPrograms < 1 || maxPrograms > 100) {
+    window.showToast('จำนวนโปรแกรมต้องเป็นเลขเต็ม 1-100', 'error');
+    return;
+  }
 
   try {
     const user = adminUsers.find(item => item._id === userId);
     const requests = [];
+    if (Number(user?.maxPrograms || 4) !== maxPrograms) requests.push(
+      axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/program-limit`, { maxPrograms }, adminApiConfig())
+    );
     if (Number(user?.diamonds || 0) !== newDiamonds) requests.push(
       axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/diamonds`, { diamonds: newDiamonds }, adminApiConfig())
     );
