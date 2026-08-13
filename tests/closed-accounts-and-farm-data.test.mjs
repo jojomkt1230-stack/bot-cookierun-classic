@@ -101,6 +101,30 @@ test('a disabled member cannot log in even with the right password', async () =>
   }
 });
 
+test('member login stays available when the optional status store is over quota', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const href = url.toString();
+    if (href.startsWith('https://redis.example')) {
+      return Response.json({ error: 'ERR max requests limit exceeded' }, { status: 429 });
+    }
+    if (href.endsWith('/api/auth/login')) return Response.json({ token: 'member-token', memberCode: MEMBER.member_code });
+    if (href.endsWith('/api/member/me')) return Response.json({ ...MEMBER, expiresAt: MEMBER.expires_at });
+    throw new Error(`Unexpected legacy URL: ${href}`);
+  };
+  try {
+    const response = await proxy.fetch(apiRequest('auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'codex_user', password: 'safe-password' })
+    }));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).memberCode, MEMBER.member_code);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('a disabled member is rejected from farm-history even with a valid session token', async () => {
   const redis = fakeRedis();
   const originalFetch = globalThis.fetch;

@@ -18,7 +18,8 @@ function disabledMetaKey(memberCode) {
 
 export async function isMemberDisabled(memberCode) {
   if (!sessionStorageConfigured() || !memberCode) return false;
-  const result = await sessionRedisCommand('SISMEMBER', disabledSetKey(), memberCode);
+  let result = 0;
+  try { result = await sessionRedisCommand('SISMEMBER', disabledSetKey(), memberCode); } catch {}
   if (Number(result) === 1) return true;
   if (codeStorageConfigured()) {
     try { return Number(await redisCommand('SISMEMBER', disabledSetKey(), memberCode)) === 1; } catch {}
