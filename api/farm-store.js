@@ -1,4 +1,9 @@
 import { codeStorageConfigured, redisCommand } from './code-store.js';
+import {
+  dedicatedSessionStorageSelected,
+  sessionRedisCommand,
+  sessionStorageConfigured
+} from './session-redis.js';
 
 const FARM_PREFIX = 'ckrcs:farm-history:v1';
 export const MAX_MEMBER_EVENTS = 5000;
@@ -68,9 +73,9 @@ export function normalizeFarmEvent(payload = {}) {
 }
 
 export async function storeFarmEvent(payload) {
-  if (!codeStorageConfigured()) throw new Error('FARM_STORAGE_NOT_CONFIGURED');
+  if (!sessionStorageConfigured()) throw new Error('FARM_STORAGE_NOT_CONFIGURED');
   const event = normalizeFarmEvent(payload);
-  const stored = await redisCommand(
+  const stored = await sessionRedisCommand(
     'SET', eventKey(event.eventId), JSON.stringify(event),
     'EX', String(EVENT_TTL_SECONDS), 'NX'
   );
@@ -78,17 +83,33 @@ export async function storeFarmEvent(payload) {
 
   const indexKey = memberIndexKey(event.memberCode);
   const score = String(Date.parse(event.occurredAt));
-  await redisCommand('ZADD', indexKey, score, event.eventId);
-  const indexSize = Number(await redisCommand('ZCARD', indexKey)) || 0;
+  await sessionRedisCommand('ZADD', indexKey, score, event.eventId);
+  const indexSize = Number(await sessionRedisCommand('ZCARD', indexKey)) || 0;
   if (indexSize > MAX_MEMBER_EVENTS) {
-    await redisCommand('ZREMRANGEBYRANK', indexKey, '0', String(indexSize - MAX_MEMBER_EVENTS - 1));
+    await sessionRedisCommand('ZREMRANGEBYRANK', indexKey, '0', String(indexSize - MAX_MEMBER_EVENTS - 1));
   }
-  await redisCommand('EXPIRE', indexKey, String(EVENT_TTL_SECONDS));
+  await sessionRedisCommand('EXPIRE', indexKey, String(EVENT_TTL_SECONDS));
   return { event, duplicate: false };
 }
 
+async function readFarmEventsFrom(command, cleanMemberCode, count, sourceLabel) {
+  try {
+    const eventIds = await command(
+      'ZREVRANGE', memberIndexKey(cleanMemberCode), '0', String(count - 1)
+    );
+    if (!Array.isArray(eventIds) || !eventIds.length) return [];
+    const values = await command('MGET', ...eventIds.map((eventId) => eventKey(eventId)));
+    return (Array.isArray(values) ? values : [])
+      .map((value) => parseEvent(value))
+      .filter((event) => event?.memberCode === cleanMemberCode);
+  } catch (error) {
+    console.error(`[Farm History] ${sourceLabel} unavailable:`, error?.message || error);
+    return [];
+  }
+}
+
 export async function listFarmEvents(memberCode, limit = MAX_MEMBER_EVENTS) {
-  if (!codeStorageConfigured()) return [];
+  if (!sessionStorageConfigured() && !codeStorageConfigured()) return [];
   const cleanMemberCode = cleanText(memberCode, 180).toUpperCase();
   if (!cleanMemberCode) return [];
   // V: this used to cap reads at 2000 even though storeFarmEvent() keeps up
@@ -99,10 +120,6 @@ export async function listFarmEvents(memberCode, limit = MAX_MEMBER_EVENTS) {
   // Capping at MAX_MEMBER_EVENTS instead means every event actually kept in
   // storage is available to the period filters that already run client-side.
   const count = Math.max(1, Math.min(cleanInteger(limit, MAX_MEMBER_EVENTS) || MAX_MEMBER_EVENTS, MAX_MEMBER_EVENTS));
-  const eventIds = await redisCommand(
-    'ZREVRANGE', memberIndexKey(cleanMemberCode), '0', String(count - 1)
-  );
-  if (!Array.isArray(eventIds) || !eventIds.length) return [];
   // Live incident: raising MAX_MEMBER_EVENTS from 2000 to 5000 turned every
   // farm-history page load into a redisPipeline() of up to 5000 individual
   // GETs. Upstash bills/limits pipelined sub-commands the same as separate
@@ -113,10 +130,16 @@ export async function listFarmEvents(memberCode, limit = MAX_MEMBER_EVENTS) {
   // same up-to-5000 keys as ONE Redis command instead of 5000, so this
   // endpoint's quota cost drops from 5000 to 1 per page load without losing
   // any of the weekly/monthly data the 2000->5000 change was fixing.
-  const values = await redisCommand('MGET', ...eventIds.map((eventId) => eventKey(eventId)));
-  return (Array.isArray(values) ? values : [])
-    .map((value) => parseEvent(value))
-    .filter((event) => event?.memberCode === cleanMemberCode);
+  const current = sessionStorageConfigured()
+    ? await readFarmEventsFrom(sessionRedisCommand, cleanMemberCode, count, 'primary storage')
+    : [];
+  const legacy = dedicatedSessionStorageSelected() && codeStorageConfigured()
+    ? await readFarmEventsFrom(redisCommand, cleanMemberCode, count, 'legacy storage')
+    : [];
+  const unique = new Map([...current, ...legacy].map((event) => [event.eventId, event]));
+  return [...unique.values()]
+    .sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))
+    .slice(0, count);
 }
 
 // Aggregate one member's events for the admin overview table. Kept here

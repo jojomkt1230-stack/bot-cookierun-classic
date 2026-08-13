@@ -1163,7 +1163,10 @@ async function adminFarmDataList(request) {
   const membersByCode = new Map(members.map((member) => [member.memberCode, member]));
 
   const results = await Promise.all(members.map(async (member) => {
-    const events = await listFarmEvents(member.memberCode);
+    const events = await listFarmEvents(member.memberCode).catch((error) => {
+      console.error('[Admin Farm] Member history unavailable:', error?.message || error);
+      return [];
+    });
     if (!events.length) return null;
     const summary = summarizeFarmEvents(events);
     return {
@@ -1180,7 +1183,10 @@ async function adminFarmDataList(request) {
 async function adminFarmDataDetail(request, memberCode) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
-  const events = await listFarmEvents(memberCode);
+  const events = await listFarmEvents(memberCode).catch((error) => {
+    console.error('[Admin Farm] Member detail unavailable:', error?.message || error);
+    return [];
+  });
   return json({
     events,
     refreshIntervalSeconds: 60,
@@ -1639,7 +1645,7 @@ async function receiveFarmEvent(request) {
   if (!sitesToken() || !validBotTelemetryRequest(request)) {
     return json({ error: 'ไม่อนุญาตให้ส่งข้อมูลการฟาร์ม' }, 401);
   }
-  if (!codeStorageConfigured()) {
+  if (!sessionStorageConfigured()) {
     return json({ error: 'ระบบบันทึกประวัติการฟาร์มยังไม่พร้อม' }, 503);
   }
   try {
@@ -1649,6 +1655,12 @@ async function receiveFarmEvent(request) {
     const reason = String(error?.message || 'INVALID_FARM_EVENT');
     if (reason === 'FARM_STORAGE_NOT_CONFIGURED') {
       return json({ error: 'ระบบบันทึกประวัติการฟาร์มยังไม่พร้อม' }, 503);
+    }
+    if (![
+      'INVALID_EVENT_ID', 'INVALID_MEMBER_CODE', 'INVALID_BOT_TYPE', 'INVALID_EVENT_TIME'
+    ].includes(reason)) {
+      console.error('[Farm History] Storage update failed:', reason);
+      return json({ error: 'ระบบบันทึกประวัติการฟาร์มขัดข้องชั่วคราว กรุณาลองใหม่', retryable: true }, 503);
     }
     return json({ error: 'ข้อมูลผลการฟาร์มไม่ถูกต้อง' }, 400);
   }
@@ -1690,7 +1702,10 @@ async function receiveSessionHeartbeat(request) {
 async function memberFarmHistory(request) {
   const identity = await authenticatedMember(request);
   if (identity.errorResponse) return identity.errorResponse;
-  const events = await listFarmEvents(identity.memberCode);
+  const events = await listFarmEvents(identity.memberCode).catch((error) => {
+    console.error('[Member Farm] History unavailable:', error?.message || error);
+    return [];
+  });
   return json({
     events,
     refreshIntervalSeconds: 60,

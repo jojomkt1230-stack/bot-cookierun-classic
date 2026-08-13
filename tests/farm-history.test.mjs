@@ -79,3 +79,43 @@ test('returns only records belonging to the requested member code', async () => 
     globalThis.fetch = originalFetch;
   }
 });
+
+test('stores new farm history in dedicated storage while legacy storage is over quota', async () => {
+  const originalFetch = globalThis.fetch;
+  const values = new Map();
+  const indexes = new Map();
+  process.env.SESSION_REDIS_REST_URL = 'https://session-redis.example';
+  process.env.SESSION_REDIS_REST_TOKEN = 'session-token';
+  globalThis.fetch = async (url, init) => {
+    const href = String(url);
+    if (href.startsWith('https://redis.example')) {
+      return Response.json({ error: 'ERR max requests limit exceeded' }, { status: 429 });
+    }
+    const [command, key, ...args] = JSON.parse(init.body);
+    const index = indexes.get(key) || [];
+    if (command === 'SET') {
+      values.set(key, args[0]);
+      return Response.json({ result: 'OK' });
+    }
+    if (command === 'ZADD') {
+      indexes.set(key, [...index.filter((id) => id !== args[1]), args[1]]);
+      return Response.json({ result: 1 });
+    }
+    if (command === 'ZCARD') return Response.json({ result: index.length });
+    if (command === 'EXPIRE') return Response.json({ result: 1 });
+    if (command === 'ZREVRANGE') return Response.json({ result: [...index].reverse() });
+    if (command === 'MGET') return Response.json({ result: [key, ...args].map((eventKey) => values.get(eventKey) ?? null) });
+    throw new Error(`Unexpected Redis command ${command}`);
+  };
+  try {
+    const dedicatedSample = { ...sample, eventId: 'dedicated-farm-event-0001' };
+    assert.equal((await storeFarmEvent(dedicatedSample)).duplicate, false);
+    const events = await listFarmEvents(sample.memberCode);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].eventId, dedicatedSample.eventId);
+  } finally {
+    delete process.env.SESSION_REDIS_REST_URL;
+    delete process.env.SESSION_REDIS_REST_TOKEN;
+    globalThis.fetch = originalFetch;
+  }
+});

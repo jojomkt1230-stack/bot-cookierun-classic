@@ -125,6 +125,27 @@ test('member login stays available when the optional status store is over quota'
   }
 });
 
+test('member farm-history returns an empty page instead of 500 when legacy storage is over quota', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const href = url.toString();
+    if (href.startsWith('https://redis.example')) {
+      return Response.json({ error: 'ERR max requests limit exceeded' }, { status: 429 });
+    }
+    if (href.endsWith('/api/member/me')) return Response.json({ ...MEMBER, memberCode: MEMBER.member_code });
+    throw new Error(`Unexpected legacy URL: ${href}`);
+  };
+  try {
+    const response = await proxy.fetch(apiRequest('users/farm-history', {
+      headers: { authorization: 'Bearer member-token' }
+    }));
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).events, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('a disabled member is rejected from farm-history even with a valid session token', async () => {
   const redis = fakeRedis();
   const originalFetch = globalThis.fetch;

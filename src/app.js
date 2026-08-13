@@ -50,13 +50,15 @@ console.log('[API] Base URL:', API_BASE_URL);
 
 function getApiErrorMessage(error, fallbackMessage) {
   const responseData = error?.response?.data;
-  if (typeof responseData === 'string' && responseData.trim()) return responseData.trim();
-
-  return responseData?.message
+  const message = (typeof responseData === 'string' && responseData.trim())
+    || responseData?.message
     || responseData?.error
     || responseData?.details?.message
     || error?.message
     || fallbackMessage;
+  const genericServerError = /^(internal server error|server error)$/i.test(String(message).trim())
+    || /^request failed with status code 5\d\d$/i.test(String(message).trim());
+  return genericServerError ? fallbackMessage : message;
 }
 
 function escapeHtml(value) {

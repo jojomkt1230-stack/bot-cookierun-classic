@@ -11,6 +11,10 @@ export function sessionStorageConfigured() {
   return selected ? Boolean(url && token) : codeStorageConfigured();
 }
 
+export function dedicatedSessionStorageSelected() {
+  return dedicatedSessionConfig().selected;
+}
+
 async function dedicatedRedisRequest(pathname, payload) {
   const { url, token } = dedicatedSessionConfig();
   if (!url || !token) throw new Error('SESSION_STORAGE_NOT_CONFIGURED');
