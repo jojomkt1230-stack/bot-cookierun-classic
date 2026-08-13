@@ -1,4 +1,5 @@
 import { codeStorageConfigured, redisCommand } from './code-store.js';
+import { sessionRedisCommand, sessionStorageConfigured } from './session-redis.js';
 
 // Account "disable" is enforced entirely at this proxy layer, independent of
 // the legacy member database (which has no such concept and cannot be
@@ -16,32 +17,48 @@ function disabledMetaKey(memberCode) {
 }
 
 export async function isMemberDisabled(memberCode) {
-  if (!codeStorageConfigured() || !memberCode) return false;
-  const result = await redisCommand('SISMEMBER', disabledSetKey(), memberCode);
-  return Number(result) === 1;
+  if (!sessionStorageConfigured() || !memberCode) return false;
+  const result = await sessionRedisCommand('SISMEMBER', disabledSetKey(), memberCode);
+  if (Number(result) === 1) return true;
+  if (codeStorageConfigured()) {
+    try { return Number(await redisCommand('SISMEMBER', disabledSetKey(), memberCode)) === 1; } catch {}
+  }
+  return false;
 }
 
 export async function listDisabledMemberCodes() {
-  if (!codeStorageConfigured()) return [];
-  const members = await redisCommand('SMEMBERS', disabledSetKey());
-  return Array.isArray(members) ? members : [];
+  if (!sessionStorageConfigured()) return [];
+  let current = [];
+  try { current = await sessionRedisCommand('SMEMBERS', disabledSetKey()); } catch {}
+  const members = Array.isArray(current) ? current : [];
+  if (codeStorageConfigured()) {
+    try {
+      const legacy = await redisCommand('SMEMBERS', disabledSetKey());
+      if (Array.isArray(legacy)) members.push(...legacy);
+    } catch {}
+  }
+  return [...new Set(members.map(String))];
 }
 
 export async function disableMember(memberCode) {
-  if (!codeStorageConfigured()) throw new Error('MEMBER_STATUS_STORAGE_NOT_CONFIGURED');
-  await redisCommand('SADD', disabledSetKey(), memberCode);
-  await redisCommand('SET', disabledMetaKey(memberCode), JSON.stringify({ disabledAt: new Date().toISOString() }));
+  if (!sessionStorageConfigured()) throw new Error('MEMBER_STATUS_STORAGE_NOT_CONFIGURED');
+  await sessionRedisCommand('SADD', disabledSetKey(), memberCode);
+  await sessionRedisCommand('SET', disabledMetaKey(memberCode), JSON.stringify({ disabledAt: new Date().toISOString() }));
 }
 
 export async function enableMember(memberCode) {
-  if (!codeStorageConfigured()) throw new Error('MEMBER_STATUS_STORAGE_NOT_CONFIGURED');
-  await redisCommand('SREM', disabledSetKey(), memberCode);
-  await redisCommand('DEL', disabledMetaKey(memberCode));
+  if (!sessionStorageConfigured()) throw new Error('MEMBER_STATUS_STORAGE_NOT_CONFIGURED');
+  await sessionRedisCommand('SREM', disabledSetKey(), memberCode);
+  await sessionRedisCommand('DEL', disabledMetaKey(memberCode));
 }
 
 export async function getDisabledMeta(memberCode) {
-  if (!codeStorageConfigured()) return null;
-  const raw = await redisCommand('GET', disabledMetaKey(memberCode));
+  if (!sessionStorageConfigured()) return null;
+  let raw = null;
+  try { raw = await sessionRedisCommand('GET', disabledMetaKey(memberCode)); } catch {}
+  if (!raw && codeStorageConfigured()) {
+    try { raw = await redisCommand('GET', disabledMetaKey(memberCode)); } catch {}
+  }
   if (typeof raw !== 'string' || !raw) return null;
   try {
     const parsed = JSON.parse(raw);

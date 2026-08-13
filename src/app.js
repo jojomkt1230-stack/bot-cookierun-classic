@@ -1785,19 +1785,22 @@ function adminApiConfig() {
   return { headers: { Authorization: `Bearer ${token}` } };
 }
 
-async function reloadAdminData() {
+async function reloadAdminUsersData() {
   if (currentUser?.role !== 'admin') return;
-  try {
-    const [usersResponse, topupsResponse] = await Promise.all([
-      axios.get(`${API_BASE_URL}/admin/users?limit=500`, adminApiConfig()),
-      axios.get(`${API_BASE_URL}/admin/topups?limit=500`, adminApiConfig())
-    ]);
-    adminUsers = usersResponse.data?.users || [];
-    adminTopups = topupsResponse.data?.topups || [];
-  } catch (error) {
-    window.showToast(getApiErrorMessage(error, 'โหลดข้อมูลแอดมินไม่สำเร็จ'), 'error');
-    throw error;
-  }
+  const response = await axios.get(`${API_BASE_URL}/admin/users?limit=500`, adminApiConfig());
+  adminUsers = response.data?.users || [];
+}
+
+async function reloadAdminTopupsData() {
+  if (currentUser?.role !== 'admin') return;
+  const response = await axios.get(`${API_BASE_URL}/admin/topups?limit=500`, adminApiConfig());
+  adminTopups = response.data?.topups || [];
+}
+
+async function reloadAdminData() {
+  const results = await Promise.allSettled([reloadAdminUsersData(), reloadAdminTopupsData()]);
+  if (results.every((result) => result.status === 'rejected')) throw results[0].reason;
+  return results;
 }
 
 window.switchAdminTab = function(tabName) {
@@ -1817,8 +1820,12 @@ window.switchAdminTab = function(tabName) {
   if (activeTabBtn) activeTabBtn.classList.add('active');
 
   if (tabName === 'stats') updateAdminPanelStats();
-  if (tabName === 'users') reloadAdminData().then(renderAdminUsersTable).catch(() => {});
-  if (tabName === 'topups') reloadAdminData().then(renderAdminTopupsTable).catch(() => {});
+  if (tabName === 'users') reloadAdminUsersData().then(renderAdminUsersTable).catch((error) => {
+    window.showToast(getApiErrorMessage(error, 'โหลดรายชื่อสมาชิกไม่สำเร็จ'), 'error');
+  });
+  if (tabName === 'topups') reloadAdminTopupsData().then(renderAdminTopupsTable).catch((error) => {
+    window.showToast(getApiErrorMessage(error, 'โหลดประวัติเติมเงินไม่สำเร็จ'), 'error');
+  });
   if (tabName === 'codes') loadAdminAccessCodes().catch(() => {});
   if (tabName === 'system') {
     loadSystemSettings(true).catch((error) => {

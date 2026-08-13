@@ -1103,7 +1103,10 @@ function thailandDate(value = new Date()) {
 async function adminUsers(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
-  const disabledCodes = new Set(await listDisabledMemberCodes());
+  const disabledCodes = new Set(await listDisabledMemberCodes().catch((error) => {
+    console.error('[Admin Users] Disabled-account list unavailable:', error?.message || error);
+    return [];
+  }));
   const members = (overview.data.members || [])
     .map(mapMember)
     .filter((member) => !disabledCodes.has(member.memberCode));
