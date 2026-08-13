@@ -1,8 +1,10 @@
-import { codeStorageConfigured, redisCommand, redisPipeline } from './code-store.js';
+import { sessionRedisCommand, sessionRedisPipeline, sessionStorageConfigured } from './session-redis.js';
+
+export { sessionStorageConfigured } from './session-redis.js';
 
 const SESSION_PREFIX = 'ckrcs:bot-session:v2';
-export const HEARTBEAT_INTERVAL_SECONDS = 60;
-export const SESSION_TTL_SECONDS = 90;
+export const HEARTBEAT_INTERVAL_SECONDS = 60 * 60;
+export const SESSION_TTL_SECONDS = 70 * 60;
 export const MAX_ACTIVE_SCREENS = 4;
 export const MAX_CONFIGURABLE_PROGRAMS = 100;
 export const LAST_IP_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -37,19 +39,19 @@ function normalizeProgramLimit(value) {
 
 export async function getMemberProgramLimit(memberCodeValue) {
   const memberCode = cleanText(memberCodeValue).toUpperCase();
-  if (!memberCode || !codeStorageConfigured()) return MAX_ACTIVE_SCREENS;
-  const stored = Number(await redisCommand('GET', programLimitKey(memberCode)));
+  if (!memberCode || !sessionStorageConfigured()) return MAX_ACTIVE_SCREENS;
+  const stored = Number(await sessionRedisCommand('GET', programLimitKey(memberCode)));
   return Number.isInteger(stored) && stored >= 1 && stored <= MAX_CONFIGURABLE_PROGRAMS
     ? stored
     : MAX_ACTIVE_SCREENS;
 }
 
 export async function setMemberProgramLimit(memberCodeValue, value) {
-  if (!codeStorageConfigured()) throw new Error('SESSION_STORAGE_NOT_CONFIGURED');
+  if (!sessionStorageConfigured()) throw new Error('SESSION_STORAGE_NOT_CONFIGURED');
   const memberCode = cleanText(memberCodeValue).toUpperCase();
   if (!/^[A-Z0-9-]{8,180}$/.test(memberCode)) throw new Error('INVALID_MEMBER_CODE');
   const limit = normalizeProgramLimit(value);
-  await redisCommand('SET', programLimitKey(memberCode), String(limit));
+  await sessionRedisCommand('SET', programLimitKey(memberCode), String(limit));
   return limit;
 }
 
@@ -110,8 +112,9 @@ if status == 'stopped' then
 end
 local ids = redis.call('ZRANGE', indexKey, 0, -1)
 local existing = redis.call('ZSCORE', indexKey, sessionId)
-for _, id in ipairs(ids) do
-  local raw = redis.call('GET', sessionPrefix .. ':session:' .. memberCode .. ':' .. id)
+local comparisonId = existing and sessionId or ids[1]
+if comparisonId then
+  local raw = redis.call('GET', sessionPrefix .. ':session:' .. memberCode .. ':' .. comparisonId)
   if raw then
     local ok, item = pcall(cjson.decode, raw)
     if ok and item.ipAddress and item.ipAddress ~= sourceIp then
@@ -130,7 +133,7 @@ return cjson.encode({allowed=true, activeScreens=redis.call('ZCARD', indexKey), 
 `;
 
 export async function storeSessionHeartbeat(payload, sourceIp) {
-  if (!codeStorageConfigured()) throw new Error('SESSION_STORAGE_NOT_CONFIGURED');
+  if (!sessionStorageConfigured()) throw new Error('SESSION_STORAGE_NOT_CONFIGURED');
   const heartbeat = normalizeSessionHeartbeat(payload, sourceIp);
   const now = Date.now();
   const expiresAt = now + SESSION_TTL_SECONDS * 1000;
@@ -139,7 +142,7 @@ export async function storeSessionHeartbeat(payload, sourceIp) {
     lastSeenAt: new Date(now).toISOString(),
     expiresAt: new Date(expiresAt).toISOString()
   };
-  const raw = await redisCommand(
+  const raw = await sessionRedisCommand(
     'EVAL', STORE_SCRIPT, '2', memberIndexKey(heartbeat.memberCode), programLimitKey(heartbeat.memberCode),
     SESSION_PREFIX, heartbeat.memberCode, heartbeat.sessionId, heartbeat.ipAddress,
     heartbeat.status, JSON.stringify(record), String(SESSION_TTL_SECONDS),
@@ -159,17 +162,17 @@ export async function storeSessionHeartbeat(payload, sourceIp) {
 }
 
 export async function getMemberSessionSummary(memberCodeValue) {
-  if (!codeStorageConfigured()) return { activeScreens: 0, activePrograms: 0, maxPrograms: MAX_ACTIVE_SCREENS, sessionIp: '', botSessions: [] };
+  if (!sessionStorageConfigured()) return { activeScreens: 0, activePrograms: 0, maxPrograms: MAX_ACTIVE_SCREENS, sessionIp: '', botSessions: [] };
   const memberCode = cleanText(memberCodeValue).toUpperCase();
   if (!memberCode) return { activeScreens: 0, activePrograms: 0, maxPrograms: MAX_ACTIVE_SCREENS, sessionIp: '', botSessions: [] };
   const maxPrograms = await getMemberProgramLimit(memberCode);
   const indexKey = memberIndexKey(memberCode);
-  await redisCommand('ZREMRANGEBYSCORE', indexKey, '-inf', String(Date.now()));
-  const ids = await redisCommand('ZRANGE', indexKey, '0', '-1');
+  await sessionRedisCommand('ZREMRANGEBYSCORE', indexKey, '-inf', String(Date.now()));
+  const ids = await sessionRedisCommand('ZRANGE', indexKey, '0', '-1');
   const sessionIds = Array.isArray(ids) ? ids.map(String) : [];
-  const lastIp = String(await redisCommand('GET', lastIpKey(memberCode)) || '');
+  const lastIp = String(await sessionRedisCommand('GET', lastIpKey(memberCode)) || '');
   if (!sessionIds.length) return { activeScreens: 0, activePrograms: 0, maxPrograms, sessionIp: lastIp, botSessions: [] };
-  const rows = await redisPipeline(sessionIds.map((id) => ['GET', sessionKey(memberCode, id)]));
+  const rows = await sessionRedisPipeline(sessionIds.map((id) => ['GET', sessionKey(memberCode, id)]));
   const botSessions = rows.map(pipelineValue).map(parseRecord).filter(Boolean);
   const ips = [...new Set(botSessions.map((item) => item.ipAddress).filter(Boolean))];
   return {

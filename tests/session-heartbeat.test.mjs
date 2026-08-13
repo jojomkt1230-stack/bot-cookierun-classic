@@ -5,10 +5,35 @@ process.env.STORAGE_REST_API_URL = 'https://redis.example';
 process.env.STORAGE_REST_API_TOKEN = 'redis-token';
 
 const {
+  HEARTBEAT_INTERVAL_SECONDS,
+  SESSION_TTL_SECONDS,
   normalizeSessionHeartbeat,
+  sessionStorageConfigured,
   setMemberProgramLimit,
   storeSessionHeartbeat
 } = await import('../api/session-store.js');
+
+test('uses the dedicated session database and an hourly lease', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = '';
+  process.env.SESSION_REDIS_REST_URL = 'https://session-redis.example';
+  process.env.SESSION_REDIS_REST_TOKEN = 'session-token';
+  globalThis.fetch = async (url) => {
+    requestedUrl = String(url);
+    return Response.json({ result: 'OK' });
+  };
+  try {
+    assert.equal(sessionStorageConfigured(), true);
+    assert.equal(HEARTBEAT_INTERVAL_SECONDS, 3600);
+    assert.equal(SESSION_TTL_SECONDS, 4200);
+    assert.equal(await setMemberProgramLimit('CKRCS-1234', 9), 9);
+    assert.equal(requestedUrl, 'https://session-redis.example');
+  } finally {
+    delete process.env.SESSION_REDIS_REST_URL;
+    delete process.env.SESSION_REDIS_REST_TOKEN;
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('contract normalizes member, device, bot type and server supplied IP', () => {
   assert.deepEqual(normalizeSessionHeartbeat({
@@ -41,6 +66,10 @@ test('running heartbeat uses one atomic admission-and-write command', async () =
     assert.equal(commands.length, 1);
     assert.equal(commands[0][0], 'EVAL');
     assert.equal(commands[0][2], '2');
+    const script = commands[0][1];
+    assert.doesNotMatch(script, /for _, id in ipairs\(ids\)/);
+    assert.match(script, /local comparisonId = existing and sessionId or ids\[1\]/);
+    assert.equal((script.match(/redis\.call\('GET'/g) || []).length, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }

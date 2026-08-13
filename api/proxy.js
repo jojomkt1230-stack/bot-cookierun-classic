@@ -18,6 +18,7 @@ import {
 import { listFarmEvents, storeFarmEvent, summarizeFarmEvents } from './farm-store.js';
 import {
   getMemberSessionSummary,
+  sessionStorageConfigured,
   setMemberProgramLimit,
   storeSessionHeartbeat
 } from './session-store.js';
@@ -1578,7 +1579,7 @@ async function receiveSessionHeartbeat(request) {
   if (!sitesToken() || !validBotTelemetryRequest(request)) {
     return json({ error: 'ไม่อนุญาตให้อัปเดต session ของบอท' }, 401);
   }
-  if (!codeStorageConfigured()) {
+  if (!sessionStorageConfigured()) {
     return json({ error: 'ระบบ session ของบอทยังไม่พร้อม' }, 503);
   }
   try {
@@ -1592,8 +1593,16 @@ async function receiveSessionHeartbeat(request) {
     }
     return json({ ok: true, ...result }, result.status === 'running' ? 202 : 200);
   } catch (error) {
-    if (String(error?.message || '') === 'SESSION_STORAGE_NOT_CONFIGURED') {
+    const reason = String(error?.message || 'UNKNOWN_SESSION_ERROR');
+    if (reason === 'SESSION_STORAGE_NOT_CONFIGURED') {
       return json({ error: 'ระบบ session ของบอทยังไม่พร้อม' }, 503);
+    }
+    if (![
+      'INVALID_MEMBER_CODE', 'INVALID_DEVICE_ID', 'INVALID_BOT_TYPE',
+      'INVALID_STATUS', 'INVALID_SOURCE_IP'
+    ].includes(reason)) {
+      console.error('[Bot Session] Storage update failed:', reason);
+      return json({ error: 'ระบบ session ขัดข้องชั่วคราว กรุณาลองใหม่', retryable: true }, 503);
     }
     return json({ error: 'ข้อมูล session ของบอทไม่ถูกต้อง' }, 400);
   }
