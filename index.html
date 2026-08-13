@@ -444,7 +444,7 @@
               <div class="qr-container">
                 <img id="qr-code-img" src="" alt="QR Code PromptPay" class="qr-image" />
               </div>
-              <div class="usage-plans" aria-label="แพ็กเกจวันใช้งาน">
+              <div class="usage-plans" id="payment-plans-display" aria-label="แพ็กเกจวันใช้งาน">
                 <span><strong>15 บาท</strong> = 1 วัน</span>
                 <span><strong>30 บาท</strong> = 2 วัน</span>
                 <span><strong>45 บาท</strong> = 3 วัน</span>
@@ -711,6 +711,13 @@
                     <img id="admin-qr-preview" class="admin-qr-preview hidden" src="" alt="ตัวอย่าง QR Code" />
                     <button class="btn-primary" onclick="savePromptPaySettings()" style="margin-top:10px;">💾 บันทึกข้อมูลพร้อมเพย์</button>
                   </div>
+                </div>
+                <!-- Payment Plan Settings -->
+                <div class="admin-card">
+                  <h4>💰 ตั้งค่าแพ็กเกจราคาและวันใช้งาน</h4>
+                  <p class="admin-field-hint">ราคาที่บันทึกจะใช้ทั้งรายการใต้ QR และระบบตรวจสลิปผ่าน LINE</p>
+                  <div id="payment-plans-editor" class="payment-plans-editor"></div>
+                  <button class="btn-primary" type="button" onclick="savePaymentPlans()" style="margin-top:12px;">💾 บันทึกราคาและจำนวนวัน</button>
                 </div>
                 <!-- Bot Download -->
                 <div class="admin-card">

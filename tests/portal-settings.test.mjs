@@ -158,6 +158,37 @@ test('saves bot name and download URL in dedicated storage when legacy Redis is 
   }, { dedicatedSession: true, failLegacyRedis: true });
 });
 
+test('stores editable payment prices and days for the website and LINE', async () => {
+  await withStubbedBackends(async ({ legacySettingsCalls }) => {
+    const paymentPlans = [
+      { amount: 20, days: 1 },
+      { amount: 55, days: 3 },
+      { amount: 120, days: 7 },
+      { amount: 399, days: 30 }
+    ];
+    const saveResponse = await proxy.fetch(adminRequest('admin/settings', { paymentPlans }));
+    assert.equal(saveResponse.status, 200);
+    assert.deepEqual(legacySettingsCalls, []);
+
+    const publicData = await (await proxy.fetch(apiRequest('settings'))).json();
+    assert.deepEqual(publicData.paymentPlans, paymentPlans);
+
+    const adminData = await (await proxy.fetch(apiRequest('admin/settings', {
+      headers: { Authorization: 'Bearer legacy-admin-token' }
+    }))).json();
+    assert.deepEqual(adminData.paymentPlans, paymentPlans);
+  });
+});
+
+test('rejects duplicate payment prices', async () => {
+  await withStubbedBackends(async () => {
+    const response = await proxy.fetch(adminRequest('admin/settings', {
+      paymentPlans: [{ amount: 20, days: 1 }, { amount: 20, days: 7 }]
+    }));
+    assert.equal(response.status, 400);
+  });
+});
+
 test('stores the four download menu entries with editable labels and links', async () => {
   await withStubbedBackends(async () => {
     const saveResponse = await proxy.fetch(adminRequest('admin/settings', {

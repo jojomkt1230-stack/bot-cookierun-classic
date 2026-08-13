@@ -242,6 +242,13 @@ const DEFAULT_SETTINGS = {
     day7: { label: '7 วัน', days: 7, price: 100 },
     month1: { label: '30 วัน', days: 30, price: 300 }
   },
+  paymentPlans: [
+    { amount: 15, days: 1 },
+    { amount: 30, days: 2 },
+    { amount: 45, days: 3 },
+    { amount: 100, days: 7 },
+    { amount: 350, days: 30 }
+  ],
   videoUrl: '',
   tutorialColor: 'cyan',
   steps: [
@@ -308,6 +315,43 @@ function fallbackPromptPayQrUrl(number) {
     : '';
 }
 
+function paymentPlansOf(settings = getSystemSettings()) {
+  const source = Array.isArray(settings.paymentPlans) ? settings.paymentPlans : DEFAULT_SETTINGS.paymentPlans;
+  const plans = source.slice(0, 10).map((item) => ({
+    amount: Number(item?.amount),
+    days: Number(item?.days)
+  })).filter(({ amount, days }) => (
+    Number.isInteger(amount) && amount >= 1
+    && Number.isInteger(days) && days >= 1 && days <= 365
+  ));
+  return plans.length ? plans : DEFAULT_SETTINGS.paymentPlans.map((item) => ({ ...item }));
+}
+
+function renderPaymentPlans(settings = getSystemSettings()) {
+  const plans = paymentPlansOf(settings);
+  const display = document.getElementById('payment-plans-display');
+  const editor = document.getElementById('payment-plans-editor');
+
+  if (display) {
+    display.innerHTML = plans.map(({ amount, days }) => (
+      `<span><strong>${amount.toLocaleString('th-TH')} บาท</strong> = ${days.toLocaleString('th-TH')} วัน</span>`
+    )).join('');
+  }
+  if (editor) {
+    editor.innerHTML = plans.map(({ amount, days }, index) => `
+      <div class="payment-plan-row" data-plan-index="${index}">
+        <label>ราคา (บาท)
+          <input type="number" min="1" max="100000" step="1" value="${amount}" class="admin-input payment-plan-amount" />
+        </label>
+        <span class="payment-plan-equals">=</span>
+        <label>จำนวนวัน
+          <input type="number" min="1" max="365" step="1" value="${days}" class="admin-input payment-plan-days" />
+        </label>
+      </div>
+    `).join('');
+  }
+}
+
 function applySystemSettingsToUI() {
   const settings = getSystemSettings();
 
@@ -327,6 +371,7 @@ function applySystemSettingsToUI() {
   }
   if (announcementBanner) announcementBanner.classList.toggle('hidden', !settings.announcement);
   if (announcementBannerText) announcementBannerText.textContent = settings.announcement || '';
+  renderPaymentPlans(settings);
 
   updateDownloadPanel(settings);
 
@@ -2578,6 +2623,35 @@ window.savePromptPaySettings = async function() {
     window.showToast('บันทึกข้อมูลพร้อมเพย์ลงฐานข้อมูลแล้ว', 'success');
   } catch (error) {
     window.showToast(getApiErrorMessage(error, 'บันทึกข้อมูลพร้อมเพย์ไม่สำเร็จ'), 'error');
+  }
+};
+
+window.savePaymentPlans = async function() {
+  const rows = [...document.querySelectorAll('#payment-plans-editor .payment-plan-row')];
+  const paymentPlans = rows.map((row) => ({
+    amount: Number(row.querySelector('.payment-plan-amount')?.value),
+    days: Number(row.querySelector('.payment-plan-days')?.value)
+  }));
+  const valid = paymentPlans.length >= 1 && paymentPlans.length <= 10
+    && paymentPlans.every(({ amount, days }) => (
+      Number.isInteger(amount) && amount >= 1 && amount <= 100000
+      && Number.isInteger(days) && days >= 1 && days <= 365
+    ));
+  if (!valid) {
+    window.showToast('ราคาและจำนวนวันต้องเป็นเลขจำนวนเต็ม โดยวันต้องอยู่ระหว่าง 1-365 วัน', 'error');
+    return;
+  }
+  if (new Set(paymentPlans.map(({ amount }) => amount)).size !== paymentPlans.length) {
+    window.showToast('ราคาแต่ละแพ็กเกจต้องไม่ซ้ำกัน', 'error');
+    return;
+  }
+
+  try {
+    await axios.post(`${API_BASE_URL}/admin/settings`, { paymentPlans }, adminApiConfig());
+    await loadSystemSettings(true);
+    window.showToast('บันทึกราคาและจำนวนวันแล้ว ระบบหน้าเว็บและ LINE อัปเดตเรียบร้อย', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'บันทึกแพ็กเกจราคาไม่สำเร็จ'), 'error');
   }
 };
 

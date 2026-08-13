@@ -6,7 +6,12 @@ import {
   rememberMemberSession,
   reserveSlipAccessCodes
 } from '../api/code-store.js';
-import { lineSlipPlan, lineSlipPlanSummary } from '../api/line-slip-plans.js';
+import {
+  lineSlipPlan,
+  lineSlipPlanSummary,
+  normalizePaymentPlans,
+  paymentPlansAreValid
+} from '../api/line-slip-plans.js';
 import { slip2GoAuthorization } from '../api/slip2go-auth.js';
 
 test('formats the Slip2Go API secret as a Bearer authorization header', () => {
@@ -26,8 +31,18 @@ test('maps verified slip amounts to the correct duration and code count', () => 
 test('rejects unsupported payment amounts without issuing codes', () => {
   assert.equal(lineSlipPlan(2000), null);
   assert.equal(lineSlipPlan(9999), null);
-  assert.match(lineSlipPlanSummary(), /30 บาท = 1 วัน 2 โค้ด/);
-  assert.match(lineSlipPlanSummary(), /45 บาท = 1 วัน 3 โค้ด/);
+  assert.match(lineSlipPlanSummary(), /30 บาท = 2 วัน/);
+  assert.match(lineSlipPlanSummary(), /45 บาท = 3 วัน/);
+});
+
+test('uses admin-configured prices and days for LINE slip issuance', () => {
+  const plans = [{ amount: 25, days: 2 }, { amount: 80, days: 5 }];
+  assert.equal(paymentPlansAreValid(plans), true);
+  assert.deepEqual(lineSlipPlan(2500, plans), { durationMinutes: 1440, codeCount: 2 });
+  assert.deepEqual(lineSlipPlan(8000, plans), { durationMinutes: 7200, codeCount: 1 });
+  assert.equal(lineSlipPlan(1500, plans), null);
+  assert.deepEqual(normalizePaymentPlans(plans), plans);
+  assert.equal(paymentPlansAreValid([{ amount: 25, days: 2 }, { amount: 25, days: 5 }]), false);
 });
 
 test('atomically reserves every code for one verified slip', async () => {

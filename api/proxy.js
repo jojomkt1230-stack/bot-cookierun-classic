@@ -23,7 +23,13 @@ import {
   setMemberProgramLimit,
   storeSessionHeartbeat
 } from './session-store.js';
-import { lineSlipPlan, lineSlipPlanSummary } from './line-slip-plans.js';
+import {
+  DEFAULT_PAYMENT_PLANS,
+  lineSlipPlan,
+  lineSlipPlanSummary,
+  normalizePaymentPlans,
+  paymentPlansAreValid
+} from './line-slip-plans.js';
 import {
   disableMember,
   enableMember,
@@ -305,7 +311,8 @@ async function encodePortalConfig(config) {
     x: Array.isArray(config.downloadItems) ? config.downloadItems : [],
     q: String(config.paymentQrUrl || ''),
     n: String(config.promptpayNumber || ''),
-    l: String(config.promptpayLabel || '')
+    l: String(config.promptpayLabel || ''),
+    p: normalizePaymentPlans(config.paymentPlans)
   }));
   const compressed = new Uint8Array(await new Response(
     new Blob([source]).stream().pipeThrough(new CompressionStream('deflate-raw'))
@@ -324,7 +331,8 @@ async function decodePortalConfig(value) {
     downloadItems: DEFAULT_DOWNLOAD_ITEMS,
     paymentQrUrl: '',
     promptpayNumber: '',
-    promptpayLabel: ''
+    promptpayLabel: '',
+    paymentPlans: normalizePaymentPlans(DEFAULT_PAYMENT_PLANS)
   };
   const raw = String(value || '');
   if (!raw) return { isStored: false, config: fallback };
@@ -354,7 +362,8 @@ async function decodePortalConfig(value) {
         downloadItems: Array.isArray(parsed.x) ? parsed.x : DEFAULT_DOWNLOAD_ITEMS,
         paymentQrUrl: typeof parsed.q === 'string' ? parsed.q : '',
         promptpayNumber: typeof parsed.n === 'string' ? parsed.n : '',
-        promptpayLabel: typeof parsed.l === 'string' ? parsed.l : ''
+        promptpayLabel: typeof parsed.l === 'string' ? parsed.l : '',
+        paymentPlans: normalizePaymentPlans(parsed.p)
       }
     };
   } catch {
@@ -382,7 +391,8 @@ function normalizePortalConfig(config) {
     ),
     paymentQrUrl: typeof source.paymentQrUrl === 'string' ? source.paymentQrUrl : '',
     promptpayNumber: typeof source.promptpayNumber === 'string' ? source.promptpayNumber : '',
-    promptpayLabel: typeof source.promptpayLabel === 'string' ? source.promptpayLabel : ''
+    promptpayLabel: typeof source.promptpayLabel === 'string' ? source.promptpayLabel : '',
+    paymentPlans: normalizePaymentPlans(source.paymentPlans)
   };
 }
 
@@ -715,6 +725,8 @@ async function processLineImage(request, event) {
       includeContentType: false
     });
     if (!configResponse.ok) throw new Error('PUBLIC_CONFIG_UNAVAILABLE');
+    const portal = await resolvePortalConfig(config.siteName || '');
+    const paymentPlans = portal.config.paymentPlans;
     const promptpayNumber = String(process.env.PROMPTPAY_NUMBER || config.promptpayNumber || '')
       .replace(/\D/g, '');
     const receiverName = String(process.env.SLIP_RECEIVER_NAME || '').trim();
@@ -753,12 +765,12 @@ async function processLineImage(request, event) {
     }
 
     const amountSatang = Math.round(Number(result.data.amount) * 100);
-    const plan = Number.isFinite(amountSatang) ? lineSlipPlan(amountSatang) : null;
+    const plan = Number.isFinite(amountSatang) ? lineSlipPlan(amountSatang, paymentPlans) : null;
     if (!plan) {
       await sendLineText(
         lineUserId,
         replyToken,
-        `❌ ยอดเงินไม่ตรงกับแพ็กเกจ\nรองรับเฉพาะ ${lineSlipPlanSummary()}\nยังไม่มีการออกโค้ด`
+        `❌ ยอดเงินไม่ตรงกับแพ็กเกจ\nรองรับเฉพาะ ${lineSlipPlanSummary(paymentPlans)}\nยังไม่มีการออกโค้ด`
       );
       return;
     }
@@ -1350,7 +1362,8 @@ async function saveAdminSettings(request) {
     'downloadItems',
     'paymentQrUrl',
     'promptpayNumber',
-    'promptpayLabel'
+    'promptpayLabel',
+    'paymentPlans'
   ].some((key) => Object.hasOwn(payload, key));
   if (Object.hasOwn(payload, 'downloadUrl')) {
     const downloadUrl = String(payload.downloadUrl || '').trim();
@@ -1394,6 +1407,12 @@ async function saveAdminSettings(request) {
     const promptpayLabel = Object.hasOwn(payload, 'promptpayLabel')
       ? String(payload.promptpayLabel || '').trim()
       : previous.config.promptpayLabel || String(overview.data.promptpayLabel || '');
+    if (Object.hasOwn(payload, 'paymentPlans') && !paymentPlansAreValid(payload.paymentPlans)) {
+      return json({ error: 'แพ็กเกจราคาต้องมี 1-10 รายการ ราคาและวันต้องเป็นเลขจำนวนเต็ม และราคาห้ามซ้ำกัน' }, 400);
+    }
+    const paymentPlans = Object.hasOwn(payload, 'paymentPlans')
+      ? normalizePaymentPlans(payload.paymentPlans)
+      : normalizePaymentPlans(previous.config.paymentPlans);
     const downloadItems = normalizeDownloadItems(
       Object.hasOwn(payload, 'downloadItems') ? payload.downloadItems : null,
       previous.config.downloadItems
@@ -1431,7 +1450,8 @@ async function saveAdminSettings(request) {
       downloadItems,
       paymentQrUrl,
       promptpayNumber,
-      promptpayLabel
+      promptpayLabel,
+      paymentPlans
     };
 
     let savedToStorage = false;
@@ -1499,6 +1519,7 @@ async function getAdminSettings(request) {
     tutorialColor: portal.config.tutorialColor,
     tutorialSteps: portal.config.tutorialSteps,
     steps: portal.config.tutorialSteps,
+    paymentPlans: stored.paymentPlans,
     plans: data.plans || {},
     portalStorageReady: portalStorageConfigured(),
     slip2GoConfigured: Boolean(data.slip2GoConfigured)
@@ -1529,6 +1550,7 @@ async function publicSettings(request) {
     tutorialColor: portal.config.tutorialColor,
     tutorialSteps: portal.config.tutorialSteps,
     steps: portal.config.tutorialSteps,
+    paymentPlans: stored.paymentPlans,
     plans: data.plans || {},
     creditRate: Number(data.creditRate || 1)
   });

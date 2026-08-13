@@ -1,16 +1,50 @@
-const PLANS_BY_SATANG = new Map([
-  [1500, { durationMinutes: 1440, codeCount: 1 }],
-  [3000, { durationMinutes: 1440, codeCount: 2 }],
-  [4500, { durationMinutes: 1440, codeCount: 3 }],
-  [10000, { durationMinutes: 10080, codeCount: 1 }],
-  [35000, { durationMinutes: 43200, codeCount: 1 }]
+export const DEFAULT_PAYMENT_PLANS = Object.freeze([
+  Object.freeze({ amount: 15, days: 1 }),
+  Object.freeze({ amount: 30, days: 2 }),
+  Object.freeze({ amount: 45, days: 3 }),
+  Object.freeze({ amount: 100, days: 7 }),
+  Object.freeze({ amount: 350, days: 30 })
 ]);
 
-export function lineSlipPlan(amountSatang) {
-  const plan = PLANS_BY_SATANG.get(Number(amountSatang));
-  return plan ? { ...plan } : null;
+function clonePlans(plans) {
+  return plans.map(({ amount, days }) => ({ amount: Number(amount), days: Number(days) }));
 }
 
-export function lineSlipPlanSummary() {
-  return '15 บาท = 1 วัน 1 โค้ด, 30 บาท = 1 วัน 2 โค้ด, 45 บาท = 1 วัน 3 โค้ด, 100 บาท = 7 วัน 1 โค้ด และ 350 บาท = 30 วัน 1 โค้ด';
+export function normalizePaymentPlans(value, fallback = DEFAULT_PAYMENT_PLANS) {
+  if (!Array.isArray(value)) return clonePlans(fallback);
+  const plans = value.slice(0, 10).map((item) => ({
+    amount: Number(item?.amount),
+    days: Number(item?.days)
+  }));
+  const valid = plans.length >= 1
+    && plans.every(({ amount, days }) => (
+      Number.isInteger(amount) && amount >= 1 && amount <= 100000
+      && Number.isInteger(days) && days >= 1 && days <= 365
+    ))
+    && new Set(plans.map(({ amount }) => amount)).size === plans.length;
+  return valid ? plans : clonePlans(fallback);
+}
+
+export function paymentPlansAreValid(value) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 10) return false;
+  const normalized = normalizePaymentPlans(value, []);
+  return normalized.length === value.length;
+}
+
+export function lineSlipPlan(amountSatang, paymentPlans = DEFAULT_PAYMENT_PLANS) {
+  const plans = normalizePaymentPlans(paymentPlans);
+  const plan = plans.find(({ amount }) => amount * 100 === Number(amountSatang));
+  if (!plan) return null;
+
+  // Keep the existing convenient behaviour for 1-3 day packages: one
+  // one-day code per day. Longer packages are delivered as one code.
+  return plan.days <= 3
+    ? { durationMinutes: 1440, codeCount: plan.days }
+    : { durationMinutes: plan.days * 1440, codeCount: 1 };
+}
+
+export function lineSlipPlanSummary(paymentPlans = DEFAULT_PAYMENT_PLANS) {
+  return normalizePaymentPlans(paymentPlans)
+    .map(({ amount, days }) => `${amount} บาท = ${days} วัน`)
+    .join(', ');
 }

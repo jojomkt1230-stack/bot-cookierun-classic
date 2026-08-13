@@ -2038,6 +2038,41 @@ body {
   text-shadow: 0 0 7px rgba(255, 222, 73, 0.52);
 }
 
+.payment-plans-editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.payment-plan-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(67, 215, 255, .28);
+  border-radius: var(--radius-sm);
+  background: rgba(1, 12, 33, .48);
+}
+
+.payment-plan-row label {
+  display: grid;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: .82rem;
+}
+
+.payment-plan-equals {
+  padding-bottom: 11px;
+  color: #ffe66d;
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  .payment-plan-row { grid-template-columns: 1fr; }
+  .payment-plan-equals { display: none; }
+}
+
 .payment-steps-card {
   display: flex;
   flex-direction: column;
