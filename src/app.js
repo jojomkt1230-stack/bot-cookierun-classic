@@ -1882,6 +1882,9 @@ window.loadAdminAccessCodes = async function() {
     const response = await axios.get(`${API_BASE_URL}/admin/codes`, adminApiConfig());
     adminAccessCodes = response.data?.codes || [];
     renderAdminAccessCodes();
+    if (response.data?.warning && container) {
+      container.insertAdjacentHTML('afterbegin', `<p style="padding:12px; color:#ffd36a;">${escapeHtml(response.data.warning)}</p>`);
+    }
   } catch (error) {
     const text = getApiErrorMessage(error, 'โหลดข้อมูลโค้ดไม่สำเร็จ');
     if (container) container.innerHTML = `<p style="padding:16px; color:var(--danger);">${escapeHtml(text)}</p>`;

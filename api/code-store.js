@@ -61,6 +61,11 @@ function dedicatedCodeConfig() {
   return { url, token, selected: Boolean(url || token) };
 }
 
+export function accessCodeStorageConfigured() {
+  const dedicated = dedicatedCodeConfig();
+  return (dedicated.url && dedicated.token) || codeStorageConfigured();
+}
+
 async function dedicatedCodeRequest(pathname, payload) {
   const { url, token } = dedicatedCodeConfig();
   if (!url || !token) throw new Error('CODE_STORAGE_NOT_CONFIGURED');
@@ -148,30 +153,43 @@ function parseRecord(value) {
 }
 
 export async function rememberAdminServiceToken(token, expiresIn = 2_592_000) {
-  if (!codeStorageConfigured() || !token) return false;
+  if (!accessCodeStorageConfigured() || !token) return false;
   const ttl = Math.max(300, Math.min(Number(expiresIn) || 2_592_000, 2_592_000));
-  await redisCommand('SET', ADMIN_TOKEN_KEY, String(token), 'EX', String(ttl));
+  await codeRedisCommand('SET', ADMIN_TOKEN_KEY, String(token), 'EX', String(ttl));
   return true;
 }
 
 export async function getAdminServiceToken() {
-  if (!codeStorageConfigured()) return '';
-  return String(await redisCommand('GET', ADMIN_TOKEN_KEY) || '');
+  if (!accessCodeStorageConfigured()) return '';
+  const primary = String(await codeRedisCommand('GET', ADMIN_TOKEN_KEY) || '');
+  if (primary || !dedicatedCodeConfig().selected || !codeStorageConfigured()) return primary;
+  try {
+    return String(await redisCommand('GET', ADMIN_TOKEN_KEY) || '');
+  } catch {
+    return '';
+  }
 }
 
 export async function rememberMemberSession(token, memberCode, expiresIn = 2_592_000) {
   const cleanToken = String(token || '').trim();
   const cleanMemberCode = String(memberCode || '').trim();
-  if (!codeStorageConfigured() || !cleanToken || !cleanMemberCode || cleanMemberCode.length > 180) return false;
+  if (!accessCodeStorageConfigured() || !cleanToken || !cleanMemberCode || cleanMemberCode.length > 180) return false;
   const ttl = Math.max(300, Math.min(Number(expiresIn) || 2_592_000, 2_592_000));
-  await redisCommand('SET', await memberSessionKey(cleanToken), cleanMemberCode, 'EX', String(ttl));
+  await codeRedisCommand('SET', await memberSessionKey(cleanToken), cleanMemberCode, 'EX', String(ttl));
   return true;
 }
 
 export async function getMemberCodeForSession(token) {
   const cleanToken = String(token || '').trim();
-  if (!codeStorageConfigured() || !cleanToken) return '';
-  return String(await redisCommand('GET', await memberSessionKey(cleanToken)) || '').trim();
+  if (!accessCodeStorageConfigured() || !cleanToken) return '';
+  const key = await memberSessionKey(cleanToken);
+  const primary = String(await codeRedisCommand('GET', key) || '').trim();
+  if (primary || !dedicatedCodeConfig().selected || !codeStorageConfigured()) return primary;
+  try {
+    return String(await redisCommand('GET', key) || '').trim();
+  } catch {
+    return '';
+  }
 }
 
 async function createUniqueCodeRecord(durationMinutes, source, extra = {}) {

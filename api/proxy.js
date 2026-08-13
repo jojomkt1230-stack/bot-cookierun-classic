@@ -1,4 +1,5 @@
 import {
+  accessCodeStorageConfigured,
   claimAccessCode,
   codeDurationToDays,
   codeStorageConfigured,
@@ -463,23 +464,49 @@ async function tryAdminLogin(request, username, password) {
 }
 
 async function adminAccessCodes(request) {
-  const overview = await adminOverview(request);
-  if (overview.errorResponse) return overview.errorResponse;
   const authorization = String(request.headers.get('authorization') || '');
-  if (authorization.startsWith('Bearer ')) {
+  const bearerToken = authorization.replace(/^Bearer\s+/i, '').trim();
+  let overviewData = null;
+  let authenticated = false;
+
+  if (bearerToken) {
     try {
-      await rememberAdminServiceToken(authorization.slice(7), 2_592_000);
+      authenticated = sameText(bearerToken, await getAdminServiceToken());
+    } catch {}
+  }
+
+  if (!authenticated) {
+    const overview = await adminOverview(request);
+    if (overview.errorResponse) return overview.errorResponse;
+    overviewData = overview.data;
+    authenticated = true;
+    try {
+      await rememberAdminServiceToken(bearerToken, 2_592_000);
     } catch (error) {
       console.error('[Code Store] Could not refresh admin service token:', error?.message || error);
     }
   }
-  if (!codeStorageConfigured()) {
+
+  if (!accessCodeStorageConfigured()) {
     return json({ error: 'ฐานข้อมูลโค้ดยังไม่ได้เชื่อมกับ Vercel' }, 503);
   }
 
   if (request.method === 'GET') {
-    const codes = await listAccessCodes(200);
-    return json({ codes: attachMemberNamesToCodes(codes, overview.data.members || []) });
+    let codes;
+    try {
+      codes = await listAccessCodes(200);
+    } catch (error) {
+      console.error('[Access Codes] History unavailable:', error?.message || error);
+      return json({ codes: [], warning: 'ประวัติโค้ดเก่ายังโหลดไม่ได้ชั่วคราว แต่สามารถสร้างโค้ดใหม่ได้' });
+    }
+
+    if (!overviewData) {
+      try {
+        const overview = await adminOverview(request);
+        if (!overview.errorResponse) overviewData = overview.data;
+      } catch {}
+    }
+    return json({ codes: attachMemberNamesToCodes(codes, overviewData?.members || []) });
   }
 
   const payload = await readJson(request);
@@ -490,7 +517,13 @@ async function adminAccessCodes(request) {
   }
   if (!durationMinutes) return json({ error: 'ระยะเวลาโค้ดไม่ถูกต้อง' }, 400);
 
-  const records = await createAccessCodes(count, durationMinutes, 'admin');
+  let records;
+  try {
+    records = await createAccessCodes(count, durationMinutes, 'admin');
+  } catch (error) {
+    console.error('[Access Codes] Creation failed:', error?.message || error);
+    return json({ error: 'ระบบจัดเก็บโค้ดขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง' }, 503);
+  }
   return json({
     ok: true,
     codes: records.map((record) => record.code),
@@ -500,7 +533,7 @@ async function adminAccessCodes(request) {
 }
 
 async function redeemAccessCode(request) {
-  if (!codeStorageConfigured()) {
+  if (!accessCodeStorageConfigured()) {
     return json({ error: 'ระบบโค้ดยังไม่พร้อมใช้งาน กรุณาติดต่อแอดมิน' }, 503);
   }
 
@@ -655,7 +688,7 @@ async function processLineImage(request, event) {
   if (!lineUserId || !messageId) return;
 
   try {
-    if (!codeStorageConfigured()) throw new Error('CODE_STORAGE_NOT_CONFIGURED');
+    if (!accessCodeStorageConfigured()) throw new Error('CODE_STORAGE_NOT_CONFIGURED');
     const lineToken = String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
     const slipSecret = String(process.env.SLIP2GO_API_SECRET || '').trim();
     if (!lineToken || !slipSecret) throw new Error('SERVICE_SECRET_MISSING');
@@ -1036,7 +1069,7 @@ export function buildLineSlipTopups(codes = [], members = []) {
 
 async function combinedAdminTopups(overviewData) {
   const legacyTopups = (overviewData.topups || []).map(mapTopup);
-  if (!codeStorageConfigured()) return legacyTopups;
+  if (!accessCodeStorageConfigured()) return legacyTopups;
   try {
     const codes = await listAccessCodes(500);
     const lineTopups = buildLineSlipTopups(codes, overviewData.members || []);
@@ -1686,7 +1719,12 @@ async function memberUsageHistory(request) {
 
   const [topups, allCodes] = await Promise.all([
     memberTopupRecords(request, identity.memberCode),
-    codeStorageConfigured() ? listAccessCodes(500) : Promise.resolve([])
+    accessCodeStorageConfigured()
+      ? listAccessCodes(500).catch((error) => {
+        console.error('[Member Activity] Could not load access-code history:', error?.message || error);
+        return [];
+      })
+      : Promise.resolve([])
   ]);
 
   const topupItems = topups.map((topup) => ({
