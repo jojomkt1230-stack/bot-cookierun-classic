@@ -55,6 +55,41 @@ export async function redisPipeline(commands) {
   return Array.isArray(result) ? result : [];
 }
 
+function dedicatedCodeConfig() {
+  const url = String(process.env.SESSION_REDIS_REST_URL || '').trim().replace(/\/+$/, '');
+  const token = String(process.env.SESSION_REDIS_REST_TOKEN || '').trim();
+  return { url, token, selected: Boolean(url || token) };
+}
+
+async function dedicatedCodeRequest(pathname, payload) {
+  const { url, token } = dedicatedCodeConfig();
+  if (!url || !token) throw new Error('CODE_STORAGE_NOT_CONFIGURED');
+  const response = await fetch(`${url}${pathname}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10_000)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || (!Array.isArray(data) && data?.error)) {
+    throw new Error(String(data?.error || `CODE_REDIS_HTTP_${response.status}`));
+  }
+  return Array.isArray(data) ? data : data?.result;
+}
+
+async function codeRedisCommand(...command) {
+  return dedicatedCodeConfig().selected
+    ? dedicatedCodeRequest('', command)
+    : redisCommand(...command);
+}
+
+async function codeRedisPipeline(commands) {
+  if (!commands.length) return [];
+  if (!dedicatedCodeConfig().selected) return redisPipeline(commands);
+  const result = await dedicatedCodeRequest('/pipeline', commands);
+  return Array.isArray(result) ? result : [];
+}
+
 function codeKey(code) {
   return `${KEY_PREFIX}:code:${code}`;
 }
@@ -154,9 +189,9 @@ async function createUniqueCodeRecord(durationMinutes, source, extra = {}) {
       createdAt,
       ...extra
     };
-    const stored = await redisCommand('SET', codeKey(code), JSON.stringify(record), 'NX');
+    const stored = await codeRedisCommand('SET', codeKey(code), JSON.stringify(record), 'NX');
     if (stored === 'OK') {
-      await redisCommand('ZADD', CODE_INDEX_KEY, String(Date.now()), code);
+      await codeRedisCommand('ZADD', CODE_INDEX_KEY, String(Date.now()), code);
       return record;
     }
   }
@@ -182,12 +217,12 @@ export async function createAccessCodes(count, durationMinutes, source = 'admin'
         createdAt: new Date().toISOString()
       };
     });
-    const results = await redisPipeline(candidates.map((record) => (
+    const results = await codeRedisPipeline(candidates.map((record) => (
       ['SET', codeKey(record.code), JSON.stringify(record), 'NX']
     )));
     const accepted = candidates.filter((_, index) => results[index]?.result === 'OK');
     if (accepted.length) {
-      await redisPipeline(accepted.map((record) => (
+      await codeRedisPipeline(accepted.map((record) => (
         ['ZADD', CODE_INDEX_KEY, String(Date.parse(record.createdAt)), record.code]
       )));
       records.push(...accepted);
@@ -202,12 +237,31 @@ export async function createAccessCodes(count, durationMinutes, source = 'admin'
 
 export async function listAccessCodes(limit = 200) {
   const count = Math.max(1, Math.min(Number(limit) || 200, 500));
-  const codes = await redisCommand('ZREVRANGE', CODE_INDEX_KEY, '0', String(count - 1));
-  if (!Array.isArray(codes) || !codes.length) return [];
-  const values = await redisPipeline(codes.map((code) => ['GET', codeKey(code)]));
-  return values
-    .map((item) => parseRecord(item?.result))
-    .filter(Boolean);
+  const records = [];
+
+  const readFrom = async (command) => {
+    const codes = await command('ZREVRANGE', CODE_INDEX_KEY, '0', String(count - 1));
+    if (!Array.isArray(codes) || !codes.length) return;
+    // One MGET replaces up to 500 pipelined GET commands. Upstash counts every
+    // pipeline sub-command toward the quota, which was causing this page's 500.
+    const values = await command('MGET', ...codes.map((code) => codeKey(code)));
+    records.push(...(Array.isArray(values) ? values : []).map(parseRecord).filter(Boolean));
+  };
+
+  await readFrom(codeRedisCommand);
+  if (dedicatedCodeConfig().selected && codeStorageConfigured()) {
+    // Preserve history created before the move. If the legacy database is
+    // currently over quota, new-code management still remains operational.
+    try {
+      await readFrom(redisCommand);
+    } catch (error) {
+      console.error('[Access Codes] Legacy history read failed:', error?.message || error);
+    }
+  }
+
+  return Array.from(new Map(records.map((record) => [record.code, record])).values())
+    .sort((left, right) => Date.parse(String(right.createdAt || '')) - Date.parse(String(left.createdAt || '')))
+    .slice(0, count);
 }
 
 const RESERVE_SLIP_CODES_SCRIPT = `
@@ -272,7 +326,7 @@ export async function reserveSlipAccessCodes({ reference, lineUserId, amount, du
       ...records.map((record) => codeKey(record.code))
     ];
     const recordArguments = records.flatMap((record) => [JSON.stringify(record), record.code]);
-    const result = await redisCommand(
+    const result = await codeRedisCommand(
       'EVAL', RESERVE_SLIP_CODES_SCRIPT, String(keys.length),
       ...keys,
       String(Date.now()), slipReservation, ...recordArguments
@@ -300,7 +354,28 @@ export async function reserveSlipAccessCode(options) {
 export async function getAccessCode(value) {
   const code = normalizeAccessCode(value);
   if (!code) return null;
-  return parseRecord(await redisCommand('GET', codeKey(code)));
+  const primary = parseRecord(await codeRedisCommand('GET', codeKey(code)));
+  if (primary || !dedicatedCodeConfig().selected || !codeStorageConfigured()) return primary;
+  try {
+    return parseRecord(await redisCommand('GET', codeKey(code)));
+  } catch (error) {
+    console.error('[Access Codes] Legacy code read failed:', error?.message || error);
+    return null;
+  }
+}
+
+async function codeRecordLocation(code) {
+  const primary = parseRecord(await codeRedisCommand('GET', codeKey(code)));
+  if (primary) return { record: primary, command: codeRedisCommand };
+  if (dedicatedCodeConfig().selected && codeStorageConfigured()) {
+    try {
+      const legacy = parseRecord(await redisCommand('GET', codeKey(code)));
+      if (legacy) return { record: legacy, command: redisCommand };
+    } catch (error) {
+      console.error('[Access Codes] Legacy code lookup failed:', error?.message || error);
+    }
+  }
+  return null;
 }
 
 const CLAIM_CODE_SCRIPT = `
@@ -322,8 +397,10 @@ return updated
 export async function claimAccessCode(value, memberCode, deviceId) {
   const code = normalizeAccessCode(value);
   if (!code) return { error: 'INVALID' };
+  const location = await codeRecordLocation(code);
+  if (!location) return { error: 'NOT_FOUND' };
   const claimId = crypto.randomUUID();
-  const result = await redisCommand(
+  const result = await location.command(
     'EVAL', CLAIM_CODE_SCRIPT, '1', codeKey(code),
     claimId, String(memberCode), String(deviceId), new Date().toISOString()
   );
@@ -350,7 +427,9 @@ return 1
 export async function finishAccessCode(value, claimId, expiresAt) {
   const code = normalizeAccessCode(value);
   if (!code) return false;
-  const result = await redisCommand(
+  const location = await codeRecordLocation(code);
+  if (!location) return false;
+  const result = await location.command(
     'EVAL', FINISH_CODE_SCRIPT, '1', codeKey(code),
     String(claimId), new Date().toISOString(), String(expiresAt || '')
   );
@@ -374,16 +453,18 @@ return 1
 export async function releaseAccessCode(value, claimId) {
   const code = normalizeAccessCode(value);
   if (!code) return false;
-  const result = await redisCommand('EVAL', RELEASE_CODE_SCRIPT, '1', codeKey(code), String(claimId));
+  const location = await codeRecordLocation(code);
+  if (!location) return false;
+  const result = await location.command('EVAL', RELEASE_CODE_SCRIPT, '1', codeKey(code), String(claimId));
   return Number(result) === 1;
 }
 
 export async function markAccessCodeDelivered(value) {
   const code = normalizeAccessCode(value);
   if (!code) return false;
-  const record = await getAccessCode(code);
-  if (!record) return false;
-  record.deliveredAt = new Date().toISOString();
-  await redisCommand('SET', codeKey(code), JSON.stringify(record));
+  const location = await codeRecordLocation(code);
+  if (!location) return false;
+  location.record.deliveredAt = new Date().toISOString();
+  await location.command('SET', codeKey(code), JSON.stringify(location.record));
   return true;
 }
