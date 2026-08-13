@@ -63,15 +63,16 @@ const TUTORIAL_COLORS = new Set(['orange', 'cyan', 'blue', 'pink']);
 const DEFAULT_BOT_NAME = 'Ckrcsbot V18.1';
 const DEFAULT_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq';
 
-// The four bot builds shown on the download page. The admin panel edits the
-// label, description and link of each entry; the id and icon stay fixed so the
-// cards keep a consistent look no matter what the admin types.
+// Starter bot cards. Administrators can edit, remove, and append cards; these
+// values are only used until the first custom list is saved.
 const DEFAULT_DOWNLOAD_ITEMS = [
-  { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', url: '', tutorialUrl: '' },
-  { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '', tutorialUrl: '' },
-  { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', url: '', tutorialUrl: 'https://youtu.be/hBXOy-5lAyQ' },
-  { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' }
+  { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', status: 'normal', url: '', tutorialUrl: '' },
+  { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', status: 'normal', url: '', tutorialUrl: '' },
+  { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', status: 'normal', url: '', tutorialUrl: 'https://youtu.be/hBXOy-5lAyQ' },
+  { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', status: 'normal', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' }
 ];
+const DOWNLOAD_ITEM_MAX = 20;
+const DOWNLOAD_ITEM_ICON_MAX = 16;
 const DOWNLOAD_ITEM_LABEL_MAX = 60;
 const DOWNLOAD_ITEM_DESCRIPTION_MAX = 160;
 const DOWNLOAD_ITEM_TUTORIAL_URL_MAX = 500;
@@ -103,7 +104,6 @@ function refreshSupersededDownloadText(items) {
 
     return {
       ...item,
-      icon: preset.icon,
       label: superseded.labels.includes(item.label) ? preset.label : item.label,
       description: superseded.descriptions.includes(item.description)
         ? preset.description
@@ -119,23 +119,32 @@ function downloadItemList(value) {
 function normalizeDownloadItems(value, previous) {
   const priorList = downloadItemList(previous) || DEFAULT_DOWNLOAD_ITEMS;
   const incoming = downloadItemList(value);
+  const source = incoming || priorList;
+  const usedIds = new Set();
 
-  return DEFAULT_DOWNLOAD_ITEMS.map((preset, index) => {
-    const prior = priorList.find((item) => item.id === preset.id) || priorList[index] || preset;
-    const patch = incoming
-      ? incoming.find((item) => item.id === preset.id) || incoming[index] || {}
-      : {};
+  return source.slice(0, DOWNLOAD_ITEM_MAX).map((patch, index) => {
+    const rawId = String(patch.id || `bot-${index + 1}`).trim();
+    let id = /^[a-zA-Z0-9_-]{1,64}$/.test(rawId) ? rawId : `bot-${index + 1}`;
+    while (usedIds.has(id)) id = `${id}-${index + 1}`;
+    usedIds.add(id);
 
-    const label = String(patch.label ?? prior.label ?? preset.label).trim();
-    const description = String(patch.description ?? prior.description ?? preset.description).trim();
+    const preset = DEFAULT_DOWNLOAD_ITEMS.find((item) => item.id === id);
+    const prior = priorList.find((item) => item.id === id) || preset || {};
+    const label = String(patch.label ?? prior.label ?? 'บอทใหม่').trim();
+    const description = String(patch.description ?? prior.description ?? '').trim();
     const url = String(patch.url ?? prior.url ?? '').trim();
-    const tutorialUrl = String(patch.tutorialUrl ?? prior.tutorialUrl ?? preset.tutorialUrl ?? '').trim();
+    const tutorialUrl = String(patch.tutorialUrl ?? prior.tutorialUrl ?? '').trim();
+    const icon = String(patch.icon ?? prior.icon ?? '🤖').trim() || '🤖';
+    const status = String(patch.status ?? prior.status ?? 'normal') === 'maintenance'
+      ? 'maintenance'
+      : 'normal';
 
     return {
-      id: preset.id,
-      icon: preset.icon,
-      label: (label || preset.label).slice(0, DOWNLOAD_ITEM_LABEL_MAX),
+      id,
+      icon: icon.slice(0, DOWNLOAD_ITEM_ICON_MAX),
+      label: (label || 'บอทใหม่').slice(0, DOWNLOAD_ITEM_LABEL_MAX),
       description: description.slice(0, DOWNLOAD_ITEM_DESCRIPTION_MAX),
+      status,
       url,
       tutorialUrl
     };
@@ -292,6 +301,7 @@ async function encodePortalConfig(config) {
     s: Array.isArray(config.tutorialSteps) ? config.tutorialSteps : [],
     b: String(config.botName || ''),
     d: String(config.downloadUrl || ''),
+    x: Array.isArray(config.downloadItems) ? config.downloadItems : [],
     q: String(config.paymentQrUrl || ''),
     n: String(config.promptpayNumber || ''),
     l: String(config.promptpayLabel || '')
@@ -310,6 +320,7 @@ async function decodePortalConfig(value) {
     tutorialSteps: [],
     botName: '',
     downloadUrl: '',
+    downloadItems: DEFAULT_DOWNLOAD_ITEMS,
     paymentQrUrl: '',
     promptpayNumber: '',
     promptpayLabel: ''
@@ -339,6 +350,7 @@ async function decodePortalConfig(value) {
           : [],
         botName: typeof parsed.b === 'string' ? parsed.b : '',
         downloadUrl: typeof parsed.d === 'string' ? parsed.d : '',
+        downloadItems: Array.isArray(parsed.x) ? parsed.x : DEFAULT_DOWNLOAD_ITEMS,
         paymentQrUrl: typeof parsed.q === 'string' ? parsed.q : '',
         promptpayNumber: typeof parsed.n === 'string' ? parsed.n : '',
         promptpayLabel: typeof parsed.l === 'string' ? parsed.l : ''

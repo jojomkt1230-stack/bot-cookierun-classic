@@ -231,10 +231,10 @@ const DEFAULT_SETTINGS = {
   siteName: 'CKRCS BOT',
   botUrl: 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq',
   downloadItems: [
-    { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', url: '', tutorialUrl: '' },
-    { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', url: '', tutorialUrl: '' },
-    { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', url: '', tutorialUrl: 'https://youtu.be/hBXOy-5lAyQ' },
-    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' }
+    { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', status: 'normal', url: '', tutorialUrl: '' },
+    { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', status: 'normal', url: '', tutorialUrl: '' },
+    { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', status: 'normal', url: '', tutorialUrl: 'https://youtu.be/hBXOy-5lAyQ' },
+    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', status: 'normal', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' }
   ],
   plans: {
     day1: { label: '1 วัน', days: 1, price: 15 },
@@ -422,23 +422,19 @@ function updateDownloadPanel(settings = getSystemSettings()) {
   renderDownloadItemsEditor(settings);
 }
 
-// The four bots advertised on the home page. `id` and `icon` are fixed so the
-// cards stay consistent; the admin panel only edits label, note and link.
-const DOWNLOAD_ITEM_PRESETS = DEFAULT_SETTINGS.downloadItems;
-
 function downloadItemsOf(settings = getSystemSettings()) {
-  const saved = Array.isArray(settings.downloadItems) ? settings.downloadItems : [];
-  return DOWNLOAD_ITEM_PRESETS.map((preset, index) => {
-    const item = saved.find((entry) => entry?.id === preset.id) || saved[index] || {};
-    return {
-      id: preset.id,
-      icon: preset.icon,
-      label: String(item.label || preset.label),
-      description: String(item.description ?? preset.description),
-      url: String(item.url || ''),
-      tutorialUrl: String(item.tutorialUrl || preset.tutorialUrl || '')
-    };
-  });
+  const saved = Array.isArray(settings.downloadItems)
+    ? settings.downloadItems
+    : DEFAULT_SETTINGS.downloadItems;
+  return saved.map((item, index) => ({
+    id: String(item?.id || `bot-${index + 1}`),
+    icon: String(item?.icon || '🤖'),
+    label: String(item?.label || 'บอทใหม่'),
+    description: String(item?.description || ''),
+    status: item?.status === 'maintenance' ? 'maintenance' : 'normal',
+    url: String(item?.url || ''),
+    tutorialUrl: String(item?.tutorialUrl || '')
+  }));
 }
 
 // Home page showcase: the same four bots, but read-only. It advertises what the
@@ -464,12 +460,12 @@ function renderHomeBotMenu(settings = getSystemSettings()) {
     note.textContent = item.description;
 
     const status = document.createElement('div');
-    status.className = 'home-bot-status';
+    status.className = `home-bot-status ${item.status}`;
     const dot = document.createElement('span');
     dot.className = 'home-bot-status-dot';
     dot.setAttribute('aria-hidden', 'true');
     const statusText = document.createElement('span');
-    statusText.textContent = 'ใช้งานได้ปกติ';
+    statusText.textContent = item.status === 'maintenance' ? 'กำลังปรับปรุง' : 'ใช้งานปกติ';
     status.append(dot, statusText);
 
     card.append(icon, title, note, status);
@@ -510,48 +506,98 @@ function renderDownloadItemsEditor(settings = getSystemSettings()) {
   const editor = document.getElementById('download-items-editor');
   if (!editor) return;
 
-  editor.replaceChildren(...downloadItemsOf(settings).map((item) => {
-    const row = document.createElement('div');
-    row.className = 'download-item-row';
-    row.dataset.itemId = item.id;
-
-    const heading = document.createElement('div');
-    heading.className = 'download-item-heading';
-    heading.textContent = `${item.icon} ${item.label}`;
-
-    const labelInput = document.createElement('input');
-    labelInput.type = 'text';
-    labelInput.className = 'admin-input download-item-label';
-    labelInput.maxLength = 60;
-    labelInput.placeholder = 'ชื่อที่แสดงบนหน้าเว็บ';
-    labelInput.value = item.label;
-    labelInput.addEventListener('input', () => {
-      heading.textContent = `${item.icon} ${labelInput.value.trim() || item.label}`;
-    });
-
-    const descriptionInput = document.createElement('input');
-    descriptionInput.type = 'text';
-    descriptionInput.className = 'admin-input download-item-description';
-    descriptionInput.maxLength = 120;
-    descriptionInput.placeholder = 'คำอธิบายสั้น ๆ ใต้ชื่อ';
-    descriptionInput.value = item.description;
-
-    const urlInput = document.createElement('input');
-    urlInput.type = 'url';
-    urlInput.className = 'admin-input download-item-url';
-    urlInput.placeholder = 'https://ลิงก์ดาวน์โหลด';
-    urlInput.value = item.url;
-
-    const tutorialUrlInput = document.createElement('input');
-    tutorialUrlInput.type = 'url';
-    tutorialUrlInput.className = 'admin-input download-item-tutorial-url';
-    tutorialUrlInput.placeholder = 'ลิงก์คลิปสอน (ไม่บังคับ) เช่น https://youtu.be/...';
-    tutorialUrlInput.value = item.tutorialUrl;
-
-    row.append(heading, labelInput, descriptionInput, urlInput, tutorialUrlInput);
-    return row;
-  }));
+  editor.replaceChildren(...downloadItemsOf(settings).map(createDownloadItemEditorRow));
 }
+
+function createDownloadItemEditorRow(item) {
+  const row = document.createElement('div');
+  row.className = 'download-item-row';
+  row.dataset.itemId = item.id;
+
+  const headingRow = document.createElement('div');
+  headingRow.className = 'download-item-heading-row';
+  const heading = document.createElement('div');
+  heading.className = 'download-item-heading';
+  heading.textContent = `${item.icon} ${item.label}`;
+
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.className = 'download-item-remove';
+  removeButton.textContent = '🗑️ ลบช่อง';
+  removeButton.setAttribute('aria-label', `ลบช่อง ${item.label}`);
+  removeButton.addEventListener('click', () => row.remove());
+  headingRow.append(heading, removeButton);
+
+  const iconInput = document.createElement('input');
+  iconInput.type = 'text';
+  iconInput.className = 'admin-input download-item-icon';
+  iconInput.maxLength = 16;
+  iconInput.placeholder = 'ไอคอน เช่น 🤖';
+  iconInput.value = item.icon;
+
+  const labelInput = document.createElement('input');
+  labelInput.type = 'text';
+  labelInput.className = 'admin-input download-item-label';
+  labelInput.maxLength = 60;
+  labelInput.placeholder = 'ชื่อที่แสดงบนหน้าเว็บ';
+  labelInput.value = item.label;
+  const updateHeading = () => {
+    heading.textContent = `${iconInput.value.trim() || '🤖'} ${labelInput.value.trim() || 'บอทใหม่'}`;
+  };
+  iconInput.addEventListener('input', updateHeading);
+  labelInput.addEventListener('input', updateHeading);
+
+  const descriptionInput = document.createElement('input');
+  descriptionInput.type = 'text';
+  descriptionInput.className = 'admin-input download-item-description';
+  descriptionInput.maxLength = 160;
+  descriptionInput.placeholder = 'คำอธิบายสั้น ๆ ใต้ชื่อ';
+  descriptionInput.value = item.description;
+
+  const statusSelect = document.createElement('select');
+  statusSelect.className = 'admin-select download-item-status';
+  statusSelect.setAttribute('aria-label', `สถานะของ ${item.label}`);
+  statusSelect.append(
+    new Option('🟢 ใช้งานปกติ', 'normal'),
+    new Option('🟡 กำลังปรับปรุง', 'maintenance')
+  );
+  statusSelect.value = item.status;
+
+  const urlInput = document.createElement('input');
+  urlInput.type = 'url';
+  urlInput.className = 'admin-input download-item-url';
+  urlInput.placeholder = 'https://ลิงก์ดาวน์โหลด';
+  urlInput.value = item.url;
+
+  const tutorialUrlInput = document.createElement('input');
+  tutorialUrlInput.type = 'url';
+  tutorialUrlInput.className = 'admin-input download-item-tutorial-url';
+  tutorialUrlInput.placeholder = 'ลิงก์คลิปสอน (ไม่บังคับ) เช่น https://youtu.be/...';
+  tutorialUrlInput.value = item.tutorialUrl;
+
+  row.append(headingRow, iconInput, labelInput, descriptionInput, statusSelect, urlInput, tutorialUrlInput);
+  return row;
+}
+
+window.addDownloadItem = function() {
+  const editor = document.getElementById('download-items-editor');
+  if (!editor) return;
+  if (editor.children.length >= 20) {
+    window.showToast('เพิ่มได้สูงสุด 20 ช่องบอท', 'error');
+    return;
+  }
+  const id = `bot-${Date.now()}-${editor.children.length + 1}`;
+  editor.append(createDownloadItemEditorRow({
+    id,
+    icon: '🤖',
+    label: 'บอทใหม่',
+    description: '',
+    status: 'normal',
+    url: '',
+    tutorialUrl: ''
+  }));
+  editor.lastElementChild?.querySelector('.download-item-label')?.focus();
+};
 
 window.saveDownloadItems = async function() {
   const rows = [...document.querySelectorAll('#download-items-editor .download-item-row')];
@@ -559,8 +605,10 @@ window.saveDownloadItems = async function() {
 
   const downloadItems = rows.map((row) => ({
     id: row.dataset.itemId,
+    icon: row.querySelector('.download-item-icon')?.value.trim() || '🤖',
     label: row.querySelector('.download-item-label')?.value.trim() || '',
     description: row.querySelector('.download-item-description')?.value.trim() || '',
+    status: row.querySelector('.download-item-status')?.value === 'maintenance' ? 'maintenance' : 'normal',
     url: row.querySelector('.download-item-url')?.value.trim() || '',
     tutorialUrl: row.querySelector('.download-item-tutorial-url')?.value.trim() || ''
   }));

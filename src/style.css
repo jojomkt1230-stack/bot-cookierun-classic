@@ -1189,6 +1189,18 @@ body {
   animation: softLive 2.4s ease-in-out infinite;
 }
 
+.home-bot-status.maintenance {
+  color: #ffe173;
+  background: rgba(255, 196, 0, 0.1);
+  border-color: rgba(255, 196, 0, 0.48);
+  box-shadow: 0 0 9px rgba(255, 196, 0, 0.16);
+}
+
+.home-bot-status.maintenance .home-bot-status-dot {
+  background: #ffd84d;
+  box-shadow: 0 0 7px rgba(255, 216, 77, 0.85);
+}
+
 @keyframes softLive {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
@@ -1303,6 +1315,10 @@ body {
   gap: 14px;
 }
 
+.download-item-add {
+  margin: 4px 0 14px;
+}
+
 .download-item-row {
   display: flex;
   flex-direction: column;
@@ -1318,6 +1334,30 @@ body {
   font-size: 0.92rem;
   color: var(--primary);
   overflow-wrap: anywhere;
+}
+
+.download-item-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.download-item-remove {
+  flex: none;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 74, 112, 0.45);
+  border-radius: 7px;
+  color: #ff94aa;
+  background: rgba(255, 51, 102, 0.08);
+  font: 700 0.75rem var(--font-ui);
+  cursor: pointer;
+}
+
+.download-item-remove:hover,
+.download-item-remove:focus-visible {
+  border-color: #ff6b8e;
+  box-shadow: 0 0 9px rgba(255, 51, 102, 0.25);
 }
 
 .access-code-card {

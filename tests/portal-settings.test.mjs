@@ -147,6 +147,30 @@ test('stores the four download menu entries with editable labels and links', asy
   });
 });
 
+test('stores a newly added bot card and its maintenance status', async () => {
+  await withStubbedBackends(async () => {
+    const saveResponse = await proxy.fetch(adminRequest('admin/settings', {
+      downloadItems: [
+        { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'เก็บกล่อง', status: 'normal', url: '' },
+        { id: 'bot-new-1', icon: '🤖', label: 'บอทกิจกรรมใหม่', description: 'รอเปิดให้บริการ', status: 'maintenance', url: '' }
+      ]
+    }));
+    assert.equal(saveResponse.status, 200);
+
+    const publicData = await (await proxy.fetch(apiRequest('settings'))).json();
+    assert.equal(publicData.downloadItems.length, 2);
+    assert.deepEqual(publicData.downloadItems[1], {
+      id: 'bot-new-1',
+      icon: '🤖',
+      label: 'บอทกิจกรรมใหม่',
+      description: 'รอเปิดให้บริการ',
+      status: 'maintenance',
+      url: '',
+      tutorialUrl: ''
+    });
+  });
+});
+
 test('refreshes menu wording the admin never edited, keeping custom text', async () => {
   await withStubbedBackends(async () => {
     // Simulate a config saved before the wording change: farm still carries the
