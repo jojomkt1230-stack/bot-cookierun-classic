@@ -1405,6 +1405,15 @@ async function saveAdminSettings(request) {
       console.error('[Portal] Redis write failed:', error?.message || error);
     }
 
+    if (savedToStorage) {
+      // These values now live in the portal store. Do not send them to the
+      // legacy members service as a second write: that service may return old
+      // values or fail after the new values were already saved, which made the
+      // admin form appear to revert immediately after clicking Save.
+      delete clean.botName;
+      delete clean.downloadUrl;
+    }
+
     if (!savedToStorage) {
       // No key/value storage available: keep the legacy behaviour of packing the
       // portal settings into the members service `siteName` field.

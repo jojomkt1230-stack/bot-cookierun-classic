@@ -48,8 +48,9 @@ function fakeRedis() {
   return { run };
 }
 
-function withStubbedBackends(handler) {
+function withStubbedBackends(handler, options = {}) {
   const redis = fakeRedis();
+  const sessionRedis = fakeRedis();
   const legacySettingsCalls = [];
   let legacyState = {
     siteName: 'CKRCS BOT',
@@ -60,10 +61,21 @@ function withStubbedBackends(handler) {
   };
 
   const originalFetch = globalThis.fetch;
+  if (options.dedicatedSession) {
+    process.env.SESSION_REDIS_REST_URL = 'https://session-redis.example';
+    process.env.SESSION_REDIS_REST_TOKEN = 'session-token';
+  }
   globalThis.fetch = async (url, init) => {
     const target = String(url);
 
+    if (target.startsWith('https://session-redis.example')) {
+      const body = JSON.parse(init.body);
+      return Response.json({ result: sessionRedis.run(body) });
+    }
     if (target.startsWith('https://redis.example')) {
+      if (options.failLegacyRedis) {
+        return Response.json({ error: 'ERR max requests limit exceeded' }, { status: 429 });
+      }
       const body = JSON.parse(init.body);
       if (target.endsWith('/pipeline')) {
         return Response.json(body.map((command) => ({ result: redis.run(command) })));
@@ -86,7 +98,11 @@ function withStubbedBackends(handler) {
   };
 
   return handler({ legacySettingsCalls })
-    .finally(() => { globalThis.fetch = originalFetch; });
+    .finally(() => {
+      delete process.env.SESSION_REDIS_REST_URL;
+      delete process.env.SESSION_REDIS_REST_TOKEN;
+      globalThis.fetch = originalFetch;
+    });
 }
 
 test('saves the announcement into portal storage and serves it publicly', async () => {
@@ -119,6 +135,27 @@ test('keeps the announcement when a later save only changes the bot name', async
     assert.equal(publicData.announcement, 'ยังเปิดให้บริการปกติ');
     assert.equal(publicData.botName, 'Ckrcsbot V19');
   });
+});
+
+test('saves bot name and download URL in dedicated storage when legacy Redis is over quota', async () => {
+  await withStubbedBackends(async ({ legacySettingsCalls }) => {
+    const saveResponse = await proxy.fetch(adminRequest('admin/settings', {
+      botName: 'CKRCS Bot V49',
+      downloadUrl: 'https://drive.google.com/file/d/v49/view'
+    }));
+    assert.equal(saveResponse.status, 200);
+    assert.deepEqual(legacySettingsCalls, []);
+
+    const adminData = await (await proxy.fetch(apiRequest('admin/settings', {
+      headers: { Authorization: 'Bearer legacy-admin-token' }
+    }))).json();
+    assert.equal(adminData.botName, 'CKRCS Bot V49');
+    assert.equal(adminData.botUrl, 'https://drive.google.com/file/d/v49/view');
+
+    const publicData = await (await proxy.fetch(apiRequest('settings'))).json();
+    assert.equal(publicData.botName, 'CKRCS Bot V49');
+    assert.equal(publicData.downloadUrl, 'https://drive.google.com/file/d/v49/view');
+  }, { dedicatedSession: true, failLegacyRedis: true });
 });
 
 test('stores the four download menu entries with editable labels and links', async () => {
