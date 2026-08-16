@@ -498,7 +498,7 @@
                   <span>📅</span>
                   <input id="farm-history-date" type="date" aria-label="เลือกวันที่ดูประวัติการฟาร์ม" />
                 </label>
-                <span id="farm-history-refresh" class="farm-refresh-chip">อัปเดตทุก 1 นาที</span>
+                <button id="farm-history-refresh" class="farm-refresh-chip" type="button" onclick="loadFarmHistory()">อัปเดตทุก 1 นาที</button>
               </div>
             </header>
 
@@ -995,6 +995,13 @@
       <div class="form-group" style="margin-bottom:16px;">
         <label style="font-size:0.9rem; color:var(--text-muted);">🖥️ จำนวนโปรแกรมสูงสุดที่เปิดพร้อมกัน</label>
         <input type="number" id="edit-user-program-limit" class="admin-input" min="1" max="100" value="4" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;" />
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label style="font-size:0.9rem; color:var(--text-muted);">🌐 การจำกัด IP</label>
+        <select id="edit-user-ip-restricted" class="admin-select" style="width:100%; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); border:1px solid var(--border); color:#fff;">
+          <option value="true">จำกัด IP</option>
+          <option value="false">ไม่จำกัด IP</option>
+        </select>
       </div>
       <div class="form-group" style="margin-bottom:16px;">
         <label style="font-size:0.9rem; color:var(--text-muted);">🔑 ตั้งรหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)</label>

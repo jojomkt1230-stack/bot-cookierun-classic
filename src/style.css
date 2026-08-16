@@ -3303,6 +3303,8 @@ button, input, select, textarea { font: inherit; }
   .combined-download-card .info-label { min-width: 0; }
   .combined-setup-guide .emulator-guide-section { padding: 15px 12px; }
   .combined-setup-guide .emulator-guide-block { padding: 12px; }
+  .display-light-warning { align-items: flex-start; gap: 11px; padding: 13px 12px; }
+  .display-light-warning-icon { flex-basis: 36px; width: 36px; height: 33px; font-size: 1.13rem; }
 }
 
 /* FARM HISTORY + ACCOUNT USAGE HISTORY */
@@ -3323,7 +3325,9 @@ button, input, select, textarea { font: inherit; }
 .farm-history-meta { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .farm-date-control { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border: 1px solid rgba(0, 212, 255, .65); border-radius: 12px; background: rgba(2, 13, 35, .82); box-shadow: inset 0 0 20px rgba(0, 177, 255, .05); }
 .farm-date-control input { color: #d9e9ff; color-scheme: dark; border: 0; outline: 0; background: transparent; font: 600 .88rem 'Sarabun', sans-serif; }
-.farm-refresh-chip { padding: 8px 11px; border: 1px solid rgba(51, 255, 169, .28); border-radius: 999px; color: #62eeb0; background: rgba(0, 255, 145, .07); font-size: .72rem; white-space: nowrap; }
+.farm-refresh-chip { padding: 8px 11px; border: 1px solid rgba(51, 255, 169, .28); border-radius: 999px; color: #62eeb0; background: rgba(0, 255, 145, .07); font-family: inherit; font-size: .72rem; white-space: nowrap; cursor: pointer; }
+.farm-refresh-chip:disabled { cursor: wait; opacity: .72; }
+.farm-inline-retry { margin-top: 14px; padding: 9px 16px; border: 1px solid rgba(0, 212, 255, .55); border-radius: 999px; color: #77ebff; background: rgba(0, 174, 255, .12); font: 700 .8rem 'Sarabun', sans-serif; cursor: pointer; }
 .farm-period-tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin: clamp(18px, 1.8vw, 26px) 0; border: 1px solid rgba(0, 212, 255, .25); border-radius: 14px; overflow: hidden; background: rgba(2, 13, 35, .6); }
 .farm-period-tabs + .farm-period-tabs { margin-top: 0; }
 .farm-bottype-tab, .farm-period-tab { min-height: clamp(48px, 4vw, 62px); border: 0; border-right: 1px solid rgba(0, 212, 255, .14); color: #a9b8d2; background: transparent; font: 700 clamp(.82rem, .5vw + .7rem, 1.05rem) 'Sarabun', sans-serif; cursor: pointer; transition: .2s ease; }

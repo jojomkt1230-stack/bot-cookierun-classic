@@ -76,6 +76,19 @@ export async function setMemberIpRestriction(memberCodeValue, restricted) {
   return restricted;
 }
 
+export async function clearMemberSessions(memberCodeValue) {
+  if (!sessionStorageConfigured()) return 0;
+  const memberCode = cleanText(memberCodeValue).toUpperCase();
+  if (!/^[A-Z0-9-]{8,180}$/.test(memberCode)) throw new Error('INVALID_MEMBER_CODE');
+  const indexKey = memberIndexKey(memberCode);
+  const ids = await sessionRedisCommand('ZRANGE', indexKey, '0', '-1');
+  const sessionIds = Array.isArray(ids) ? ids.map(String) : [];
+  const keys = sessionIds.map((id) => sessionKey(memberCode, id));
+  keys.push(indexKey, lastIpKey(memberCode));
+  await sessionRedisCommand('DEL', ...keys);
+  return sessionIds.length;
+}
+
 function pipelineValue(value) {
   return value && typeof value === 'object' && Object.hasOwn(value, 'result') ? value.result : value;
 }
@@ -112,6 +125,7 @@ export function normalizeSessionHeartbeat(payload = {}, sourceIp = '') {
 const STORE_SCRIPT = String.raw`
 local indexKey = KEYS[1]
 local limitKey = KEYS[2]
+local ipRestrictionKey = KEYS[3]
 local sessionPrefix = ARGV[1]
 local memberCode = ARGV[2]
 local sessionId = ARGV[3]
@@ -123,6 +137,7 @@ local now = tonumber(ARGV[8])
 local expiresAt = tonumber(ARGV[9])
 local defaultMaxPrograms = tonumber(ARGV[10])
 local maxScreens = tonumber(redis.call('GET', limitKey)) or defaultMaxPrograms
+local ipRestricted = redis.call('GET', ipRestrictionKey) ~= '0'
 local lastIpTtl = tonumber(ARGV[11])
 local key = sessionPrefix .. ':session:' .. memberCode .. ':' .. sessionId
 redis.call('ZREMRANGEBYSCORE', indexKey, '-inf', now)
@@ -134,7 +149,7 @@ end
 local ids = redis.call('ZRANGE', indexKey, 0, -1)
 local existing = redis.call('ZSCORE', indexKey, sessionId)
 local comparisonId = existing and sessionId or ids[1]
-if comparisonId then
+if ipRestricted and comparisonId then
   local raw = redis.call('GET', sessionPrefix .. ':session:' .. memberCode .. ':' .. comparisonId)
   if raw then
     local ok, item = pcall(cjson.decode, raw)
@@ -164,7 +179,8 @@ export async function storeSessionHeartbeat(payload, sourceIp) {
     expiresAt: new Date(expiresAt).toISOString()
   };
   const raw = await sessionRedisCommand(
-    'EVAL', STORE_SCRIPT, '2', memberIndexKey(heartbeat.memberCode), programLimitKey(heartbeat.memberCode),
+    'EVAL', STORE_SCRIPT, '3', memberIndexKey(heartbeat.memberCode), programLimitKey(heartbeat.memberCode),
+    ipRestrictionKey(heartbeat.memberCode),
     SESSION_PREFIX, heartbeat.memberCode, heartbeat.sessionId, heartbeat.ipAddress,
     heartbeat.status, JSON.stringify(record), String(SESSION_TTL_SECONDS),
     String(now), String(expiresAt), String(MAX_ACTIVE_SCREENS), String(LAST_IP_TTL_SECONDS)
@@ -183,16 +199,17 @@ export async function storeSessionHeartbeat(payload, sourceIp) {
 }
 
 export async function getMemberSessionSummary(memberCodeValue) {
-  if (!sessionStorageConfigured()) return { activeScreens: 0, activePrograms: 0, maxPrograms: MAX_ACTIVE_SCREENS, sessionIp: '', botSessions: [] };
+  if (!sessionStorageConfigured()) return { activeScreens: 0, activePrograms: 0, maxPrograms: MAX_ACTIVE_SCREENS, ipRestricted: true, sessionIp: '', botSessions: [] };
   const memberCode = cleanText(memberCodeValue).toUpperCase();
-  if (!memberCode) return { activeScreens: 0, activePrograms: 0, maxPrograms: MAX_ACTIVE_SCREENS, sessionIp: '', botSessions: [] };
+  if (!memberCode) return { activeScreens: 0, activePrograms: 0, maxPrograms: MAX_ACTIVE_SCREENS, ipRestricted: true, sessionIp: '', botSessions: [] };
   const maxPrograms = await getMemberProgramLimit(memberCode);
+  const ipRestricted = await getMemberIpRestriction(memberCode);
   const indexKey = memberIndexKey(memberCode);
   await sessionRedisCommand('ZREMRANGEBYSCORE', indexKey, '-inf', String(Date.now()));
   const ids = await sessionRedisCommand('ZRANGE', indexKey, '0', '-1');
   const sessionIds = Array.isArray(ids) ? ids.map(String) : [];
   const lastIp = String(await sessionRedisCommand('GET', lastIpKey(memberCode)) || '');
-  if (!sessionIds.length) return { activeScreens: 0, activePrograms: 0, maxPrograms, sessionIp: lastIp, botSessions: [] };
+  if (!sessionIds.length) return { activeScreens: 0, activePrograms: 0, maxPrograms, ipRestricted, sessionIp: lastIp, botSessions: [] };
   const rows = await sessionRedisPipeline(sessionIds.map((id) => ['GET', sessionKey(memberCode, id)]));
   const botSessions = rows.map(pipelineValue).map(parseRecord).filter(Boolean);
   const ips = [...new Set(botSessions.map((item) => item.ipAddress).filter(Boolean))];
@@ -200,6 +217,7 @@ export async function getMemberSessionSummary(memberCodeValue) {
     activeScreens: botSessions.length,
     activePrograms: botSessions.length,
     maxPrograms,
+    ipRestricted,
     sessionIp: ips.join(', ') || lastIp,
     botSessions: botSessions.map(({ botType, deviceId, deviceLabel, lastSeenAt }) => ({
       botType, deviceId, deviceLabel, lastSeenAt

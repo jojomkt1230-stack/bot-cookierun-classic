@@ -5,13 +5,41 @@ process.env.STORAGE_REST_API_URL = 'https://redis.example';
 process.env.STORAGE_REST_API_TOKEN = 'redis-token';
 
 const {
+  clearMemberSessions,
   HEARTBEAT_INTERVAL_SECONDS,
   SESSION_TTL_SECONDS,
   normalizeSessionHeartbeat,
   sessionStorageConfigured,
+  setMemberIpRestriction,
   setMemberProgramLimit,
   storeSessionHeartbeat
 } = await import('../api/session-store.js');
+
+test('reset device clears active program leases and the remembered IP only for that member', async () => {
+  const originalFetch = globalThis.fetch;
+  const commands = [];
+  globalThis.fetch = async (_url, init) => {
+    const command = JSON.parse(init.body);
+    commands.push(command);
+    if (command[0] === 'ZRANGE') {
+      return Response.json({ result: ['coin:device-a', 'account:device-b'] });
+    }
+    return Response.json({ result: 4 });
+  };
+  try {
+    assert.equal(await clearMemberSessions('ckrcs-1234'), 2);
+    assert.deepEqual(commands[0], ['ZRANGE', 'ckrcs:bot-session:v2:member:CKRCS-1234', '0', '-1']);
+    assert.deepEqual(commands[1], [
+      'DEL',
+      'ckrcs:bot-session:v2:session:CKRCS-1234:coin:device-a',
+      'ckrcs:bot-session:v2:session:CKRCS-1234:account:device-b',
+      'ckrcs:bot-session:v2:member:CKRCS-1234',
+      'ckrcs:bot-session:v2:last-ip:CKRCS-1234'
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('uses the dedicated session database and an hourly lease', async () => {
   const originalFetch = globalThis.fetch;
@@ -65,11 +93,29 @@ test('running heartbeat uses one atomic admission-and-write command', async () =
     assert.equal(result.maxPrograms, 7);
     assert.equal(commands.length, 1);
     assert.equal(commands[0][0], 'EVAL');
-    assert.equal(commands[0][2], '2');
+    assert.equal(commands[0][2], '3');
     const script = commands[0][1];
     assert.doesNotMatch(script, /for _, id in ipairs\(ids\)/);
     assert.match(script, /local comparisonId = existing and sessionId or ids\[1\]/);
-    assert.equal((script.match(/redis\.call\('GET'/g) || []).length, 2);
+    assert.equal((script.match(/redis\.call\('GET'/g) || []).length, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('admin can explicitly disable and restore IP restriction per member', async () => {
+  const originalFetch = globalThis.fetch;
+  const commands = [];
+  globalThis.fetch = async (_url, init) => {
+    commands.push(JSON.parse(init.body));
+    return Response.json({ result: 'OK' });
+  };
+  try {
+    assert.equal(await setMemberIpRestriction('ckrcs-1234', false), false);
+    assert.deepEqual(commands[0], ['SET', 'ckrcs:bot-session:v2:ip-restricted:CKRCS-1234', '0']);
+    assert.equal(await setMemberIpRestriction('ckrcs-1234', true), true);
+    assert.deepEqual(commands[1], ['SET', 'ckrcs:bot-session:v2:ip-restricted:CKRCS-1234', '1']);
+    await assert.rejects(() => setMemberIpRestriction('CKRCS-1234', 'false'), /INVALID_IP_RESTRICTION/);
   } finally {
     globalThis.fetch = originalFetch;
   }

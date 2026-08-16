@@ -18,6 +18,7 @@ import {
 } from './code-store.js';
 import { listFarmEvents, storeFarmEvent, summarizeFarmEvents } from './farm-store.js';
 import {
+  clearMemberSessions,
   getMemberSessionSummary,
   sessionStorageConfigured,
   setMemberIpRestriction,
@@ -1126,7 +1127,7 @@ async function adminUsers(request) {
   const users = await Promise.all(members.map(async (member) => ({
     ...member,
     ...(await getMemberSessionSummary(member.memberCode).catch(() => ({
-      activeScreens: 0, activePrograms: 0, maxPrograms: 4, sessionIp: '', botSessions: []
+      activeScreens: 0, activePrograms: 0, maxPrograms: 4, ipRestricted: true, sessionIp: '', botSessions: []
     })))
   })));
   return json({ users });
@@ -1328,7 +1329,31 @@ async function updateAdminUser(request, path) {
       method: 'POST',
       body: JSON.stringify({ memberCode, action: 'reset_device' })
     });
-    return json(data, response.status);
+    if (!response.ok) return json(data, response.status);
+    try {
+      const clearedPrograms = await clearMemberSessions(memberCode);
+      return json({ ...data, ok: true, clearedPrograms }, response.status);
+    } catch {
+      return json({ error: 'รีเซ็ตเครื่องเดิมสำเร็จ แต่ล้างโปรแกรมที่กำลังใช้งานไม่สำเร็จ กรุณาลองอีกครั้ง' }, 503);
+    }
+  }
+
+  if (action === 'ip-restriction') {
+    const overview = await adminOverview(request);
+    if (overview.errorResponse) return overview.errorResponse;
+    const member = (overview.data.members || [])
+      .find((item) => String(item.member_code) === memberCode);
+    if (!member) return json({ error: 'ไม่พบสมาชิก' }, 404);
+    try {
+      const ipRestricted = await setMemberIpRestriction(memberCode, payload.ipRestricted);
+      return json({ ok: true, memberCode, ipRestricted });
+    } catch (error) {
+      const reason = String(error?.message || '');
+      if (reason === 'INVALID_IP_RESTRICTION') {
+        return json({ error: 'สถานะจำกัด IP ไม่ถูกต้อง' }, 400);
+      }
+      return json({ error: 'บันทึกสถานะจำกัด IP ไม่สำเร็จ' }, 503);
+    }
   }
 
   const newPassword = String(payload.newPassword || '');

@@ -42,9 +42,13 @@ window.showSection = function(sectionId) {
   }
 };
 
-const DEFAULT_API_BASE_URL = window.location.hostname.endsWith('.vercel.app')
-  ? '/api'
-  : 'https://ibot-cookierun-classic.onrender.com/api';
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+// Production must use the same origin as the page. The previous custom-domain
+// branch sent browsers directly to Render; some mobile networks/webviews
+// blocked that cross-origin request while desktop browsers still allowed it.
+const DEFAULT_API_BASE_URL = LOCAL_HOSTS.has(window.location.hostname)
+  ? 'https://ibot-cookierun-classic.onrender.com/api'
+  : '/api';
 const API_BASE_URL = (window.BACKEND_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 console.log('[API] Base URL:', API_BASE_URL);
 
@@ -1469,6 +1473,8 @@ let farmHistoryTimer = null;
 let farmDateListenerReady = false;
 let farmBotTypeFilter = 'all';
 let farmDeviceFilter = 'all';
+let farmHistoryLoaded = false;
+let farmHistoryLoading = false;
 
 function farmDeviceLabel(deviceId) {
   const match = /(\d{1,2})\s*$/.exec(String(deviceId || '').trim());
@@ -1707,21 +1713,72 @@ function renderFarmHistory() {
   }).join('');
 }
 
+function setFarmHistorySummaryUnavailable(value = '—') {
+  ['farm-total-coins', 'farm-total-exp', 'farm-total-powder', 'farm-total-rounds', 'farm-total-time']
+    .forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = value;
+    });
+}
+
+function waitForFarmRetry(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+async function requestFarmHistory() {
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await axios.get(`${API_BASE_URL}/users/farm-history`, {
+        headers: { ...getAuthHeaders(), 'Cache-Control': 'no-cache' },
+        params: { _t: Date.now() },
+        timeout: 20_000
+      });
+    } catch (error) {
+      lastError = error;
+      const status = Number(error?.response?.status || 0);
+      // Authentication errors require a new login; retry only network/5xx.
+      if ((status >= 400 && status < 500) || attempt === 1) throw error;
+      await waitForFarmRetry(900);
+    }
+  }
+  throw lastError;
+}
+
 async function loadFarmHistory() {
+  if (farmHistoryLoading) return;
+  farmHistoryLoading = true;
   const refreshEl = document.getElementById('farm-history-refresh');
-  if (refreshEl) refreshEl.textContent = 'กำลังอัปเดต...';
+  if (refreshEl) {
+    refreshEl.textContent = 'กำลังอัปเดต...';
+    refreshEl.classList.remove('farm-load-error');
+  }
+  if (!farmHistoryLoaded) setFarmHistorySummaryUnavailable();
   try {
-    const response = await axios.get(`${API_BASE_URL}/users/farm-history`, { headers: getAuthHeaders() });
+    const response = await requestFarmHistory();
     farmHistoryEvents = Array.isArray(response.data?.events) ? response.data.events : [];
+    farmHistoryLoaded = true;
     computeRoundDurations(farmHistoryEvents);
     renderFarmHistory();
     if (refreshEl) refreshEl.textContent = `อัปเดตล่าสุด ${new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }).format(new Date())}`;
   } catch (error) {
+    const status = Number(error?.response?.status || 0);
+    const message = status === 401
+      ? 'เซสชันในโทรศัพท์หมดอายุ กรุณาออกและเข้าระบบใหม่'
+      : getApiErrorMessage(error, 'เชื่อมต่อข้อมูลการฟาร์มไม่สำเร็จ');
     const rows = document.getElementById('farm-history-rows');
-    if (rows) rows.innerHTML = `<tr><td colspan="${farmHistoryColumns().length}" class="farm-empty-cell farm-load-error">${escapeHtml(getApiErrorMessage(error, 'โหลดประวัติการฟาร์มไม่สำเร็จ'))}</td></tr>`;
-    if (refreshEl) refreshEl.textContent = 'ลองใหม่ใน 1 นาที';
+    if (rows) rows.innerHTML = `<tr><td colspan="${farmHistoryColumns().length}" class="farm-empty-cell farm-load-error">${escapeHtml(message)}<br><button type="button" class="farm-inline-retry" onclick="loadFarmHistory()">ลองใหม่ตอนนี้</button></td></tr>`;
+    if (!farmHistoryLoaded) setFarmHistorySummaryUnavailable();
+    if (refreshEl) {
+      refreshEl.textContent = 'โหลดไม่สำเร็จ · แตะเพื่อลองใหม่';
+      refreshEl.classList.add('farm-load-error');
+    }
+  } finally {
+    farmHistoryLoading = false;
   }
 }
+
+window.loadFarmHistory = loadFarmHistory;
 
 window.setFarmHistoryPeriod = function(period) {
   if (!['daily', 'weekly', 'monthly'].includes(period)) return;
@@ -2293,6 +2350,7 @@ function renderAdminUsersTable() {
           <th style="padding:10px;">วันหมดอายุ</th>
           <th style="padding:10px;">โปรแกรมที่กำลังใช้งาน</th>
           <th style="padding:10px;">IP ที่กำลังใช้งาน</th>
+          <th style="padding:10px;">นโยบาย IP</th>
           <th style="padding:10px; text-align:right;">จัดการ</th>
         </tr>
       </thead>
@@ -2311,6 +2369,7 @@ function renderAdminUsersTable() {
             <td style="padding:12px; font-size:0.85rem;">${u.botExpiry ? new Date(u.botExpiry).toLocaleString('th-TH') : 'ยังไม่ได้เช่า'}</td>
             <td style="padding:12px; font-weight:700;">${Number(u.activePrograms ?? u.activeScreens ?? 0)} / ${Number(u.maxPrograms || 4)}</td>
             <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(u.sessionIp || '-')}</td>
+            <td style="padding:12px; font-size:0.85rem; color:${u.ipRestricted === false ? 'var(--success)' : 'var(--warning)'};">${u.ipRestricted === false ? 'ไม่จำกัด IP' : 'จำกัด IP'}</td>
             <td style="padding:12px; text-align:right;">
               <button onclick="openEditUserModal('${encodeURIComponent(u._id)}')" style="background:rgba(0,212,255,0.2); color:var(--primary); border:1px solid var(--primary); padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer;">✏️ จัดการ</button>
             </td>
@@ -2337,6 +2396,7 @@ window.openEditUserModal = function(userId) {
   const diaInput = document.getElementById('edit-user-diamonds');
   const addTimeInput = document.getElementById('edit-user-add-time');
   const programLimitInput = document.getElementById('edit-user-program-limit');
+  const ipRestrictedInput = document.getElementById('edit-user-ip-restricted');
 
   if (idInput) idInput.value = user._id || user.username;
   if (userInput) {
@@ -2347,6 +2407,7 @@ window.openEditUserModal = function(userId) {
   if (diaInput) diaInput.value = user.diamonds || 0;
   if (addTimeInput) addTimeInput.value = '';
   if (programLimitInput) programLimitInput.value = Number(user.maxPrograms || 4);
+  if (ipRestrictedInput) ipRestrictedInput.value = user.ipRestricted === false ? 'false' : 'true';
 
   window.openModal('user-modal');
 };
@@ -2358,6 +2419,7 @@ window.saveEditedUser = async function() {
   const addTime = parseInt(document.getElementById('edit-user-add-time')?.value || 0);
   const newPassword = document.getElementById('edit-user-password')?.value || '';
   const maxPrograms = parseInt(document.getElementById('edit-user-program-limit')?.value || 4);
+  const ipRestricted = document.getElementById('edit-user-ip-restricted')?.value === 'true';
 
   if (!userId || !newUsername) return;
   if (!Number.isInteger(newDiamonds) || newDiamonds < 0 || newDiamonds > 1000000) {
@@ -2382,6 +2444,9 @@ window.saveEditedUser = async function() {
     const requests = [];
     if (Number(user?.maxPrograms || 4) !== maxPrograms) requests.push(
       axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/program-limit`, { maxPrograms }, adminApiConfig())
+    );
+    if ((user?.ipRestricted !== false) !== ipRestricted) requests.push(
+      axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/ip-restriction`, { ipRestricted }, adminApiConfig())
     );
     if (Number(user?.diamonds || 0) !== newDiamonds) requests.push(
       axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/diamonds`, { diamonds: newDiamonds }, adminApiConfig())
