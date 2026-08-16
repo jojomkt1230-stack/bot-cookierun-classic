@@ -20,6 +20,7 @@ import { listFarmEvents, storeFarmEvent, summarizeFarmEvents } from './farm-stor
 import {
   getMemberSessionSummary,
   sessionStorageConfigured,
+  setMemberIpRestriction,
   setMemberProgramLimit,
   storeSessionHeartbeat
 } from './session-store.js';
@@ -1222,7 +1223,7 @@ async function adminStats(request) {
 }
 
 async function updateAdminUser(request, path) {
-  const match = path.match(/^admin\/users\/([^/]+)\/(diamonds|days|reset-password|reset-device|disable|enable|program-limit)$/);
+  const match = path.match(/^admin\/users\/([^/]+)\/(diamonds|days|reset-password|reset-device|disable|enable|program-limit|ip-restriction)$/);
   if (!match) {
     return json({
       error: 'ระบบฐานข้อมูลเดิมไม่รองรับการเปลี่ยนชื่อหรือลบสมาชิกจากหน้าเว็บ'
@@ -1268,6 +1269,24 @@ async function updateAdminUser(request, path) {
         return json({ error: 'จำนวนโปรแกรมต้องเป็นเลขเต็ม 1-100' }, 400);
       }
       return json({ error: 'บันทึกจำนวนโปรแกรมสูงสุดไม่สำเร็จ' }, 503);
+    }
+  }
+
+  if (action === 'ip-restriction') {
+    const overview = await adminOverview(request);
+    if (overview.errorResponse) return overview.errorResponse;
+    const member = (overview.data.members || [])
+      .find((item) => String(item.member_code) === memberCode);
+    if (!member) return json({ error: 'ไม่พบสมาชิก' }, 404);
+    try {
+      const ipRestricted = await setMemberIpRestriction(memberCode, payload.ipRestricted);
+      return json({ ok: true, memberCode, ipRestricted });
+    } catch (error) {
+      const reason = String(error?.message || '');
+      if (reason === 'INVALID_IP_RESTRICTION') {
+        return json({ error: 'สถานะจำกัด IP ไม่ถูกต้อง' }, 400);
+      }
+      return json({ error: 'บันทึกสถานะจำกัด IP ไม่สำเร็จ' }, 503);
     }
   }
 

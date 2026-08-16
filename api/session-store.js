@@ -29,6 +29,10 @@ function programLimitKey(memberCode) {
   return `${SESSION_PREFIX}:program-limit:${memberCode}`;
 }
 
+function ipRestrictionKey(memberCode) {
+  return `${SESSION_PREFIX}:ip-restricted:${memberCode}`;
+}
+
 function normalizeProgramLimit(value) {
   const limit = Number(value);
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_CONFIGURABLE_PROGRAMS) {
@@ -53,6 +57,23 @@ export async function setMemberProgramLimit(memberCodeValue, value) {
   const limit = normalizeProgramLimit(value);
   await sessionRedisCommand('SET', programLimitKey(memberCode), String(limit));
   return limit;
+}
+
+export async function getMemberIpRestriction(memberCodeValue) {
+  const memberCode = cleanText(memberCodeValue).toUpperCase();
+  if (!memberCode || !sessionStorageConfigured()) return true;
+  const stored = await sessionRedisCommand('GET', ipRestrictionKey(memberCode));
+  // Accounts are restricted to one IP unless an admin explicitly disables it.
+  return String(stored ?? '1') !== '0';
+}
+
+export async function setMemberIpRestriction(memberCodeValue, restricted) {
+  if (!sessionStorageConfigured()) throw new Error('SESSION_STORAGE_NOT_CONFIGURED');
+  const memberCode = cleanText(memberCodeValue).toUpperCase();
+  if (!/^[A-Z0-9-]{8,180}$/.test(memberCode)) throw new Error('INVALID_MEMBER_CODE');
+  if (typeof restricted !== 'boolean') throw new Error('INVALID_IP_RESTRICTION');
+  await sessionRedisCommand('SET', ipRestrictionKey(memberCode), restricted ? '1' : '0');
+  return restricted;
 }
 
 function pipelineValue(value) {
