@@ -1576,6 +1576,67 @@ body {
 
 .emulator-guide-block + .emulator-guide-block { margin-top: 17px; }
 
+.display-light-warning {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 15px 17px;
+  overflow: hidden;
+  border: 2px solid #ff3548;
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 18px 50%, rgba(255, 45, 65, 0.22), transparent 34%),
+    linear-gradient(135deg, rgba(92, 4, 18, 0.82), rgba(34, 3, 12, 0.9));
+  box-shadow: 0 0 11px rgba(255, 38, 58, 0.34), inset 0 0 22px rgba(255, 47, 68, 0.08);
+}
+
+.display-light-warning-icon {
+  position: relative;
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 38px;
+  place-items: center;
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 950;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(70, 0, 0, 0.8);
+  filter: drop-shadow(0 0 7px rgba(255, 39, 58, 0.62));
+  isolation: isolate;
+}
+
+.display-light-warning-icon::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: #ef233c;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  content: "";
+}
+
+.display-light-warning-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.display-light-warning-copy strong {
+  color: #ff5363 !important;
+  font-size: clamp(1rem, 0.45vw + 0.92rem, 1.22rem);
+  font-weight: 900;
+  line-height: 1.42;
+  text-shadow: 0 0 9px rgba(255, 41, 62, 0.38);
+}
+
+.display-light-warning-copy span {
+  color: #fff0f2;
+  font-size: clamp(0.9rem, 0.2vw + 0.85rem, 1rem);
+  font-weight: 800;
+  line-height: 1.55;
+}
+
 .emulator-setup-guide p,
 .emulator-setup-guide li {
   color: #e7f3ff;
