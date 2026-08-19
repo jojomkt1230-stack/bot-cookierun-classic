@@ -148,8 +148,11 @@ if status == 'stopped' then
 end
 local ids = redis.call('ZRANGE', indexKey, 0, -1)
 local existing = redis.call('ZSCORE', indexKey, sessionId)
-local comparisonId = existing and sessionId or ids[1]
-if ipRestricted and comparisonId then
+-- An existing program lease is the same device/bot session renewing itself.
+-- Let it follow a legitimate public-IP change; only a brand-new session is
+-- required to match the IP of the member's currently active programs.
+local comparisonId = ids[1]
+if ipRestricted and (not existing) and comparisonId then
   local raw = redis.call('GET', sessionPrefix .. ':session:' .. memberCode .. ':' .. comparisonId)
   if raw then
     local ok, item = pcall(cjson.decode, raw)

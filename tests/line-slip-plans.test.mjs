@@ -13,11 +13,49 @@ import {
   paymentPlansAreValid
 } from '../api/line-slip-plans.js';
 import { slip2GoAuthorization } from '../api/slip2go-auth.js';
+import { verifyLineSlip } from '../api/proxy.js';
 
 test('formats the Slip2Go API secret as a Bearer authorization header', () => {
   assert.equal(slip2GoAuthorization('secret-key'), 'Bearer secret-key');
   assert.equal(slip2GoAuthorization(' Bearer secret-key '), 'Bearer secret-key');
   assert.equal(slip2GoAuthorization(''), '');
+});
+
+test('retries a temporarily missing bank slip and returns the successful result', async () => {
+  const originalFetch = globalThis.fetch;
+  const responses = [
+    { code: '200404', message: 'not found' },
+    { code: '200404', message: 'not found' },
+    { code: '200200', data: { amount: 20, transRef: 'TEST-REF' } }
+  ];
+  let calls = 0;
+  globalThis.fetch = async () => Response.json(responses[calls++]);
+
+  try {
+    const verified = await verifyLineSlip(new FormData(), 'Bearer test', 'line-message', [0, 0, 0]);
+    assert.equal(calls, 3);
+    assert.equal(verified.result.code, '200200');
+    assert.equal(verified.result.data.amount, 20);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('does not retry a permanent slip verification failure', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return Response.json({ code: '400001', message: 'invalid QR' }, { status: 400 });
+  };
+
+  try {
+    const verified = await verifyLineSlip(new FormData(), 'Bearer test', 'line-message', [0, 0, 0]);
+    assert.equal(calls, 1);
+    assert.equal(verified.result.code, '400001');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('maps verified slip amounts to the correct duration and code count', () => {

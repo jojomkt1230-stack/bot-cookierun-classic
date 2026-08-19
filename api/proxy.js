@@ -686,6 +686,52 @@ function slipResultMessage(code, fallback) {
   return messages[code] || String(fallback || 'ตรวจสอบสลิปไม่สำเร็จ');
 }
 
+const SLIP_RETRY_DELAYS_MS = Object.freeze([0, 1_500, 3_000]);
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+export async function verifyLineSlip(
+  form,
+  authorization,
+  messageId,
+  retryDelays = SLIP_RETRY_DELAYS_MS
+) {
+  const endpoint = process.env.SLIP2GO_API_URL
+    || 'https://connect.slip2go.com/api/verify-slip/qr-image/info';
+  let lastVerification;
+  let lastResult = {};
+
+  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+    const delay = retryDelays[attempt];
+    if (delay) await wait(delay);
+
+    lastVerification = await fetch(endpoint, {
+      method: 'POST',
+      headers: { authorization },
+      body: form,
+      signal: AbortSignal.timeout(20_000)
+    });
+    lastResult = await lastVerification.json().catch(() => ({}));
+    const resultCode = String(lastResult.code || `HTTP_${lastVerification.status}`);
+    const safeMessage = String(lastResult.message || '').replace(/[\r\n]+/g, ' ').slice(0, 160);
+    console.info('[LINE Slip] Verification result:', {
+      messageId: String(messageId).slice(-12),
+      attempt: attempt + 1,
+      httpStatus: lastVerification.status,
+      code: resultCode,
+      message: safeMessage
+    });
+
+    // A newly-created transfer can briefly be absent from the bank lookup.
+    // Retry only this transient response; other failures must not be replayed.
+    if (resultCode !== '200404') break;
+  }
+
+  return { verification: lastVerification, result: lastResult };
+}
+
 function lineDurationLabel(durationMinutes) {
   if (durationMinutes === 1440) return '1 วัน';
   if (durationMinutes === 10080) return '7 วัน';
@@ -746,16 +792,7 @@ async function processLineImage(request, event) {
       }]
     }));
 
-    const verification = await fetch(
-      process.env.SLIP2GO_API_URL || 'https://connect.slip2go.com/api/verify-slip/qr-image/info',
-      {
-        method: 'POST',
-        headers: { authorization: slipAuthorization },
-        body: form,
-        signal: AbortSignal.timeout(20_000)
-      }
-    );
-    const result = await verification.json().catch(() => ({}));
+    const { verification, result } = await verifyLineSlip(form, slipAuthorization, messageId);
     const resultCode = String(result.code || `HTTP_${verification.status}`);
     if (!verification.ok || resultCode !== '200200' || !result.data) {
       await sendLineText(

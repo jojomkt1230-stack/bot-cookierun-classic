@@ -74,7 +74,7 @@ test('contract normalizes member, device, bot type and server supplied IP', () =
   assert.throws(() => normalizeSessionHeartbeat({ memberCode: 'CKRCS-1234', deviceId: '01', botType: 'other', status: 'running' }, '203.0.113.7'));
 });
 
-test('running heartbeat uses one atomic admission-and-write command', async () => {
+test('running heartbeat renews the same session across an IP change with one atomic command', async () => {
   const originalFetch = globalThis.fetch;
   const commands = [];
   globalThis.fetch = async (_url, init) => {
@@ -96,7 +96,8 @@ test('running heartbeat uses one atomic admission-and-write command', async () =
     assert.equal(commands[0][2], '3');
     const script = commands[0][1];
     assert.doesNotMatch(script, /for _, id in ipairs\(ids\)/);
-    assert.match(script, /local comparisonId = existing and sessionId or ids\[1\]/);
+    assert.match(script, /local comparisonId = ids\[1\]/);
+    assert.match(script, /if ipRestricted and \(not existing\) and comparisonId then/);
     assert.equal((script.match(/redis\.call\('GET'/g) || []).length, 3);
   } finally {
     globalThis.fetch = originalFetch;
