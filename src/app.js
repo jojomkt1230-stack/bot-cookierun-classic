@@ -1535,13 +1535,12 @@ function farmEventsForSelection() {
     return farmHistoryEvents.filter((event) => matches(event) && thailandDateKey(event.occurredAt).slice(0, 7) === selected.slice(0, 7));
   }
 
+  // "Weekly" is a rolling 7-day window ending on the selected date (the
+  // latest 7 days when no date is picked), not the Mon-Sun calendar week.
   const selectedDate = new Date(`${selected}T12:00:00+07:00`);
-  const weekday = selectedDate.getUTCDay();
-  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
-  const monday = new Date(selectedDate.getTime() + mondayOffset * 86_400_000);
-  const sunday = new Date(monday.getTime() + 6 * 86_400_000);
-  const startKey = thailandDateKey(monday);
-  const endKey = thailandDateKey(sunday);
+  const windowStart = new Date(selectedDate.getTime() - 6 * 86_400_000);
+  const startKey = thailandDateKey(windowStart);
+  const endKey = selected;
   return farmHistoryEvents.filter((event) => {
     const key = thailandDateKey(event.occurredAt);
     return matches(event) && key >= startKey && key <= endKey;
@@ -2234,13 +2233,12 @@ function adminFarmEventsForSelection() {
     return adminFarmDetailEvents.filter((event) => matches(event) && thailandDateKey(event.occurredAt).slice(0, 7) === selected.slice(0, 7));
   }
 
+  // "Weekly" is a rolling 7-day window ending on the selected date (the
+  // latest 7 days when no date is picked), not the Mon-Sun calendar week.
   const selectedDate = new Date(`${selected}T12:00:00+07:00`);
-  const weekday = selectedDate.getUTCDay();
-  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
-  const monday = new Date(selectedDate.getTime() + mondayOffset * 86_400_000);
-  const sunday = new Date(monday.getTime() + 6 * 86_400_000);
-  const startKey = thailandDateKey(monday);
-  const endKey = thailandDateKey(sunday);
+  const windowStart = new Date(selectedDate.getTime() - 6 * 86_400_000);
+  const startKey = thailandDateKey(windowStart);
+  const endKey = selected;
   return adminFarmDetailEvents.filter((event) => {
     const key = thailandDateKey(event.occurredAt);
     return matches(event) && key >= startKey && key <= endKey;
