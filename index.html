@@ -628,6 +628,46 @@
                 </div>
               </div>
 
+              <!-- Revenue history -->
+              <div class="admin-card">
+                <h4>💰 รายได้ตามช่วงเวลา</h4>
+                <div class="farm-period-tabs" role="tablist" aria-label="ช่วงเวลารายได้">
+                  <button class="farm-period-tab active" type="button" data-revenue-period="daily" onclick="setAdminRevenuePeriod('daily')">▣ รายวัน</button>
+                  <button class="farm-period-tab" type="button" data-revenue-period="weekly" onclick="setAdminRevenuePeriod('weekly')">▣ รายสัปดาห์</button>
+                  <button class="farm-period-tab" type="button" data-revenue-period="monthly" onclick="setAdminRevenuePeriod('monthly')">▣ รายเดือน</button>
+                </div>
+
+                <div class="farm-summary-grid" aria-live="polite">
+                  <article class="farm-summary-card farm-summary-card--coins">
+                    <span class="farm-summary-icon">💰</span>
+                    <div><span id="admin-revenue-summary-label">รายได้วันนี้</span><strong id="admin-revenue-summary-total">0</strong></div>
+                  </article>
+                </div>
+
+                <div class="farm-details-panel">
+                  <div class="farm-details-heading">
+                    <div>
+                      <h3 id="admin-revenue-history-title">ประวัติรายได้ (รายวัน)</h3>
+                      <p>รวมยอดเติมเงินที่อนุมัติแล้ว ดึงย้อนหลังเท่าที่มีข้อมูลในระบบ</p>
+                    </div>
+                  </div>
+                  <div class="farm-table-wrap">
+                    <table class="farm-history-table">
+                      <thead>
+                        <tr>
+                          <th>ช่วงเวลา</th>
+                          <th>รายได้ (บาท)</th>
+                          <th>จำนวนรายการเติมเงิน</th>
+                        </tr>
+                      </thead>
+                      <tbody id="admin-revenue-history-rows">
+                        <tr><td colspan="3" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
               <!-- Mass Compensation -->
               <div class="admin-card">
                 <h4>🎁 ชดเชยเวลาใช้งานบอท (ผู้ใช้ทุกคน)</h4>

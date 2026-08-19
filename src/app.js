@@ -2067,6 +2067,11 @@ async function initAdminPanel() {
   applySystemSettingsToUI();
 }
 
+// ── Admin: revenue overview (daily/weekly/monthly, with full history) ──
+let adminRevenueHistory = []; // [{date: 'YYYY-MM-DD', total, count}, ...] newest first, from /admin/stats
+let adminRevenueSummary = { todayRevenue: 0, weekRevenue: 0, monthRevenue: 0 };
+let adminRevenuePeriod = 'daily';
+
 // ── Admin: player farm data (list of every member + per-member detail) ──
 let adminFarmDataList = [];
 let adminFarmDetailEvents = [];
@@ -2315,6 +2320,123 @@ async function updateAdminPanelStats() {
   if (activeUsersEl) activeUsersEl.textContent = stats.activeUsers || 0;
   if (pendingTopupsEl) pendingTopupsEl.textContent = stats.pendingTopups || 0;
   if (revenueEl) revenueEl.textContent = Number(stats.todayRevenue || 0).toLocaleString('th-TH');
+
+  adminRevenueSummary = {
+    todayRevenue: stats.todayRevenue || 0,
+    weekRevenue: stats.weekRevenue || 0,
+    monthRevenue: stats.monthRevenue || 0
+  };
+  adminRevenueHistory = Array.isArray(stats.revenueHistory) ? stats.revenueHistory : [];
+  renderAdminRevenueHistory();
+}
+
+window.setAdminRevenuePeriod = function(period) {
+  if (!['daily', 'weekly', 'monthly'].includes(period)) return;
+  adminRevenuePeriod = period;
+  document.querySelectorAll('#admin-stats [data-revenue-period]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.revenuePeriod === period);
+  });
+  renderAdminRevenueHistory();
+};
+
+// Group the daily revenue history (as returned by the server) into weekly
+// (Mon-Sun, Thailand calendar) or monthly buckets for display. Daily rows
+// are already one-per-day so they pass through unchanged.
+function groupAdminRevenueHistory(period) {
+  if (period === 'daily') {
+    return adminRevenueHistory.map((row) => ({
+      label: thaiDateOnly(row.date),
+      total: row.total,
+      count: row.count
+    }));
+  }
+
+  const buckets = new Map(); // bucketKey -> { total, count, sortKey }
+  adminRevenueHistory.forEach((row) => {
+    const day = new Date(`${row.date}T00:00:00+07:00`);
+    if (Number.isNaN(day.getTime())) return;
+    let bucketKey;
+    let sortKey;
+    if (period === 'monthly') {
+      bucketKey = row.date.slice(0, 7); // YYYY-MM
+      sortKey = bucketKey;
+    } else {
+      // Monday-anchored week start containing this day.
+      const weekday = day.getUTCDay(); // 0=Sun..6=Sat
+      const diffToMonday = weekday === 0 ? 6 : weekday - 1;
+      const weekStart = new Date(day);
+      weekStart.setUTCDate(weekStart.getUTCDate() - diffToMonday);
+      bucketKey = weekStart.toISOString().slice(0, 10);
+      sortKey = bucketKey;
+    }
+    const existing = buckets.get(bucketKey) || { total: 0, count: 0, sortKey };
+    existing.total += Number(row.total) || 0;
+    existing.count += Number(row.count) || 0;
+    buckets.set(bucketKey, existing);
+  });
+
+  return [...buckets.entries()]
+    .sort((a, b) => (a[1].sortKey < b[1].sortKey ? 1 : -1))
+    .map(([bucketKey, value]) => ({
+      label: period === 'monthly' ? thaiMonthLabel(bucketKey) : thaiWeekLabel(bucketKey),
+      total: value.total,
+      count: value.count
+    }));
+}
+
+function thaiDateOnly(dateKey) {
+  const date = new Date(`${dateKey}T00:00:00+07:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric'
+  }).format(date);
+}
+
+function thaiMonthLabel(monthKey) {
+  const date = new Date(`${monthKey}-01T00:00:00+07:00`);
+  if (Number.isNaN(date.getTime())) return monthKey;
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok', month: 'long', year: 'numeric'
+  }).format(date);
+}
+
+function thaiWeekLabel(weekStartKey) {
+  const start = new Date(`${weekStartKey}T00:00:00+07:00`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  return `${thaiDateOnly(weekStartKey)} - ${thaiDateOnly(end.toISOString().slice(0, 10))}`;
+}
+
+function renderAdminRevenueHistory() {
+  const labelEl = document.getElementById('admin-revenue-summary-label');
+  const totalEl = document.getElementById('admin-revenue-summary-total');
+  const titleEl = document.getElementById('admin-revenue-history-title');
+  const rows = document.getElementById('admin-revenue-history-rows');
+  if (!rows) return;
+
+  const periodLabels = { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน' };
+  const summaryByPeriod = {
+    daily: { label: 'รายได้วันนี้', total: adminRevenueSummary.todayRevenue },
+    weekly: { label: 'รายได้ 7 วันล่าสุด', total: adminRevenueSummary.weekRevenue },
+    monthly: { label: 'รายได้ 30 วันล่าสุด', total: adminRevenueSummary.monthRevenue }
+  };
+  const summary = summaryByPeriod[adminRevenuePeriod];
+  if (labelEl) labelEl.textContent = summary.label;
+  if (totalEl) totalEl.textContent = numberText(summary.total);
+  if (titleEl) titleEl.textContent = `ประวัติรายได้ (${periodLabels[adminRevenuePeriod]})`;
+
+  const grouped = groupAdminRevenueHistory(adminRevenuePeriod);
+  if (!grouped.length) {
+    rows.innerHTML = `<tr><td colspan="3" class="farm-empty-cell"><span>💤</span> ยังไม่มีข้อมูลรายได้ในระบบ</td></tr>`;
+    return;
+  }
+  rows.innerHTML = grouped.map((row) => `
+    <tr>
+      <td data-label="ช่วงเวลา">${escapeHtml(row.label)}</td>
+      <td data-label="รายได้ (บาท)">${numberText(row.total)}</td>
+      <td data-label="จำนวนรายการเติมเงิน">${numberText(row.count)}</td>
+    </tr>
+  `).join('');
 }
 
 function renderAdminUsersTable() {
