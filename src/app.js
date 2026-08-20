@@ -240,7 +240,8 @@ const DEFAULT_SETTINGS = {
     { id: 'farm', icon: '💰📦', label: 'ฟาร์มเงิน/กล่อง', description: 'วิ่งเก็บกล่องออโต้รันตลอดวัน', status: 'normal', url: '', tutorialUrl: '' },
     { id: 'powder', icon: '🧪', label: 'ย่อยผง', description: 'ย่อยผงอัตโนมัติ เปิดพร้อมกันได้หลายจอ', status: 'normal', url: '', tutorialUrl: '' },
     { id: 'friend', icon: '💌', label: 'เพิ่มเพื่อน/ส่งใจ', description: 'เพิ่มเพื่อนและส่งใจให้ครบทุกวัน (แบบเพิ่มเพื่อนปกติครบ 300 คน และส่งใจตรงรายชื่อเพื่อนทุกคน)', status: 'normal', url: '', tutorialUrl: 'https://youtu.be/hBXOy-5lAyQ' },
-    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', status: 'normal', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' }
+    { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', status: 'normal', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' },
+    { id: 'reid', icon: '🆔', label: 'รีไอดี', description: 'เดินไอดีใหม่ผ่านขั้นตอนเริ่มเกมและเก็บกล่องต้อนรับให้อัตโนมัติ', status: 'normal', url: '', tutorialUrl: '' }
   ],
   plans: {
     day1: { label: '1 วัน', days: 1, price: 15 },
@@ -520,6 +521,22 @@ function renderHomeBotMenu(settings = getSystemSettings()) {
     status.append(dot, statusText);
 
     card.append(icon, title, note, status);
+
+    if (item.url) {
+      const downloadBtn = document.createElement('a');
+      downloadBtn.className = 'btn-primary home-bot-download-btn';
+      downloadBtn.href = item.url;
+      downloadBtn.target = '_blank';
+      downloadBtn.rel = 'noopener noreferrer';
+      downloadBtn.textContent = '⬇️ ดาวน์โหลด';
+      if (item.status === 'maintenance') {
+        downloadBtn.classList.add('disabled');
+        downloadBtn.setAttribute('aria-disabled', 'true');
+        downloadBtn.addEventListener('click', (event) => event.preventDefault());
+      }
+      card.append(downloadBtn);
+    }
+
     return card;
   }));
 }
