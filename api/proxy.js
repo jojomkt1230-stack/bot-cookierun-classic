@@ -1003,28 +1003,36 @@ function mapMember(member) {
 }
 
 function mapTopup(topup) {
-  const sourceStatus = String(topup?.status || 'pending');
-  const status = sourceStatus === 'verified'
+  const sourceStatus = String(topup?.status || 'pending').toLowerCase();
+  const status = sourceStatus === 'verified' || sourceStatus === 'approved'
     ? 'approved'
-    : sourceStatus === 'cancelled'
+    : sourceStatus === 'cancelled' || sourceStatus === 'rejected' || sourceStatus === 'duplicate'
       ? 'rejected'
       : 'pending';
+  const createdAt = topup?.created_at || topup?.createdAt || null;
+  const verifiedAt = topup?.verified_at
+    || topup?.processed_at
+    || topup?.processedAt
+    || (status === 'approved' ? createdAt : null);
+  const rawAmount = topup?.amount ?? (
+    Number.isFinite(Number(topup?.amountSatang)) ? Number(topup.amountSatang) / 100 : 0
+  );
 
   return {
-    _id: String(topup?.id || ''),
-    id: String(topup?.id || ''),
-    orderId: String(topup?.id || ''),
-    memberCode: String(topup?.member_code || ''),
-    username: String(topup?.username || topup?.display_name || topup?.member_code || ''),
-    amount: Number(topup?.amount || 0),
-    diamonds: Number(topup?.credits || 0),
-    credits: Number(topup?.credits || 0),
+    _id: String(topup?.id || topup?._id || topup?.orderId || ''),
+    id: String(topup?.id || topup?._id || topup?.orderId || ''),
+    orderId: String(topup?.id || topup?._id || topup?.orderId || ''),
+    memberCode: String(topup?.member_code || topup?.memberCode || ''),
+    username: String(topup?.username || topup?.display_name || topup?.displayName || topup?.member_code || topup?.memberCode || ''),
+    amount: Number(rawAmount || 0),
+    diamonds: Number(topup?.credits ?? topup?.diamonds ?? 0),
+    credits: Number(topup?.credits ?? topup?.diamonds ?? 0),
     status,
     sourceStatus,
-    slipRef: String(topup?.slip_reference || ''),
-    hasSlip: Boolean(topup?.has_slip),
-    createdAt: topup?.created_at || null,
-    verifiedAt: topup?.verified_at || null
+    slipRef: String(topup?.slip_reference || topup?.slipRef || ''),
+    hasSlip: Boolean(topup?.has_slip ?? topup?.hasSlip ?? topup?.slipRef),
+    createdAt,
+    verifiedAt
   };
 }
 
@@ -1151,6 +1159,46 @@ function thailandDate(value = new Date()) {
   }).format(value);
 }
 
+export function summarizeAdminRevenue(topups = [], now = new Date()) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const today = thailandDate(now);
+  const weekStart = thailandDate(new Date(now.getTime() - (6 * dayMs)));
+  const monthStart = thailandDate(new Date(now.getTime() - (29 * dayMs)));
+  const history = new Map();
+
+  for (const item of topups) {
+    const status = String(item?.status || '').toLowerCase();
+    if (status !== 'approved' && status !== 'verified') continue;
+    const occurredAt = new Date(
+      item.verifiedAt || item.verified_at || item.processedAt || item.processed_at || item.createdAt || item.created_at || ''
+    );
+    const amount = Number(item.amount ?? (
+      Number.isFinite(Number(item.amountSatang)) ? Number(item.amountSatang) / 100 : 0
+    ));
+    if (!Number.isFinite(occurredAt.getTime()) || !Number.isFinite(amount)) continue;
+
+    const date = thailandDate(occurredAt);
+    const row = history.get(date) || { date, total: 0, count: 0 };
+    row.total += amount;
+    row.count += 1;
+    history.set(date, row);
+  }
+
+  const revenueHistory = Array.from(history.values()).sort((left, right) => (
+    right.date.localeCompare(left.date)
+  ));
+  const sumSince = (start) => revenueHistory
+    .filter((row) => row.date >= start && row.date <= today)
+    .reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    todayRevenue: history.get(today)?.total || 0,
+    weekRevenue: sumSince(weekStart),
+    monthRevenue: sumSince(monthStart),
+    revenueHistory
+  };
+}
+
 async function adminUsers(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
@@ -1245,18 +1293,13 @@ async function adminStats(request) {
 
   const members = (overview.data.members || []).map(mapMember);
   const topups = await combinedAdminTopups(overview.data);
-  const today = thailandDate();
-  const todayRevenue = topups
-    .filter((item) => item.status === 'approved'
-      && item.verifiedAt
-      && thailandDate(new Date(item.verifiedAt)) === today)
-    .reduce((sum, item) => sum + item.amount, 0);
+  const revenue = summarizeAdminRevenue(topups);
 
   return json({
     totalUsers: members.length,
     activeUsers: members.filter((item) => item.isActive).length,
     pendingTopups: topups.filter((item) => item.status === 'pending').length,
-    todayRevenue
+    ...revenue
   });
 }
 

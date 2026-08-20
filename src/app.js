@@ -2088,6 +2088,42 @@ let adminRevenueHistory = []; // [{date: 'YYYY-MM-DD', total, count}, ...] newes
 let adminRevenueSummary = { todayRevenue: 0, weekRevenue: 0, monthRevenue: 0 };
 let adminRevenuePeriod = 'daily';
 
+// Safety net for mixed/older deployments: the top-up table is an independent
+// endpoint and already contains the source records. If /admin/stats is missing
+// its history fields, rebuild the exact Thailand-day totals here instead of
+// silently rendering an empty revenue table.
+function summarizeAdminRevenueFromTopups(topups = [], now = new Date()) {
+  const today = thailandDateKey(now);
+  const dayMs = 86_400_000;
+  const weekStart = thailandDateKey(new Date(now.getTime() - 6 * dayMs));
+  const monthStart = thailandDateKey(new Date(now.getTime() - 29 * dayMs));
+  const byDate = new Map();
+
+  topups.forEach((item) => {
+    if (String(item?.status || '').toLowerCase() !== 'approved') return;
+    const occurredAt = item.verifiedAt || item.createdAt;
+    const timestamp = new Date(occurredAt || '');
+    const amount = Number(item.amount);
+    if (Number.isNaN(timestamp.getTime()) || !Number.isFinite(amount)) return;
+    const date = thailandDateKey(timestamp);
+    const row = byDate.get(date) || { date, total: 0, count: 0 };
+    row.total += amount;
+    row.count += 1;
+    byDate.set(date, row);
+  });
+
+  const revenueHistory = [...byDate.values()].sort((left, right) => right.date.localeCompare(left.date));
+  const totalSince = (start) => revenueHistory
+    .filter((row) => row.date >= start && row.date <= today)
+    .reduce((sum, row) => sum + row.total, 0);
+  return {
+    todayRevenue: byDate.get(today)?.total || 0,
+    weekRevenue: totalSince(weekStart),
+    monthRevenue: totalSince(monthStart),
+    revenueHistory
+  };
+}
+
 // ── Admin: player farm data (list of every member + per-member detail) ──
 let adminFarmDataList = [];
 let adminFarmDetailEvents = [];
@@ -2327,9 +2363,22 @@ async function updateAdminPanelStats() {
   try {
     stats = (await axios.get(`${API_BASE_URL}/admin/stats`, adminApiConfig())).data;
   } catch (error) {
-    window.showToast(getApiErrorMessage(error, 'โหลดสถิติไม่สำเร็จ'), 'error');
-    return;
+    if (!adminTopups.length) {
+      window.showToast(getApiErrorMessage(error, 'โหลดสถิติไม่สำเร็จ'), 'error');
+      return;
+    }
+    stats = {
+      ...summarizeAdminRevenueFromTopups(adminTopups),
+      totalUsers: adminUsers.length,
+      activeUsers: adminUsers.filter((item) => item.isActive).length,
+      pendingTopups: adminTopups.filter((item) => item.status === 'pending').length
+    };
   }
+
+  const fallback = summarizeAdminRevenueFromTopups(adminTopups);
+  const serverHistory = Array.isArray(stats.revenueHistory) ? stats.revenueHistory : [];
+  const history = serverHistory.length ? serverHistory : fallback.revenueHistory;
+  const summarySource = serverHistory.length || !fallback.revenueHistory.length ? stats : fallback;
 
   if (totalUsersEl) totalUsersEl.textContent = stats.totalUsers || 0;
   if (activeUsersEl) activeUsersEl.textContent = stats.activeUsers || 0;
@@ -2337,11 +2386,11 @@ async function updateAdminPanelStats() {
   if (revenueEl) revenueEl.textContent = Number(stats.todayRevenue || 0).toLocaleString('th-TH');
 
   adminRevenueSummary = {
-    todayRevenue: stats.todayRevenue || 0,
-    weekRevenue: stats.weekRevenue || 0,
-    monthRevenue: stats.monthRevenue || 0
+    todayRevenue: Number(summarySource.todayRevenue) || 0,
+    weekRevenue: Number(summarySource.weekRevenue) || 0,
+    monthRevenue: Number(summarySource.monthRevenue) || 0
   };
-  adminRevenueHistory = Array.isArray(stats.revenueHistory) ? stats.revenueHistory : [];
+  adminRevenueHistory = history;
   renderAdminRevenueHistory();
 }
 
