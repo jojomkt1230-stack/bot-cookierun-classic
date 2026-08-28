@@ -130,14 +130,17 @@ export async function listFarmEvents(memberCode, limit = MAX_MEMBER_EVENTS) {
   // same up-to-5000 keys as ONE Redis command instead of 5000, so this
   // endpoint's quota cost drops from 5000 to 1 per page load without losing
   // any of the weekly/monthly data the 2000->5000 change was fixing.
-  const current = sessionStorageConfigured()
-    ? await readFarmEventsFrom(sessionRedisCommand, cleanMemberCode, count, 'primary storage')
-    : [];
-  const legacy = dedicatedSessionStorageSelected() && codeStorageConfigured()
-    ? await readFarmEventsFrom(redisCommand, cleanMemberCode, count, 'legacy storage')
-    : [];
+  const [current, legacy] = await Promise.all([
+    sessionStorageConfigured()
+      ? readFarmEventsFrom(sessionRedisCommand, cleanMemberCode, count, 'primary storage')
+      : [],
+    dedicatedSessionStorageSelected() && codeStorageConfigured()
+      ? readFarmEventsFrom(redisCommand, cleanMemberCode, count, 'legacy storage')
+      : []
+  ]);
   const unique = new Map([...current, ...legacy].map((event) => [event.eventId, event]));
   return [...unique.values()]
+    .filter((event) => event.botType === 'coin')
     .sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))
     .slice(0, count);
 }

@@ -233,7 +233,7 @@ const DEFAULT_SETTINGS = {
   promptPayNumber: '',
   promptPayAccountName: '',
   promptPayQrUrl: '',
-  botName: 'Ckrcsbot V18.1',
+  botName: 'BotCKRC V1.87',
   siteName: 'CKRCS BOT',
   botUrl: 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq',
   downloadItems: [
@@ -243,6 +243,23 @@ const DEFAULT_SETTINGS = {
     { id: 'account', icon: '🆕', label: 'สมัครไอดี/ส่งใจ/เพิ่มเพื่อน', description: 'สมัครไอดีใหม่ ส่งใจ และเพิ่มเพื่อนในตัวเดียว (วนส่งใจให้ไอดีที่ขาดหัวใจ รองรับหลายจอ)', status: 'normal', url: '', tutorialUrl: 'https://youtu.be/BVrpmF8Qarc' },
     { id: 'reid', icon: '🆔', label: 'รีไอดี', description: 'เดินไอดีใหม่ผ่านขั้นตอนเริ่มเกมและเก็บกล่องต้อนรับให้อัตโนมัติ', status: 'normal', url: '', tutorialUrl: '' }
   ],
+  setupGuide: {
+    pageIcon: '⬇️',
+    pageTitle: 'ดาวน์โหลดบอทและวิธีตั้งค่า',
+    downloadIcon: '⬇️',
+    downloadText: 'ดาวน์โหลดบอท',
+    setupIcon: '⚙️',
+    setupTitle: 'การตั้งค่า LDPlayer และ MuMu',
+    cards: [
+      { id: 'ldplayer', icon: '📱', title: '1. ตั้งค่า LDPlayer', content: '📱 การแสดงผล\nเลือก แท็บเล็ต → ความละเอียด 1280x720 (DPI 240)\n\n⚠️ สำคัญ: กรุณาปรับขนาดหน้าจอ LD/MuMu ก่อนใช้งานบอท\n\n⚡ ประสิทธิภาพ\nCPU: 3 cores\nRAM: 3072 MB\nเฟรมเรท: 60\n\n🌐 เครือข่าย\nใช้การ์ดเครือข่ายตามที่คอมมีอยู่จริง\n\n🔧 การตั้งค่าอื่น\nเปิดการดีบัก ADB → เลือกเปิดการเชื่อมต่อ', backgroundColor: '#06172d', borderColor: '#00bce8', textColor: '#d9f6ff' },
+      { id: 'mumu', icon: '📲', title: '2. ตั้งค่า MuMu', content: 'ตั้งค่าเหมือน LDPlayer ทุกอย่าง\nจุดเปิด ADB อยู่ที่หน้า ตัวเลือกนักพัฒนา → เปิดเหมือน LDPlayer', backgroundColor: '#06172d', borderColor: '#00bce8', textColor: '#d9f6ff' },
+      { id: 'model', icon: '📱', title: '3. ตั้งค่าโมเดลโทรศัพท์ MuMu (ROG Phone 9)', content: '⚠️ สำคัญ หากใช้บอทสมัครไอดีแล้วบอททำงานผิดพลาด\n\n⚙️ เปิด MuMu Player แล้วกดการตั้งค่ามุมขวาบน\n📲 เข้าเมนู รุ่น (Model)\n🏭 ยี่ห้อโทรศัพท์: Asus\n📱 รุ่นโทรศัพท์: ROG Phone 9\n🆔 รุ่นตัวเครื่อง: ASUSAI2501B\n💾 กดบันทึก ปิด MuMu แล้วเปิดใหม่', backgroundColor: '#100d2b', borderColor: '#a855f7', textColor: '#eee7ff' },
+      { id: 'multi', icon: '💡', title: 'คำแนะนำการใช้งานบอทเพิ่มเติม', content: 'ฟาร์ม 1 ไอดี หลายอย่างพร้อมกันได้\nจอที่ 1 → ฟาร์มเหรียญ 💰\nจอที่ 2 → ปล่อยบอทย่อยผง 🧪\nจอที่ 3 → ปล่อยบอทย่อยผง 🧪', backgroundColor: '#06172d', borderColor: '#00bce8', textColor: '#d9f6ff' },
+      { id: 'warning', icon: '⚠️', title: 'สำคัญ', content: 'ต้องไม่ใช้จอที่คัดลอกมา ต้องสร้างจอใหม่เท่านั้น ไม่งั้นอาจจะหลุด', backgroundColor: '#282000', borderColor: '#ffd43b', textColor: '#ffe66d' },
+      { id: 'danger', icon: '🚫', title: 'ข้อห้ามสำคัญ', content: 'ห้ามเปิดวิ่งเหรียญพร้อมกัน 2 จอ → เกมจะหลุด', backgroundColor: '#2b0613', borderColor: '#ff3366', textColor: '#ff9ab3' },
+      { id: 'powder', icon: '✨', title: 'การย่อยผง', content: 'สามารถย่อยผงพร้อมกันได้ 2–5 จอ (หรือมากกว่า)\nต้องเตรียมช่องนมให้พอ\nสูงสุด 16 กล่องต่อรอบ จะพอดีกับหน้าย่อยผง', backgroundColor: '#06172d', borderColor: '#00bce8', textColor: '#d9f6ff' }
+    ]
+  },
   plans: {
     day1: { label: '1 วัน', days: 1, price: 15 },
     day3: { label: '3 วัน', days: 3, price: 40 },
@@ -267,12 +284,23 @@ const DEFAULT_SETTINGS = {
 };
 
 let systemSettings = { ...DEFAULT_SETTINGS };
+let settingsRetryTimer = null;
+
+function normalizeCachedSystemSettings(value) {
+  const cached = value && typeof value === 'object' ? { ...value } : {};
+  // These values were bundled by older releases and can remain in a
+  // customer's localStorage when the settings API is temporarily offline.
+  if (/^ckrcsbot\s+v18\.1$/i.test(String(cached.botName || '').trim())) {
+    cached.botName = DEFAULT_SETTINGS.botName;
+  }
+  return cached;
+}
 
 function getSystemSettings() {
   const saved = safeStorageGet('systemSettings');
   if (saved) {
     try {
-      systemSettings = { ...systemSettings, ...JSON.parse(saved) };
+      systemSettings = { ...systemSettings, ...normalizeCachedSystemSettings(JSON.parse(saved)) };
     } catch (e) {}
   }
   return systemSettings;
@@ -287,13 +315,24 @@ function saveSystemSettings(settings) {
 async function loadSystemSettings(useAdminEndpoint = false) {
   try {
     const config = useAdminEndpoint ? adminApiConfig() : {};
+    config.headers = { ...(config.headers || {}), 'Cache-Control': 'no-cache' };
+    config.params = { ...(config.params || {}), _t: Date.now() };
+    config.timeout = 12_000;
     const endpoint = useAdminEndpoint ? 'admin/settings' : 'settings';
     const response = await axios.get(`${API_BASE_URL}/${endpoint}`, config);
     saveSystemSettings({ ...getSystemSettings(), ...response.data });
+    if (settingsRetryTimer) window.clearTimeout(settingsRetryTimer);
+    settingsRetryTimer = null;
   } catch (error) {
     console.warn('[SETTINGS] ใช้ค่าที่บันทึกไว้ชั่วคราว:', error?.message || error);
     applySystemSettingsToUI();
     if (useAdminEndpoint) throw error;
+    if (!settingsRetryTimer) {
+      settingsRetryTimer = window.setTimeout(() => {
+        settingsRetryTimer = null;
+        loadSystemSettings(false);
+      }, 3_000);
+    }
   }
   return getSystemSettings();
 }
@@ -472,7 +511,160 @@ function updateDownloadPanel(settings = getSystemSettings()) {
   renderHomeBotMenu(settings);
   renderHomeTutorialList(settings);
   renderDownloadItemsEditor(settings);
+  renderSetupGuide(settings);
+  renderSetupGuideEditor(settings);
 }
+
+function setupGuideOf(settings = getSystemSettings()) {
+  const saved = settings?.setupGuide && typeof settings.setupGuide === 'object'
+    ? settings.setupGuide
+    : {};
+  const defaults = DEFAULT_SETTINGS.setupGuide;
+  return {
+    pageIcon: String(saved.pageIcon || defaults.pageIcon),
+    pageTitle: String(saved.pageTitle || defaults.pageTitle),
+    downloadIcon: String(saved.downloadIcon || defaults.downloadIcon),
+    downloadText: String(saved.downloadText || defaults.downloadText),
+    setupIcon: String(saved.setupIcon || defaults.setupIcon),
+    setupTitle: String(saved.setupTitle || defaults.setupTitle),
+    cards: Array.isArray(saved.cards) && saved.cards.length ? saved.cards : defaults.cards
+  };
+}
+
+function renderSetupGuide(settings = getSystemSettings()) {
+  const guide = setupGuideOf(settings);
+  const pageTitle = document.getElementById('download-page-title');
+  const buttonIcon = document.getElementById('download-button-icon');
+  const buttonText = document.getElementById('download-button-text');
+  const setupTitle = document.getElementById('setup-page-title');
+  const preview = document.getElementById('setup-guide-preview');
+  if (pageTitle) pageTitle.textContent = `${guide.pageIcon} ${guide.pageTitle}`;
+  if (buttonIcon) buttonIcon.textContent = guide.downloadIcon;
+  if (buttonText) buttonText.textContent = guide.downloadText;
+  if (setupTitle) setupTitle.textContent = `${guide.setupIcon} ${guide.setupTitle}`;
+  if (!preview) return;
+
+  const heading = document.createElement('h3');
+  heading.id = 'emulator-setup-title';
+  heading.textContent = `${guide.setupIcon} ${guide.setupTitle}`;
+  const cards = guide.cards.map((card) => {
+    const section = document.createElement('section');
+    section.className = 'emulator-guide-section setup-custom-card';
+    section.style.setProperty('--setup-bg', card.backgroundColor || '#06172d');
+    section.style.setProperty('--setup-border', card.borderColor || '#00bce8');
+    section.style.setProperty('--setup-text', card.textColor || '#d9f6ff');
+    const title = document.createElement('h4');
+    title.textContent = `${card.icon || '📌'} ${card.title || 'หัวข้อ'}`;
+    const content = document.createElement('div');
+    content.className = 'setup-custom-content';
+    content.textContent = card.content || '';
+    section.append(title, content);
+    return section;
+  });
+  preview.replaceChildren(heading, ...cards);
+}
+
+function createSetupGuideEditorRow(card) {
+  const row = document.createElement('div');
+  row.className = 'setup-guide-editor-row';
+  row.dataset.itemId = card.id || `setup-${Date.now()}`;
+  row.innerHTML = `
+    <div class="download-item-heading-row">
+      <strong class="setup-guide-editor-heading"></strong>
+      <button type="button" class="download-item-remove">🗑️ ลบช่อง</button>
+    </div>
+    <div class="setup-guide-title-fields">
+      <label>อีโมจิ<input class="admin-input setup-card-icon" maxlength="16"></label>
+      <label>หัวข้อ<input class="admin-input setup-card-title" maxlength="100"></label>
+    </div>
+    <label>ข้อความในช่อง<textarea class="admin-input admin-textarea setup-card-content" maxlength="1200"></textarea></label>
+    <div class="setup-guide-color-fields">
+      <label>สีพื้นช่อง<input type="color" class="setup-card-background"></label>
+      <label>สีขอบช่อง<input type="color" class="setup-card-border"></label>
+      <label>สีตัวหนังสือ<input type="color" class="setup-card-text"></label>
+    </div>`;
+  const icon = row.querySelector('.setup-card-icon');
+  const title = row.querySelector('.setup-card-title');
+  const heading = row.querySelector('.setup-guide-editor-heading');
+  icon.value = card.icon || '📌';
+  title.value = card.title || 'หัวข้อใหม่';
+  row.querySelector('.setup-card-content').value = card.content || '';
+  row.querySelector('.setup-card-background').value = card.backgroundColor || '#06172d';
+  row.querySelector('.setup-card-border').value = card.borderColor || '#00bce8';
+  row.querySelector('.setup-card-text').value = card.textColor || '#d9f6ff';
+  const updateHeading = () => { heading.textContent = `${icon.value || '📌'} ${title.value || 'หัวข้อใหม่'}`; };
+  icon.addEventListener('input', updateHeading);
+  title.addEventListener('input', updateHeading);
+  row.querySelector('.download-item-remove').addEventListener('click', () => row.remove());
+  updateHeading();
+  return row;
+}
+
+function renderSetupGuideEditor(settings = getSystemSettings()) {
+  const editor = document.getElementById('setup-guide-editor');
+  if (!editor) return;
+  const guide = setupGuideOf(settings);
+  const fields = {
+    'setup-page-icon-input': guide.pageIcon,
+    'setup-page-title-input': guide.pageTitle,
+    'setup-download-icon-input': guide.downloadIcon,
+    'setup-download-text-input': guide.downloadText,
+    'setup-title-icon-input': guide.setupIcon,
+    'setup-title-input': guide.setupTitle
+  };
+  Object.entries(fields).forEach(([id, value]) => {
+    const input = document.getElementById(id);
+    if (input) input.value = value;
+  });
+  editor.replaceChildren(...guide.cards.map(createSetupGuideEditorRow));
+}
+
+window.addSetupGuideCard = function() {
+  const editor = document.getElementById('setup-guide-editor');
+  if (!editor) return;
+  if (editor.children.length >= 20) {
+    window.showToast('เพิ่มช่องคำแนะนำได้สูงสุด 20 ช่อง', 'error');
+    return;
+  }
+  editor.append(createSetupGuideEditorRow({
+    id: `setup-${Date.now()}`,
+    icon: '📌', title: 'หัวข้อใหม่', content: '',
+    backgroundColor: '#06172d', borderColor: '#00bce8', textColor: '#d9f6ff'
+  }));
+};
+
+window.saveSetupGuide = async function() {
+  const rows = [...document.querySelectorAll('#setup-guide-editor .setup-guide-editor-row')];
+  if (!rows.length) {
+    window.showToast('ต้องมีช่องคำแนะนำอย่างน้อย 1 ช่อง', 'error');
+    return;
+  }
+  const value = (id, fallback = '') => document.getElementById(id)?.value.trim() || fallback;
+  const setupGuide = {
+    pageIcon: value('setup-page-icon-input', '⬇️'),
+    pageTitle: value('setup-page-title-input', 'ดาวน์โหลดบอทและวิธีตั้งค่า'),
+    downloadIcon: value('setup-download-icon-input', '⬇️'),
+    downloadText: value('setup-download-text-input', 'ดาวน์โหลดบอท'),
+    setupIcon: value('setup-title-icon-input', '⚙️'),
+    setupTitle: value('setup-title-input', 'การตั้งค่า LDPlayer และ MuMu'),
+    cards: rows.map((row) => ({
+      id: row.dataset.itemId,
+      icon: row.querySelector('.setup-card-icon').value.trim() || '📌',
+      title: row.querySelector('.setup-card-title').value.trim() || 'หัวข้อใหม่',
+      content: row.querySelector('.setup-card-content').value.trim(),
+      backgroundColor: row.querySelector('.setup-card-background').value,
+      borderColor: row.querySelector('.setup-card-border').value,
+      textColor: row.querySelector('.setup-card-text').value
+    }))
+  };
+  try {
+    await axios.post(`${API_BASE_URL}/admin/settings`, { setupGuide }, adminApiConfig());
+    await loadSystemSettings(true);
+    window.showToast('บันทึกหน้าดาวน์โหลดและการตั้งค่าแล้ว', 'success');
+  } catch (error) {
+    window.showToast(getApiErrorMessage(error, 'บันทึกหน้าดาวน์โหลดไม่สำเร็จ'), 'error');
+  }
+};
 
 function downloadItemsOf(settings = getSystemSettings()) {
   const saved = Array.isArray(settings.downloadItems)
@@ -494,6 +686,8 @@ function downloadItemsOf(settings = getSystemSettings()) {
 function renderHomeBotMenu(settings = getSystemSettings()) {
   const grid = document.getElementById('home-bot-menu-grid');
   if (!grid) return;
+
+  const activeLicense = licenseIsActive();
 
   grid.replaceChildren(...downloadItemsOf(settings).map((item) => {
     const card = document.createElement('article');
@@ -525,15 +719,25 @@ function renderHomeBotMenu(settings = getSystemSettings()) {
     if (item.url) {
       const downloadBtn = document.createElement('a');
       downloadBtn.className = 'btn-primary home-bot-download-btn';
-      downloadBtn.href = item.url;
+      const canDownload = activeLicense && item.status !== 'maintenance';
+      downloadBtn.href = canDownload ? item.url : '#';
       downloadBtn.target = '_blank';
       downloadBtn.rel = 'noopener noreferrer';
       downloadBtn.textContent = '⬇️ ดาวน์โหลด';
-      if (item.status === 'maintenance') {
+      if (!canDownload) {
         downloadBtn.classList.add('disabled');
         downloadBtn.setAttribute('aria-disabled', 'true');
-        downloadBtn.addEventListener('click', (event) => event.preventDefault());
       }
+      downloadBtn.addEventListener('click', (event) => {
+        if (item.status !== 'maintenance' && licenseIsActive()) return;
+        event.preventDefault();
+        window.showToast(
+          item.status === 'maintenance'
+            ? 'บอทนี้กำลังปรับปรุง ยังไม่สามารถดาวน์โหลดได้'
+            : 'ต้องมีวันใช้งานก่อนจึงจะดาวน์โหลดได้ กรุณาเติมวันใช้งาน',
+          'error'
+        );
+      });
       card.append(downloadBtn);
     }
 
@@ -1488,10 +1692,37 @@ let farmHistoryEvents = [];
 let farmHistoryPeriod = 'daily';
 let farmHistoryTimer = null;
 let farmDateListenerReady = false;
-let farmBotTypeFilter = 'all';
+let farmBotTypeFilter = 'coin';
 let farmDeviceFilter = 'all';
 let farmHistoryLoaded = false;
 let farmHistoryLoading = false;
+function farmHistoryCacheKey() {
+  try {
+    const user = JSON.parse(safeStorageGet('user') || '{}');
+    const identity = String(user.memberCode || user.member_code || user.username || '').trim();
+    return identity ? `farmHistoryEventsCacheV1:${identity}` : '';
+  } catch {
+    return '';
+  }
+}
+
+function restoreFarmHistoryCache() {
+  if (farmHistoryLoaded) return false;
+  const key = farmHistoryCacheKey();
+  const saved = key ? safeStorageGet(key) : '';
+  if (!saved) return false;
+  try {
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed?.events) || Date.now() - Number(parsed.savedAt || 0) > 15 * 60_000) return false;
+    farmHistoryEvents = parsed.events;
+    farmHistoryLoaded = true;
+    computeRoundDurations(farmHistoryEvents);
+    renderFarmHistory();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function farmDeviceLabel(deviceId) {
   const match = /(\d{1,2})\s*$/.exec(String(deviceId || '').trim());
@@ -1541,7 +1772,7 @@ function farmEventsForSelection() {
   const dateInput = document.getElementById('farm-history-date');
   const selected = dateInput?.value || thailandDateKey();
   const matches = (event) => (
-    (farmBotTypeFilter === 'all' || event.botType === farmBotTypeFilter)
+    event.botType === 'coin'
     && (farmDeviceFilter === 'all' || event.deviceId === farmDeviceFilter)
   );
 
@@ -1565,8 +1796,8 @@ function farmEventsForSelection() {
 }
 
 window.setFarmBotType = function(type) {
-  if (!['all', 'coin', 'powder'].includes(type)) return;
-  farmBotTypeFilter = type;
+  if (type !== 'coin') return;
+  farmBotTypeFilter = 'coin';
   document.querySelectorAll('.farm-bottype-tab').forEach((button) => {
     button.classList.toggle('active', button.dataset.farmBottype === type);
   });
@@ -1594,19 +1825,12 @@ function renderFarmDeviceChips() {
 
 function farmHistoryColumns() {
   const id = { key: 'id', label: 'หมายเลขไอดี' };
-  const bot = { key: 'bot', label: 'บอท' };
   const time = { key: 'time', label: 'เวลา' };
   const round = { key: 'round', label: 'รอบที่' };
   const duration = { key: 'roundDuration', label: 'ระยะเวลารอบ' };
   const version = { key: 'version', label: 'เวอร์ชัน' };
   const status = { key: 'status', label: 'สถานะ' };
-  if (farmBotTypeFilter === 'coin') {
-    return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, duration, version, status];
-  }
-  if (farmBotTypeFilter === 'powder') {
-    return [id, time, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, duration, version, status];
-  }
-  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, duration, version, status];
+  return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, duration, version, status];
 }
 
 function farmHistoryClockTime(value) {
@@ -1620,11 +1844,9 @@ function farmHistoryClockTime(value) {
 function farmHistoryCell(key, event, roundNumber) {
   switch (key) {
     case 'id': return farmDeviceLabel(event.deviceId);
-    case 'bot': return event.botType === 'coin' ? 'บอทเหรียญ' : 'บอทย่อยผง';
     case 'time': return escapeHtml(farmHistoryClockTime(event.occurredAt));
     case 'coins': return `<strong class="farm-value-coins">🪙 ${numberText(event.coins)}</strong>`;
     case 'exp': return `<strong class="farm-value-exp">EXP ${numberText(event.exp)}</strong>`;
-    case 'powder': return `<strong class="farm-value-powder">🧪 ${numberText(event.powder)}</strong>`;
     case 'round': return numberText(roundNumber);
     case 'roundDuration': return formatRoundDurationCell(event.roundDurationSeconds);
     case 'version': return `<span class="farm-table-version">${escapeHtml(event.botVersion || '-')}</span>`;
@@ -1697,22 +1919,17 @@ function renderFarmHistory() {
   const events = farmEventsForSelection();
   const coins = events.reduce((sum, event) => sum + (Number(event.coins) || 0), 0);
   const exp = events.reduce((sum, event) => sum + (Number(event.exp) || 0), 0);
-  const powder = events.reduce((sum, event) => sum + (Number(event.powder) || 0), 0);
   const seconds = events.reduce((sum, event) => sum + (typeof event.roundDurationSeconds === 'number' ? event.roundDurationSeconds : 0), 0);
   const versions = [...new Set(events.map((event) => event.botVersion).filter(Boolean))];
   const periodLabels = { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน' };
 
   document.getElementById('farm-total-coins').textContent = numberText(coins);
   document.getElementById('farm-total-exp').textContent = numberText(exp);
-  document.getElementById('farm-total-powder').textContent = numberText(powder);
   document.getElementById('farm-total-rounds').textContent = numberText(events.length);
   document.getElementById('farm-total-time').textContent = durationText(seconds);
   document.getElementById('farm-details-title').textContent = `รายละเอียดการฟาร์ม (${periodLabels[farmHistoryPeriod]})`;
   document.getElementById('farm-bot-version').textContent = `เวอร์ชัน: ${versions.join(', ') || '-'}`;
 
-  document.getElementById('farm-summary-coins')?.classList.toggle('hidden', farmBotTypeFilter === 'powder');
-  document.getElementById('farm-summary-exp')?.classList.toggle('hidden', farmBotTypeFilter === 'powder');
-  document.getElementById('farm-summary-powder')?.classList.toggle('hidden', farmBotTypeFilter === 'coin');
   renderFarmDeviceChips();
 
   const columns = farmHistoryColumns();
@@ -1730,7 +1947,7 @@ function renderFarmHistory() {
 }
 
 function setFarmHistorySummaryUnavailable(value = '—') {
-  ['farm-total-coins', 'farm-total-exp', 'farm-total-powder', 'farm-total-rounds', 'farm-total-time']
+  ['farm-total-coins', 'farm-total-exp', 'farm-total-rounds', 'farm-total-time']
     .forEach((id) => {
       const element = document.getElementById(id);
       if (element) element.textContent = value;
@@ -1748,7 +1965,7 @@ async function requestFarmHistory() {
       return await axios.get(`${API_BASE_URL}/users/farm-history`, {
         headers: { ...getAuthHeaders(), 'Cache-Control': 'no-cache' },
         params: { _t: Date.now() },
-        timeout: 20_000
+        timeout: 12_000
       });
     } catch (error) {
       lastError = error;
@@ -1764,6 +1981,7 @@ async function requestFarmHistory() {
 async function loadFarmHistory() {
   if (farmHistoryLoading) return;
   farmHistoryLoading = true;
+  const restoredCache = restoreFarmHistoryCache();
   const refreshEl = document.getElementById('farm-history-refresh');
   if (refreshEl) {
     refreshEl.textContent = 'กำลังอัปเดต...';
@@ -1774,6 +1992,8 @@ async function loadFarmHistory() {
     const response = await requestFarmHistory();
     farmHistoryEvents = Array.isArray(response.data?.events) ? response.data.events : [];
     farmHistoryLoaded = true;
+    const cacheKey = farmHistoryCacheKey();
+    if (cacheKey) safeStorageSet(cacheKey, JSON.stringify({ savedAt: Date.now(), events: farmHistoryEvents }));
     computeRoundDurations(farmHistoryEvents);
     renderFarmHistory();
     if (refreshEl) refreshEl.textContent = `อัปเดตล่าสุด ${new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }).format(new Date())}`;
@@ -1783,10 +2003,10 @@ async function loadFarmHistory() {
       ? 'เซสชันในโทรศัพท์หมดอายุ กรุณาออกและเข้าระบบใหม่'
       : getApiErrorMessage(error, 'เชื่อมต่อข้อมูลการฟาร์มไม่สำเร็จ');
     const rows = document.getElementById('farm-history-rows');
-    if (rows) rows.innerHTML = `<tr><td colspan="${farmHistoryColumns().length}" class="farm-empty-cell farm-load-error">${escapeHtml(message)}<br><button type="button" class="farm-inline-retry" onclick="loadFarmHistory()">ลองใหม่ตอนนี้</button></td></tr>`;
+    if (!restoredCache && rows) rows.innerHTML = `<tr><td colspan="${farmHistoryColumns().length}" class="farm-empty-cell farm-load-error">${escapeHtml(message)}<br><button type="button" class="farm-inline-retry" onclick="loadFarmHistory()">ลองใหม่ตอนนี้</button></td></tr>`;
     if (!farmHistoryLoaded) setFarmHistorySummaryUnavailable();
     if (refreshEl) {
-      refreshEl.textContent = 'โหลดไม่สำเร็จ · แตะเพื่อลองใหม่';
+      refreshEl.textContent = restoredCache ? 'แสดงข้อมูลล่าสุด · แตะเพื่ออัปเดต' : 'โหลดไม่สำเร็จ · แตะเพื่อลองใหม่';
       refreshEl.classList.add('farm-load-error');
     }
   } finally {
@@ -2128,7 +2348,7 @@ function summarizeAdminRevenueFromTopups(topups = [], now = new Date()) {
 let adminFarmDataList = [];
 let adminFarmDetailEvents = [];
 let adminFarmPeriod = 'daily';
-let adminFarmBotTypeFilter = 'all';
+let adminFarmBotTypeFilter = 'coin';
 let adminFarmDeviceFilter = 'all';
 let adminFarmCurrentMember = null;
 
@@ -2212,7 +2432,7 @@ window.openAdminFarmDetail = async function(memberCode, username) {
   username = decodeURIComponent(username);
   adminFarmCurrentMember = { memberCode, username };
   adminFarmPeriod = 'daily';
-  adminFarmBotTypeFilter = 'all';
+  adminFarmBotTypeFilter = 'coin';
   adminFarmDeviceFilter = 'all';
   document.querySelectorAll('#admin-farm-detail-view .farm-period-tab').forEach((button) => {
     button.classList.toggle('active', button.dataset.farmPeriod === 'daily');
@@ -2254,8 +2474,8 @@ window.closeAdminFarmDetail = function() {
 };
 
 window.setAdminFarmBotType = function(type) {
-  if (!['all', 'coin', 'powder'].includes(type)) return;
-  adminFarmBotTypeFilter = type;
+  if (type !== 'coin') return;
+  adminFarmBotTypeFilter = 'coin';
   document.querySelectorAll('#admin-farm-detail-view .farm-bottype-tab').forEach((button) => {
     button.classList.toggle('active', button.dataset.farmBottype === type);
   });
@@ -2275,7 +2495,7 @@ function adminFarmEventsForSelection() {
   const dateInput = document.getElementById('admin-farm-detail-date');
   const selected = dateInput?.value || thailandDateKey();
   const matches = (event) => (
-    (adminFarmBotTypeFilter === 'all' || event.botType === adminFarmBotTypeFilter)
+    event.botType === 'coin'
     && (adminFarmDeviceFilter === 'all' || event.deviceId === adminFarmDeviceFilter)
   );
 
@@ -2300,19 +2520,12 @@ function adminFarmEventsForSelection() {
 
 function adminFarmHistoryColumns() {
   const id = { key: 'id', label: 'หมายเลขไอดี' };
-  const bot = { key: 'bot', label: 'บอท' };
   const time = { key: 'time', label: 'เวลา' };
   const round = { key: 'round', label: 'รอบที่' };
   const duration = { key: 'roundDuration', label: 'ระยะเวลารอบ' };
   const version = { key: 'version', label: 'เวอร์ชัน' };
   const status = { key: 'status', label: 'สถานะ' };
-  if (adminFarmBotTypeFilter === 'coin') {
-    return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, duration, version, status];
-  }
-  if (adminFarmBotTypeFilter === 'powder') {
-    return [id, time, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, duration, version, status];
-  }
-  return [id, bot, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, { key: 'powder', label: 'ได้รับผงจากการย่อย' }, round, duration, version, status];
+  return [id, time, { key: 'coins', label: 'เหรียญที่ได้รับ' }, { key: 'exp', label: 'EXP ที่ได้รับ' }, round, duration, version, status];
 }
 
 function renderAdminFarmDetail() {
@@ -2322,22 +2535,17 @@ function renderAdminFarmDetail() {
   const events = adminFarmEventsForSelection();
   const coins = events.reduce((sum, event) => sum + (Number(event.coins) || 0), 0);
   const exp = events.reduce((sum, event) => sum + (Number(event.exp) || 0), 0);
-  const powder = events.reduce((sum, event) => sum + (Number(event.powder) || 0), 0);
   const seconds = events.reduce((sum, event) => sum + (typeof event.roundDurationSeconds === 'number' ? event.roundDurationSeconds : 0), 0);
   const versions = [...new Set(events.map((event) => event.botVersion).filter(Boolean))];
   const periodLabels = { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน' };
 
   document.getElementById('admin-farm-total-coins').textContent = numberText(coins);
   document.getElementById('admin-farm-total-exp').textContent = numberText(exp);
-  document.getElementById('admin-farm-total-powder').textContent = numberText(powder);
   document.getElementById('admin-farm-total-rounds').textContent = numberText(events.length);
   document.getElementById('admin-farm-total-time').textContent = durationText(seconds);
   document.getElementById('admin-farm-details-title').textContent = `รายละเอียดการฟาร์ม (${periodLabels[adminFarmPeriod]})`;
   document.getElementById('admin-farm-bot-version').textContent = `เวอร์ชัน: ${versions.join(', ') || '-'}`;
 
-  document.getElementById('admin-farm-summary-coins')?.classList.toggle('hidden', adminFarmBotTypeFilter === 'powder');
-  document.getElementById('admin-farm-summary-exp')?.classList.toggle('hidden', adminFarmBotTypeFilter === 'powder');
-  document.getElementById('admin-farm-summary-powder')?.classList.toggle('hidden', adminFarmBotTypeFilter === 'coin');
 
   const columns = adminFarmHistoryColumns();
   if (head) head.innerHTML = `<tr>${columns.map((c) => `<th>${c.label}</th>`).join('')}</tr>`;

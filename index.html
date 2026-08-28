@@ -288,7 +288,7 @@
         <section id="section-download" class="content-section hidden">
           <div class="section-header card-panel combined-page-header">
             <span class="combined-page-eyebrow">CKRCS BOT • DOWNLOAD &amp; SETUP</span>
-            <h2>⬇️ ดาวน์โหลดบอทและวิธีตั้งค่า</h2>
+            <h2 id="download-page-title">⬇️ ดาวน์โหลดบอทและวิธีตั้งค่า</h2>
           </div>
           <div class="download-card combined-download-card">
             <div class="bot-info-display">
@@ -299,7 +299,7 @@
             </div>
             <div id="download-btn-area" class="download-btn-area">
               <a id="download-link" href="#" class="btn-primary btn-download" target="_blank" rel="noopener noreferrer" onclick="return startDownload(event)">
-                <span class="btn-icon">⬇️</span> ดาวน์โหลดบอท
+                <span id="download-button-icon" class="btn-icon">⬇️</span> <span id="download-button-text">ดาวน์โหลดบอท</span>
               </a>
               <p id="download-warning" class="download-warning hidden">
                 ⚠️ วันใช้งานหมดแล้ว กรุณาต่ออายุก่อนดาวน์โหลด
@@ -310,12 +310,12 @@
           <!-- ── ORIGINAL SETUP GUIDE (text preserved verbatim) ── -->
           <div id="combined-setup-guide" class="combined-setup-guide">
           <div class="section-header card-panel combined-setup-header">
-            <h2><span class="section-settings-gear" aria-hidden="true">&#9881;</span> การตั้งค่า LDPlayer และ MuMu</h2>
+            <h2 id="setup-page-title"><span class="section-settings-gear" aria-hidden="true">&#9881;</span> การตั้งค่า LDPlayer และ MuMu</h2>
           </div>
           <div id="tutorial-video-box" class="tutorial-video-wrapper hidden">
             <iframe id="tutorial-iframe" src="" allowfullscreen></iframe>
           </div>
-          <article class="emulator-setup-guide card-panel" aria-labelledby="emulator-setup-title">
+          <article id="setup-guide-preview" class="emulator-setup-guide card-panel" aria-labelledby="emulator-setup-title">
             <h3 id="emulator-setup-title">🎮 การตั้งค่า LDPlayer / MuMu เพื่อใช้งานบอท</h3>
 
             <section class="emulator-guide-section">
@@ -490,7 +490,7 @@
                 <div>
                   <span class="farm-history-kicker">BOT TELEMETRY</span>
                   <h2>ประวัติการฟาร์ม</h2>
-                  <p>ข้อมูลจากบอทเหรียญและบอทย่อยผงของไอดีที่ล็อกอินอยู่เท่านั้น</p>
+                  <p>ข้อมูลเหรียญและ EXP จากบอทเหรียญของไอดีที่ล็อกอินอยู่เท่านั้น</p>
                 </div>
               </div>
               <div class="farm-history-meta">
@@ -501,12 +501,6 @@
                 <button id="farm-history-refresh" class="farm-refresh-chip" type="button" onclick="loadFarmHistory()">อัปเดตทุก 1 นาที</button>
               </div>
             </header>
-
-            <div class="farm-period-tabs" role="tablist" aria-label="ประเภทบอทประวัติการฟาร์ม">
-              <button class="farm-bottype-tab active" type="button" data-farm-bottype="all" onclick="setFarmBotType('all')">📦 รวมทั้งหมด</button>
-              <button class="farm-bottype-tab" type="button" data-farm-bottype="coin" onclick="setFarmBotType('coin')">🪙 ข้อมูลเหรียญ</button>
-              <button class="farm-bottype-tab" type="button" data-farm-bottype="powder" onclick="setFarmBotType('powder')">🧪 ข้อมูลย่อยผง</button>
-            </div>
 
             <div class="farm-period-tabs" role="tablist" aria-label="ช่วงเวลาประวัติการฟาร์ม">
               <button class="farm-period-tab active" type="button" data-farm-period="daily" onclick="setFarmHistoryPeriod('daily')">▣ รายวัน</button>
@@ -522,10 +516,6 @@
               <article class="farm-summary-card farm-summary-card--exp" id="farm-summary-exp">
                 <span class="farm-summary-icon">⭐</span>
                 <div><span>EXP ที่ได้รับ</span><strong id="farm-total-exp">0</strong></div>
-              </article>
-              <article class="farm-summary-card farm-summary-card--powder" id="farm-summary-powder">
-                <span class="farm-summary-icon">🧪</span>
-                <div><span>ได้รับผงจากการย่อย</span><strong id="farm-total-powder">0</strong></div>
               </article>
               <article class="farm-summary-card farm-summary-card--rounds">
                 <span class="farm-summary-icon">🔁</span>
@@ -551,11 +541,9 @@
                   <thead id="farm-history-head">
                     <tr>
                       <th>หมายเลขไอดี</th>
-                      <th>บอท</th>
                       <th>เวลา</th>
                       <th>เหรียญที่ได้รับ</th>
                       <th>EXP ที่ได้รับ</th>
-                      <th>ได้รับผงจากการย่อย</th>
                       <th>รอบที่</th>
                       <th>ระยะเวลารอบ</th>
                       <th>เวอร์ชัน</th>
@@ -563,7 +551,7 @@
                     </tr>
                   </thead>
                   <tbody id="farm-history-rows">
-                    <tr><td colspan="10" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
+                    <tr><td colspan="8" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -776,6 +764,21 @@
                   </div>
                 </div>
                 <div class="admin-card full-width">
+                  <h4>🎨 แก้ไขหน้าดาวน์โหลดและการตั้งค่า</h4>
+                  <p class="admin-field-hint">แก้ข้อความ อีโมจิ และสีของแต่ละช่องได้เอง สีจะถูกบันทึกและแสดงกับสมาชิกทันที</p>
+                  <div class="setup-guide-header-editor">
+                    <label>อีโมจิหัวข้อหน้า<input id="setup-page-icon-input" class="admin-input" maxlength="16" /></label>
+                    <label>ชื่อหน้าดาวน์โหลด<input id="setup-page-title-input" class="admin-input" maxlength="100" /></label>
+                    <label>อีโมจิปุ่มดาวน์โหลด<input id="setup-download-icon-input" class="admin-input" maxlength="16" /></label>
+                    <label>ข้อความปุ่มดาวน์โหลด<input id="setup-download-text-input" class="admin-input" maxlength="60" /></label>
+                    <label>อีโมจิหัวข้อตั้งค่า<input id="setup-title-icon-input" class="admin-input" maxlength="16" /></label>
+                    <label>ชื่อส่วนตั้งค่า<input id="setup-title-input" class="admin-input" maxlength="100" /></label>
+                  </div>
+                  <button type="button" class="btn-secondary download-item-add" onclick="addSetupGuideCard()">＋ เพิ่มช่องคำแนะนำ</button>
+                  <div id="setup-guide-editor" class="setup-guide-editor"></div>
+                  <button class="btn-primary" type="button" onclick="saveSetupGuide()" style="margin-top:12px;">💾 บันทึกหน้าดาวน์โหลดและการตั้งค่า</button>
+                </div>
+                <div class="admin-card full-width">
                   <h4>🧩 จัดการช่องบอทหน้าแรก</h4>
                   <button type="button" class="btn-secondary download-item-add" onclick="addDownloadItem()">
                     ＋ เพิ่มช่องบอทใหม่
@@ -870,7 +873,7 @@
                   <div>
                     <span class="farm-history-kicker" id="admin-farm-detail-code">-</span>
                     <h2 id="admin-farm-detail-username">-</h2>
-                    <p>ข้อมูลจากบอทเหรียญและบอทย่อยผงของสมาชิกคนนี้</p>
+                    <p>ข้อมูลเหรียญและ EXP จากบอทเหรียญของสมาชิกคนนี้</p>
                   </div>
                 </div>
                 <div class="farm-history-meta">
@@ -881,11 +884,6 @@
                 </div>
               </header>
 
-              <div class="farm-period-tabs" role="tablist" aria-label="ประเภทบอทประวัติการฟาร์ม">
-                <button class="farm-bottype-tab active" type="button" data-farm-bottype="all" onclick="setAdminFarmBotType('all')">📦 รวมทั้งหมด</button>
-                <button class="farm-bottype-tab" type="button" data-farm-bottype="coin" onclick="setAdminFarmBotType('coin')">🪙 ข้อมูลเหรียญ</button>
-                <button class="farm-bottype-tab" type="button" data-farm-bottype="powder" onclick="setAdminFarmBotType('powder')">🧪 ข้อมูลย่อยผง</button>
-              </div>
               <div class="farm-period-tabs" role="tablist" aria-label="ช่วงเวลาประวัติการฟาร์ม">
                 <button class="farm-period-tab active" type="button" data-farm-period="daily" onclick="setAdminFarmPeriod('daily')">▣ รายวัน</button>
                 <button class="farm-period-tab" type="button" data-farm-period="weekly" onclick="setAdminFarmPeriod('weekly')">▣ รายสัปดาห์</button>
@@ -900,10 +898,6 @@
                 <article class="farm-summary-card farm-summary-card--exp" id="admin-farm-summary-exp">
                   <span class="farm-summary-icon">⭐</span>
                   <div><span>EXP ที่ได้รับ</span><strong id="admin-farm-total-exp">0</strong></div>
-                </article>
-                <article class="farm-summary-card farm-summary-card--powder" id="admin-farm-summary-powder">
-                  <span class="farm-summary-icon">🧪</span>
-                  <div><span>ได้รับผงจากการย่อย</span><strong id="admin-farm-total-powder">0</strong></div>
                 </article>
                 <article class="farm-summary-card farm-summary-card--rounds">
                   <span class="farm-summary-icon">🔁</span>
@@ -929,11 +923,9 @@
                     <thead id="admin-farm-history-head">
                       <tr>
                         <th>หมายเลขไอดี</th>
-                        <th>บอท</th>
                         <th>เวลา</th>
                         <th>เหรียญที่ได้รับ</th>
                         <th>EXP ที่ได้รับ</th>
-                        <th>ได้รับผงจากการย่อย</th>
                         <th>รอบที่</th>
                         <th>ระยะเวลารอบ</th>
                         <th>เวอร์ชัน</th>
@@ -941,7 +933,7 @@
                       </tr>
                     </thead>
                     <tbody id="admin-farm-history-rows">
-                      <tr><td colspan="10" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
+                      <tr><td colspan="8" class="farm-empty-cell">กำลังโหลดข้อมูล...</td></tr>
                     </tbody>
                   </table>
                 </div>

@@ -69,7 +69,7 @@ const TUTORIAL_COLORS = new Set(['orange', 'cyan', 'blue', 'pink']);
 // A public default prevents the download page from becoming blank while the
 // legacy settings service has not stored its first portal configuration yet.
 // Admin settings still take priority as soon as they are saved.
-const DEFAULT_BOT_NAME = 'Ckrcsbot V18.1';
+const DEFAULT_BOT_NAME = 'BotCKRC V1.87';
 const DEFAULT_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=1Wy3d4X1OOTvsXtOf4WrScRxpYljzbARq';
 
 // Starter bot cards. Administrators can edit, remove, and append cards; these
@@ -85,6 +85,48 @@ const DOWNLOAD_ITEM_ICON_MAX = 16;
 const DOWNLOAD_ITEM_LABEL_MAX = 60;
 const DOWNLOAD_ITEM_DESCRIPTION_MAX = 160;
 const DOWNLOAD_ITEM_TUTORIAL_URL_MAX = 500;
+const SETUP_GUIDE_CARD_MAX = 20;
+const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+export function normalizeSetupGuide(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const cleanColor = (color, fallback) => (
+    HEX_COLOR_PATTERN.test(String(color || '')) ? String(color).toLowerCase() : fallback
+  );
+  const cards = Array.isArray(source.cards) ? source.cards : [];
+  return {
+    pageIcon: String(source.pageIcon || '⬇️').slice(0, 16),
+    pageTitle: String(source.pageTitle || 'ดาวน์โหลดบอทและวิธีตั้งค่า').trim().slice(0, 100),
+    downloadIcon: String(source.downloadIcon || '⬇️').slice(0, 16),
+    downloadText: String(source.downloadText || 'ดาวน์โหลดบอท').trim().slice(0, 60),
+    setupIcon: String(source.setupIcon || '⚙️').slice(0, 16),
+    setupTitle: String(source.setupTitle || 'การตั้งค่า LDPlayer และ MuMu').trim().slice(0, 100),
+    cards: cards.slice(0, SETUP_GUIDE_CARD_MAX).map((card, index) => ({
+      id: String(card?.id || `setup-${index + 1}`).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || `setup-${index + 1}`,
+      icon: String(card?.icon || '📌').slice(0, 16),
+      title: String(card?.title || 'หัวข้อใหม่').trim().slice(0, 100),
+      content: String(card?.content || '').trim().slice(0, 1200),
+      backgroundColor: cleanColor(card?.backgroundColor, '#06172d'),
+      borderColor: cleanColor(card?.borderColor, '#00bce8'),
+      textColor: cleanColor(card?.textColor, '#d9f6ff')
+    }))
+  };
+}
+
+function setupGuideError(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'ข้อมูลหน้าดาวน์โหลดไม่ถูกต้อง';
+  if (!Array.isArray(value.cards) || value.cards.length > SETUP_GUIDE_CARD_MAX) {
+    return `เพิ่มช่องคำแนะนำได้ไม่เกิน ${SETUP_GUIDE_CARD_MAX} ช่อง`;
+  }
+  const textTotal = value.cards.reduce((sum, card) => sum + String(card?.content || '').length, 0);
+  if (textTotal > 12000) return 'ข้อความคำแนะนำรวมยาวเกิน 12,000 ตัวอักษร';
+  const invalidColor = value.cards.some((card) => (
+    !HEX_COLOR_PATTERN.test(String(card?.backgroundColor || ''))
+    || !HEX_COLOR_PATTERN.test(String(card?.borderColor || ''))
+    || !HEX_COLOR_PATTERN.test(String(card?.textColor || ''))
+  ));
+  return invalidColor ? 'รหัสสีของช่องคำแนะนำไม่ถูกต้อง' : '';
+}
 
 // Wording from earlier releases. A stored entry still carrying one of these
 // strings was never edited by the admin, so it is refreshed to the current
@@ -311,6 +353,7 @@ async function encodePortalConfig(config) {
     b: String(config.botName || ''),
     d: String(config.downloadUrl || ''),
     x: Array.isArray(config.downloadItems) ? config.downloadItems : [],
+    g: normalizeSetupGuide(config.setupGuide),
     q: String(config.paymentQrUrl || ''),
     n: String(config.promptpayNumber || ''),
     l: String(config.promptpayLabel || ''),
@@ -331,6 +374,7 @@ async function decodePortalConfig(value) {
     botName: '',
     downloadUrl: '',
     downloadItems: DEFAULT_DOWNLOAD_ITEMS,
+    setupGuide: normalizeSetupGuide(null),
     paymentQrUrl: '',
     promptpayNumber: '',
     promptpayLabel: '',
@@ -362,6 +406,7 @@ async function decodePortalConfig(value) {
         botName: typeof parsed.b === 'string' ? parsed.b : '',
         downloadUrl: typeof parsed.d === 'string' ? parsed.d : '',
         downloadItems: Array.isArray(parsed.x) ? parsed.x : DEFAULT_DOWNLOAD_ITEMS,
+        setupGuide: normalizeSetupGuide(parsed.g),
         paymentQrUrl: typeof parsed.q === 'string' ? parsed.q : '',
         promptpayNumber: typeof parsed.n === 'string' ? parsed.n : '',
         promptpayLabel: typeof parsed.l === 'string' ? parsed.l : '',
@@ -391,6 +436,7 @@ function normalizePortalConfig(config) {
     downloadItems: refreshSupersededDownloadText(
       normalizeDownloadItems(source.downloadItems, null)
     ),
+    setupGuide: normalizeSetupGuide(source.setupGuide),
     paymentQrUrl: typeof source.paymentQrUrl === 'string' ? source.paymentQrUrl : '',
     promptpayNumber: typeof source.promptpayNumber === 'string' ? source.promptpayNumber : '',
     promptpayLabel: typeof source.promptpayLabel === 'string' ? source.promptpayLabel : '',
@@ -1490,6 +1536,7 @@ async function saveAdminSettings(request) {
     'botName',
     'downloadUrl',
     'downloadItems',
+    'setupGuide',
     'paymentQrUrl',
     'promptpayNumber',
     'promptpayLabel',
@@ -1547,6 +1594,12 @@ async function saveAdminSettings(request) {
       Object.hasOwn(payload, 'downloadItems') ? payload.downloadItems : null,
       previous.config.downloadItems
     );
+    const setupGuideSource = Object.hasOwn(payload, 'setupGuide')
+      ? payload.setupGuide
+      : previous.config.setupGuide;
+    const setupError = setupGuideError(setupGuideSource);
+    if (setupError) return json({ error: setupError }, 400);
+    const setupGuide = normalizeSetupGuide(setupGuideSource);
 
     if (announcement.length > 240) {
       return json({ error: 'ข้อความประกาศต้องไม่เกิน 240 ตัวอักษร' }, 400);
@@ -1578,6 +1631,7 @@ async function saveAdminSettings(request) {
       botName,
       downloadUrl,
       downloadItems,
+      setupGuide,
       paymentQrUrl,
       promptpayNumber,
       promptpayLabel,
@@ -1640,6 +1694,7 @@ async function getAdminSettings(request) {
     botUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
     downloadUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
     downloadItems: stored.downloadItems,
+    setupGuide: stored.setupGuide,
     promptPayNumber: portal.isStored ? stored.promptpayNumber : data.promptpayNumber || '',
     promptPayAccountName: portal.isStored ? stored.promptpayLabel : data.promptpayLabel || '',
     slipReceiverName: data.slipReceiverName || '',
@@ -1672,6 +1727,7 @@ async function publicSettings(request) {
     botUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
     downloadUrl: portal.isStored ? stored.downloadUrl || DEFAULT_DOWNLOAD_URL : data.downloadUrl || DEFAULT_DOWNLOAD_URL,
     downloadItems: stored.downloadItems,
+    setupGuide: stored.setupGuide,
     promptPayNumber: portal.isStored ? stored.promptpayNumber : data.promptpayNumber || '',
     promptPayAccountName: portal.isStored ? stored.promptpayLabel : data.promptpayLabel || '',
     promptPayQrUrl: portal.isStored ? stored.paymentQrUrl : data.paymentQrUrl || '',
