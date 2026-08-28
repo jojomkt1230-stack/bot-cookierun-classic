@@ -558,12 +558,9 @@ async function adminAccessCodes(request) {
       return json({ codes: [], warning: 'ประวัติโค้ดเก่ายังโหลดไม่ได้ชั่วคราว แต่สามารถสร้างโค้ดใหม่ได้' });
     }
 
-    if (!overviewData) {
-      try {
-        const overview = await adminOverview(request);
-        if (!overview.errorResponse) overviewData = overview.data;
-      } catch {}
-    }
+    // A valid remembered admin token is enough to list codes. Avoid a second
+    // round trip to the legacy overview just to decorate names; the browser
+    // already has the member directory and joins names locally.
     return json({ codes: attachMemberNamesToCodes(codes, overviewData?.members || []) });
   }
 
@@ -1255,6 +1252,20 @@ async function adminUsers(request) {
   const members = (overview.data.members || [])
     .map(mapMember)
     .filter((member) => !disabledCodes.has(member.memberCode));
+  if (new URL(request.url).searchParams.get('fast') === '1') {
+    return json({
+      users: members.map((member) => ({
+        ...member,
+        activeScreens: null,
+        activePrograms: null,
+        maxPrograms: null,
+        ipRestricted: null,
+        sessionIp: '',
+        botSessions: [],
+        sessionSummaryPending: true
+      }))
+    });
+  }
   const users = await Promise.all(members.map(async (member) => ({
     ...member,
     ...(await getMemberSessionSummary(member.memberCode).catch(() => ({
@@ -1293,30 +1304,23 @@ async function adminFarmDataList(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
   const members = (overview.data.members || []).map(mapMember);
-  const membersByCode = new Map(members.map((member) => [member.memberCode, member]));
-
-  const results = await Promise.all(members.map(async (member) => {
-    const events = await listFarmEvents(member.memberCode).catch((error) => {
-      console.error('[Admin Farm] Member history unavailable:', error?.message || error);
-      return [];
-    });
-    if (!events.length) return null;
-    const summary = summarizeFarmEvents(events);
-    return {
+  // Do not read up to 5,000 farm events for every member before showing the
+  // directory. Detail history is loaded for only the selected member.
+  return json({
+    members: members.map((member) => ({
       username: member.username,
       memberCode: member.memberCode,
       joinedAt: member.createdAt || null,
-      ...summary
-    };
-  }));
-
-  return json({ members: results.filter(Boolean) });
+      lastActiveAt: null,
+      summaryReady: false
+    }))
+  });
 }
 
 async function adminFarmDataDetail(request, memberCode) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
-  const events = await listFarmEvents(memberCode).catch((error) => {
+  const events = await listFarmEvents(memberCode, 1000).catch((error) => {
     console.error('[Admin Farm] Member detail unavailable:', error?.message || error);
     return [];
   });
@@ -1882,7 +1886,7 @@ async function receiveSessionHeartbeat(request) {
 async function memberFarmHistory(request) {
   const identity = await authenticatedMember(request);
   if (identity.errorResponse) return identity.errorResponse;
-  const events = await listFarmEvents(identity.memberCode).catch((error) => {
+  const events = await listFarmEvents(identity.memberCode, 1000).catch((error) => {
     console.error('[Member Farm] History unavailable:', error?.message || error);
     return [];
   });

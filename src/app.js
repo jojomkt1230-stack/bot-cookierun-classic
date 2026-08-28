@@ -2162,8 +2162,11 @@ let adminUsers = [];
 let adminTopups = [];
 let adminAccessCodes = [];
 let latestGeneratedAccessCodes = [];
+let adminCodesLoadedAt = 0;
+let adminCodesLoading = null;
 let adminDataLoadedAt = 0;
 let adminDataLoading = null;
+let adminSessionDetailsLoading = null;
 
 function adminDataCacheKey() {
   return userDataCacheKey('adminDashboardCacheV1');
@@ -2197,8 +2200,26 @@ function adminApiConfig() {
 
 async function reloadAdminUsersData() {
   if (currentUser?.role !== 'admin') return;
-  const response = await axios.get(`${API_BASE_URL}/admin/users?limit=500`, adminApiConfig());
+  const response = await axios.get(`${API_BASE_URL}/admin/users?limit=500&fast=1`, {
+    ...adminApiConfig(), timeout: 12_000
+  });
   adminUsers = response.data?.users || [];
+}
+
+async function refreshAdminUserSessionDetails() {
+  if (currentUser?.role !== 'admin' || adminSessionDetailsLoading) return adminSessionDetailsLoading;
+  adminSessionDetailsLoading = axios.get(`${API_BASE_URL}/admin/users?limit=500`, {
+    ...adminApiConfig(), timeout: 30_000
+  }).then((response) => {
+    const detailed = Array.isArray(response.data?.users) ? response.data.users : [];
+    if (detailed.length) adminUsers = detailed;
+    adminDataLoadedAt = Date.now();
+    saveAdminDataCache();
+    if (document.getElementById('admin-users')?.classList.contains('active')) renderAdminUsersTable();
+  }).catch(() => {}).finally(() => {
+    adminSessionDetailsLoading = null;
+  });
+  return adminSessionDetailsLoading;
 }
 
 async function reloadAdminTopupsData() {
@@ -2241,6 +2262,7 @@ window.switchAdminTab = function(tabName) {
   if (tabName === 'stats') updateAdminPanelStats(true);
   if (tabName === 'users') {
     renderAdminUsersTable();
+    window.setTimeout(() => refreshAdminUserSessionDetails(), 0);
     if (Date.now() - adminDataLoadedAt < 30_000) return;
     reloadAdminData().then(renderAdminUsersTable).catch((error) => {
     window.showToast(getApiErrorMessage(error, 'โหลดรายชื่อสมาชิกไม่สำเร็จ'), 'error');
@@ -2309,20 +2331,55 @@ function renderAdminAccessCodes() {
     </table>`;
 }
 
-window.loadAdminAccessCodes = async function() {
-  const container = document.getElementById('admin-codes-table');
-  if (container) container.innerHTML = '<div class="loading-spinner">⟳</div>';
+function enrichAdminCodeMembers(codes) {
+  const members = new Map(adminUsers.map((user) => [String(user.memberCode || user.member_code || ''), user]));
+  return codes.map((item) => {
+    const member = members.get(String(item.memberCode || ''));
+    return member ? { ...item, memberName: member.username || member.displayName || item.memberName } : item;
+  });
+}
+
+function restoreAdminCodesCache() {
+  if (adminAccessCodes.length) return true;
+  const key = userDataCacheKey('adminCodesCacheV1');
+  if (!key) return false;
   try {
-    const response = await axios.get(`${API_BASE_URL}/admin/codes`, adminApiConfig());
-    adminAccessCodes = response.data?.codes || [];
+    const cached = JSON.parse(safeStorageGet(key) || '{}');
+    if (!Array.isArray(cached.codes) || Date.now() - Number(cached.savedAt || 0) > 15 * 60_000) return false;
+    adminAccessCodes = enrichAdminCodeMembers(cached.codes);
+    adminCodesLoadedAt = Number(cached.savedAt || 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+window.loadAdminAccessCodes = async function(force = false) {
+  const container = document.getElementById('admin-codes-table');
+  const restoredCache = restoreAdminCodesCache();
+  if (restoredCache) renderAdminAccessCodes();
+  else if (container) container.innerHTML = '<div class="loading-spinner">⟳</div>';
+  if (!force && adminCodesLoadedAt && Date.now() - adminCodesLoadedAt < 30_000) return;
+  if (adminCodesLoading) return adminCodesLoading;
+  try {
+    adminCodesLoading = axios.get(`${API_BASE_URL}/admin/codes`, {
+      ...adminApiConfig(), timeout: 12_000, params: { _t: Date.now() }
+    });
+    const response = await adminCodesLoading;
+    adminAccessCodes = enrichAdminCodeMembers(response.data?.codes || []);
+    adminCodesLoadedAt = Date.now();
+    const key = userDataCacheKey('adminCodesCacheV1');
+    if (key) safeStorageSet(key, JSON.stringify({ savedAt: adminCodesLoadedAt, codes: adminAccessCodes }));
     renderAdminAccessCodes();
     if (response.data?.warning && container) {
       container.insertAdjacentHTML('afterbegin', `<p style="padding:12px; color:#ffd36a;">${escapeHtml(response.data.warning)}</p>`);
     }
   } catch (error) {
     const text = getApiErrorMessage(error, 'โหลดข้อมูลโค้ดไม่สำเร็จ');
-    if (container) container.innerHTML = `<p style="padding:16px; color:var(--danger);">${escapeHtml(text)}</p>`;
+    if (!restoredCache && container) container.innerHTML = `<p style="padding:16px; color:var(--danger);">${escapeHtml(text)}</p>`;
     window.showToast(text, 'error');
+  } finally {
+    adminCodesLoading = null;
   }
 };
 
@@ -2358,7 +2415,7 @@ window.createAdminAccessCodes = async function() {
       output.innerHTML = `<button class="btn-secondary" type="button" onclick="copyGeneratedAccessCodes()" style="margin-bottom:10px;">📋 คัดลอกทั้งหมด</button>\n${escapeHtml(latestGeneratedAccessCodes.join('\n'))}`;
     }
     window.showToast(response.data?.message || 'สร้างโค้ดเรียบร้อยแล้ว', 'success');
-    await window.loadAdminAccessCodes();
+    await window.loadAdminAccessCodes(true);
   } catch (error) {
     window.showToast(getApiErrorMessage(error, 'สร้างโค้ดไม่สำเร็จ'), 'error');
   } finally {
@@ -2449,7 +2506,8 @@ async function loadPlayerFarmDataList() {
   document.getElementById('admin-farm-list-view')?.classList.remove('hidden');
   document.getElementById('admin-farm-detail-view')?.classList.add('hidden');
   const container = document.getElementById('admin-farm-table-container');
-  if (container) container.innerHTML = '<div class="loading-spinner">⟳</div>';
+  if (adminFarmDataList.length) window.renderAdminFarmDataTable();
+  else if (container) container.innerHTML = '<div class="loading-spinner">⟳</div>';
   try {
     const response = await axios.get(`${API_BASE_URL}/admin/farm-data`, adminApiConfig());
     adminFarmDataList = response.data?.members || [];
@@ -2508,11 +2566,11 @@ window.renderAdminFarmDataTable = function() {
             <td style="padding:12px; font-weight:700;">${escapeHtml(item.username)}</td>
             <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(item.memberCode)}</td>
             <td style="padding:12px; font-size:0.85rem;">${item.joinedAt ? escapeHtml(thaiDateTime(item.joinedAt)) : '-'}</td>
-            <td style="padding:12px; font-size:0.85rem;">${item.lastActiveAt ? escapeHtml(thaiDateTime(item.lastActiveAt)) : '-'}</td>
-            <td style="padding:12px;">${numberText(item.rounds)}</td>
-            <td style="padding:12px; color:var(--accent); font-weight:700;">🪙 ${numberText(item.totalCoins)}</td>
-            <td style="padding:12px; color:#c79aff; font-weight:700;">⭐ ${numberText(item.totalExp)}</td>
-            <td style="padding:12px;">${durationText(item.durationSeconds)}</td>
+            <td style="padding:12px; font-size:0.85rem;">${item.summaryReady ? (item.lastActiveAt ? escapeHtml(thaiDateTime(item.lastActiveAt)) : '-') : 'กดดูรายละเอียด'}</td>
+            <td style="padding:12px;">${item.summaryReady ? numberText(item.rounds) : '-'}</td>
+            <td style="padding:12px; color:var(--accent); font-weight:700;">${item.summaryReady ? `🪙 ${numberText(item.totalCoins)}` : '-'}</td>
+            <td style="padding:12px; color:#c79aff; font-weight:700;">${item.summaryReady ? `⭐ ${numberText(item.totalExp)}` : '-'}</td>
+            <td style="padding:12px;">${item.summaryReady ? durationText(item.durationSeconds) : '-'}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -2855,18 +2913,18 @@ function renderAdminUsersTable() {
             <td style="padding:12px; font-weight:700;">
               ${escapeHtml(u.username)}
               <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(u.memberCode)}</div>
-              <div style="font-size:0.78rem; color:var(--primary); margin-top:5px;">โปรแกรมที่ใช้งาน: ${Number(u.activePrograms ?? u.activeScreens ?? 0)} / ${Number(u.maxPrograms || 4)}</div>
-              <div style="font-size:0.75rem; color:var(--text-muted);">IP ล่าสุด: ${escapeHtml(u.sessionIp || 'ยังไม่มี Heartbeat')}</div>
+              <div style="font-size:0.78rem; color:var(--primary); margin-top:5px;">โปรแกรมที่ใช้งาน: ${u.sessionSummaryPending ? 'กำลังอัปเดต…' : `${Number(u.activePrograms ?? u.activeScreens ?? 0)} / ${Number(u.maxPrograms || 4)}`}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">IP ล่าสุด: ${u.sessionSummaryPending ? 'กำลังอัปเดต…' : escapeHtml(u.sessionIp || 'ยังไม่มี Heartbeat')}</div>
             </td>
             <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${u.createdAt ? new Date(u.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</td>
             <td style="padding:12px;"><span style="padding:4px 8px; border-radius:12px; font-size:0.8rem; background:${u.role === 'admin' ? 'rgba(255,170,0,0.2)' : 'rgba(0,212,255,0.2)'}; color:${u.role === 'admin' ? '#ffcc00' : 'var(--primary)'}">${u.role === 'admin' ? '👑 แอดมิน' : '👤 สมาชิก'}</span></td>
             <td style="padding:12px; color:var(--accent); font-weight:700;">${u.diamonds || 0}</td>
             <td style="padding:12px; font-size:0.85rem;">${u.botExpiry ? new Date(u.botExpiry).toLocaleString('th-TH') : 'ยังไม่ได้เช่า'}</td>
-            <td style="padding:12px; font-weight:700;">${Number(u.activePrograms ?? u.activeScreens ?? 0)} / ${Number(u.maxPrograms || 4)}</td>
-            <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(u.sessionIp || '-')}</td>
-            <td style="padding:12px; font-size:0.85rem; color:${u.ipRestricted === false ? 'var(--success)' : 'var(--warning)'};">${u.ipRestricted === false ? 'ไม่จำกัด IP' : 'จำกัด IP'}</td>
+            <td style="padding:12px; font-weight:700;">${u.sessionSummaryPending ? 'กำลังอัปเดต…' : `${Number(u.activePrograms ?? u.activeScreens ?? 0)} / ${Number(u.maxPrograms || 4)}`}</td>
+            <td style="padding:12px; font-size:0.85rem; color:var(--text-muted);">${u.sessionSummaryPending ? '…' : escapeHtml(u.sessionIp || '-')}</td>
+            <td style="padding:12px; font-size:0.85rem; color:${u.ipRestricted === false ? 'var(--success)' : 'var(--warning)'};">${u.sessionSummaryPending ? 'กำลังอัปเดต…' : (u.ipRestricted === false ? 'ไม่จำกัด IP' : 'จำกัด IP')}</td>
             <td style="padding:12px; text-align:right;">
-              <button onclick="openEditUserModal('${encodeURIComponent(u._id)}')" style="background:rgba(0,212,255,0.2); color:var(--primary); border:1px solid var(--primary); padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer;">✏️ จัดการ</button>
+              <button ${u.sessionSummaryPending ? 'disabled title="กำลังโหลดข้อมูล Session"' : `onclick="openEditUserModal('${encodeURIComponent(u._id)}')"`} style="background:rgba(0,212,255,0.2); color:var(--primary); border:1px solid var(--primary); padding:4px 10px; border-radius:6px; font-weight:700; cursor:pointer;">${u.sessionSummaryPending ? 'กำลังอัปเดต…' : '✏️ จัดการ'}</button>
             </td>
           </tr>
         `).join('')}
@@ -3346,6 +3404,8 @@ function warmDashboardData() {
   if (currentUser.role === 'admin') {
     restoreAdminDataCache();
     reloadAdminData().catch(() => {});
+    restoreAdminCodesCache();
+    window.loadAdminAccessCodes().catch(() => {});
   }
 }
 
