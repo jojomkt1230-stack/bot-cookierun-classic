@@ -16,7 +16,7 @@ import {
   reserveSlipAccessCodes,
   validCodeDuration
 } from './code-store.js';
-import { listFarmEvents, storeFarmEvent, summarizeFarmEvents } from './farm-store.js';
+import { listFarmEvents, listLatestFarmEvents, storeFarmEvent, summarizeFarmEvents } from './farm-store.js';
 import {
   clearMemberSessions,
   getMemberSessionSummary,
@@ -1304,16 +1304,24 @@ async function adminFarmDataList(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
   const members = (overview.data.members || []).map(mapMember);
+  const latestByMember = await listLatestFarmEvents(members.map((member) => member.memberCode)).catch((error) => {
+    console.error('[Admin Farm] Latest activity unavailable:', error?.message || error);
+    return new Map();
+  });
   // Do not read up to 5,000 farm events for every member before showing the
   // directory. Detail history is loaded for only the selected member.
   return json({
-    members: members.map((member) => ({
+    members: members.map((member) => {
+      const latest = latestByMember.get(member.memberCode);
+      return {
       username: member.username,
       memberCode: member.memberCode,
       joinedAt: member.createdAt || null,
-      lastActiveAt: null,
+      lastActiveAt: latest?.occurredAt || null,
       summaryReady: false
-    }))
+      };
+    }).filter((member) => member.lastActiveAt)
+      .sort((left, right) => Date.parse(right.lastActiveAt) - Date.parse(left.lastActiveAt))
   });
 }
 

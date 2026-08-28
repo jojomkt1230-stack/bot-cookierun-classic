@@ -2,6 +2,7 @@ import { codeStorageConfigured, redisCommand } from './code-store.js';
 import {
   dedicatedSessionStorageSelected,
   sessionRedisCommand,
+  sessionRedisPipeline,
   sessionStorageConfigured
 } from './session-redis.js';
 
@@ -143,6 +144,32 @@ export async function listFarmEvents(memberCode, limit = MAX_MEMBER_EVENTS) {
     .filter((event) => event.botType === 'coin')
     .sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))
     .slice(0, count);
+}
+
+function pipelineResult(value) {
+  if (Array.isArray(value) && value.length === 2 && value[0] == null) return value[1];
+  return value;
+}
+
+export async function listLatestFarmEvents(memberCodes = []) {
+  if (!sessionStorageConfigured()) return new Map();
+  const codes = [...new Set(memberCodes.map((value) => cleanText(value, 180).toUpperCase()).filter(Boolean))];
+  if (!codes.length) return new Map();
+  const rows = await sessionRedisPipeline(codes.map((memberCode) => [
+    'ZREVRANGE', memberIndexKey(memberCode), '0', '0'
+  ]));
+  const pairs = codes.map((memberCode, index) => {
+    const ids = pipelineResult(rows[index]);
+    return [memberCode, Array.isArray(ids) ? String(ids[0] || '') : ''];
+  }).filter(([, eventId]) => eventId);
+  if (!pairs.length) return new Map();
+  const values = await sessionRedisCommand('MGET', ...pairs.map(([, eventId]) => eventKey(eventId)));
+  const latest = new Map();
+  pairs.forEach(([memberCode], index) => {
+    const event = parseEvent(Array.isArray(values) ? values[index] : null);
+    if (event?.memberCode === memberCode && event.botType === 'coin') latest.set(memberCode, event);
+  });
+  return latest;
 }
 
 // Aggregate one member's events for the admin overview table. Kept here
