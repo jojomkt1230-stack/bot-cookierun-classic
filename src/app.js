@@ -1197,6 +1197,7 @@ window.handleLogin = async function(event) {
     // request right after login can't misfire a false "session expired".
     skipNextDashboardBootRefresh = true;
     navigateTo(consumePostLoginRedirect() || '/dashboard', { replace: true });
+    window.setTimeout(() => warmDashboardData(), 0);
     window.showToast(
       storageBlocked
         ? `เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.username} 🎉 (เบราว์เซอร์บล็อกการจำข้อมูล อาจต้องเข้าสู่ระบบใหม่ทุกครั้งที่เปิดเว็บ)`
@@ -1730,6 +1731,47 @@ function farmDeviceLabel(deviceId) {
 }
 let usageHistoryItems = [];
 let usageHistoryFilter = 'all';
+let usageHistoryLoading = null;
+let usageHistoryLoadedAt = 0;
+
+function userDataCacheKey(name) {
+  const identity = String(currentUser?.memberCode || currentUser?.member_code || currentUser?.username || '').trim();
+  return identity ? `${name}:${identity}` : '';
+}
+
+function restoreUsageHistoryCache() {
+  if (usageHistoryItems.length) return true;
+  const key = userDataCacheKey('usageHistoryCacheV1');
+  if (!key) return false;
+  try {
+    const cached = JSON.parse(safeStorageGet(key) || '{}');
+    if (!Array.isArray(cached.items) || Date.now() - Number(cached.savedAt || 0) > 15 * 60_000) return false;
+    usageHistoryItems = cached.items;
+    usageHistoryLoadedAt = Number(cached.savedAt || 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function loadUsageHistoryData({ force = false } = {}) {
+  if (!force && usageHistoryItems.length && Date.now() - usageHistoryLoadedAt < 30_000) return usageHistoryItems;
+  if (usageHistoryLoading) return usageHistoryLoading;
+  usageHistoryLoading = axios.get(`${API_BASE_URL}/users/activity`, {
+    headers: { ...getAuthHeaders(), 'Cache-Control': 'no-cache' },
+    params: { _t: Date.now() },
+    timeout: 12_000
+  }).then((response) => {
+    usageHistoryItems = Array.isArray(response.data?.items) ? response.data.items : [];
+    usageHistoryLoadedAt = Date.now();
+    const key = userDataCacheKey('usageHistoryCacheV1');
+    if (key) safeStorageSet(key, JSON.stringify({ savedAt: usageHistoryLoadedAt, items: usageHistoryItems }));
+    return usageHistoryItems;
+  }).finally(() => {
+    usageHistoryLoading = null;
+  });
+  return usageHistoryLoading;
+}
 
 function thailandDateKey(value = new Date()) {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -2104,13 +2146,14 @@ window.setUsageHistoryFilter = function(filter) {
 async function renderActivityHistory() {
   const listEl = document.getElementById('activity-list');
   if (!listEl || !currentUser) return;
-  listEl.innerHTML = '<div class="usage-loading card-panel"><span>⟳</span> กำลังโหลดประวัติการใช้งาน...</div>';
+  const hasCachedData = restoreUsageHistoryCache();
+  if (hasCachedData) renderUsageHistoryItems();
+  else listEl.innerHTML = '<div class="usage-loading card-panel"><span>⟳</span> กำลังโหลดประวัติการใช้งาน...</div>';
   try {
-    const response = await axios.get(`${API_BASE_URL}/users/activity`, { headers: getAuthHeaders() });
-    usageHistoryItems = Array.isArray(response.data?.items) ? response.data.items : [];
+    await loadUsageHistoryData();
     renderUsageHistoryItems();
   } catch (error) {
-    listEl.innerHTML = `<div class="usage-empty-state card-panel is-error"><span>!</span><h3>โหลดข้อมูลไม่สำเร็จ</h3><p>${escapeHtml(getApiErrorMessage(error, 'กรุณาลองใหม่อีกครั้ง'))}</p></div>`;
+    if (!hasCachedData) listEl.innerHTML = `<div class="usage-empty-state card-panel is-error"><span>!</span><h3>โหลดข้อมูลไม่สำเร็จ</h3><p>${escapeHtml(getApiErrorMessage(error, 'กรุณาลองใหม่อีกครั้ง'))}</p></div>`;
   }
 }
 
@@ -2119,6 +2162,33 @@ let adminUsers = [];
 let adminTopups = [];
 let adminAccessCodes = [];
 let latestGeneratedAccessCodes = [];
+let adminDataLoadedAt = 0;
+let adminDataLoading = null;
+
+function adminDataCacheKey() {
+  return userDataCacheKey('adminDashboardCacheV1');
+}
+
+function restoreAdminDataCache() {
+  if (adminUsers.length || adminTopups.length) return true;
+  const key = adminDataCacheKey();
+  if (!key) return false;
+  try {
+    const cached = JSON.parse(safeStorageGet(key) || '{}');
+    if (!Array.isArray(cached.users) || !Array.isArray(cached.topups) || Date.now() - Number(cached.savedAt || 0) > 15 * 60_000) return false;
+    adminUsers = cached.users;
+    adminTopups = cached.topups;
+    adminDataLoadedAt = Number(cached.savedAt || 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveAdminDataCache() {
+  const key = adminDataCacheKey();
+  if (key) safeStorageSet(key, JSON.stringify({ savedAt: adminDataLoadedAt, users: adminUsers, topups: adminTopups }));
+}
 
 function adminApiConfig() {
   const token = safeStorageGet('token');
@@ -2138,9 +2208,17 @@ async function reloadAdminTopupsData() {
 }
 
 async function reloadAdminData() {
-  const results = await Promise.allSettled([reloadAdminUsersData(), reloadAdminTopupsData()]);
-  if (results.every((result) => result.status === 'rejected')) throw results[0].reason;
-  return results;
+  if (adminDataLoading) return adminDataLoading;
+  adminDataLoading = Promise.allSettled([reloadAdminUsersData(), reloadAdminTopupsData()])
+    .then((results) => {
+      if (results.every((result) => result.status === 'rejected')) throw results[0].reason;
+      adminDataLoadedAt = Date.now();
+      saveAdminDataCache();
+      return results;
+    }).finally(() => {
+      adminDataLoading = null;
+    });
+  return adminDataLoading;
 }
 
 window.switchAdminTab = function(tabName) {
@@ -2159,13 +2237,22 @@ window.switchAdminTab = function(tabName) {
   const activeTabBtn = document.querySelector(`.admin-tab[onclick*="${tabName}"]`);
   if (activeTabBtn) activeTabBtn.classList.add('active');
 
-  if (tabName === 'stats') updateAdminPanelStats();
-  if (tabName === 'users') reloadAdminUsersData().then(renderAdminUsersTable).catch((error) => {
+  restoreAdminDataCache();
+  if (tabName === 'stats') updateAdminPanelStats(true);
+  if (tabName === 'users') {
+    renderAdminUsersTable();
+    if (Date.now() - adminDataLoadedAt < 30_000) return;
+    reloadAdminData().then(renderAdminUsersTable).catch((error) => {
     window.showToast(getApiErrorMessage(error, 'โหลดรายชื่อสมาชิกไม่สำเร็จ'), 'error');
-  });
-  if (tabName === 'topups') reloadAdminTopupsData().then(renderAdminTopupsTable).catch((error) => {
+    });
+  }
+  if (tabName === 'topups') {
+    renderAdminTopupsTable();
+    if (Date.now() - adminDataLoadedAt < 30_000) return;
+    reloadAdminData().then(renderAdminTopupsTable).catch((error) => {
     window.showToast(getApiErrorMessage(error, 'โหลดประวัติเติมเงินไม่สำเร็จ'), 'error');
-  });
+    });
+  }
   if (tabName === 'codes') loadAdminAccessCodes().catch(() => {});
   if (tabName === 'system') {
     loadSystemSettings(true).catch((error) => {
@@ -2293,11 +2380,17 @@ window.copyGeneratedAccessCodes = async function() {
 };
 
 async function initAdminPanel() {
+  const restoredCache = restoreAdminDataCache();
+  if (restoredCache) {
+    renderAdminUsersTable();
+    renderAdminTopupsTable();
+    await updateAdminPanelStats(true);
+  }
   await Promise.all([
     reloadAdminData(),
     loadSystemSettings(true)
   ]).catch(() => {});
-  await updateAdminPanelStats().catch(() => {});
+  await updateAdminPanelStats(true).catch(() => {});
   renderAdminUsersTable();
   renderAdminTopupsTable();
   applySystemSettingsToUI();
@@ -2561,15 +2654,23 @@ function renderAdminFarmDetail() {
   }).join('');
 }
 
-async function updateAdminPanelStats() {
+async function updateAdminPanelStats(preferCached = false) {
   const totalUsersEl = document.getElementById('stat-total-users');
   const activeUsersEl = document.getElementById('stat-active-users');
   const pendingTopupsEl = document.getElementById('stat-pending-topups');
   const revenueEl = document.getElementById('stat-today-revenue');
 
   let stats;
+  if (preferCached && (adminUsers.length || adminTopups.length)) {
+    stats = {
+      ...summarizeAdminRevenueFromTopups(adminTopups),
+      totalUsers: adminUsers.length,
+      activeUsers: adminUsers.filter((item) => item.isActive).length,
+      pendingTopups: adminTopups.filter((item) => item.status === 'pending').length
+    };
+  }
   try {
-    stats = (await axios.get(`${API_BASE_URL}/admin/stats`, adminApiConfig())).data;
+    if (!stats) stats = (await axios.get(`${API_BASE_URL}/admin/stats`, adminApiConfig())).data;
   } catch (error) {
     if (!adminTopups.length) {
       window.showToast(getApiErrorMessage(error, 'โหลดสถิติไม่สำเร็จ'), 'error');
@@ -3236,6 +3337,18 @@ window.massCompensation = async function() {
   }
 };
 
+function warmDashboardData() {
+  if (!currentUser || !safeStorageGet('token')) return;
+  restoreUsageHistoryCache();
+  restoreFarmHistoryCache();
+  loadUsageHistoryData().catch(() => {});
+  loadFarmHistory().catch(() => {});
+  if (currentUser.role === 'admin') {
+    restoreAdminDataCache();
+    reloadAdminData().catch(() => {});
+  }
+}
+
 // 9. DOM READY INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tab-login')?.addEventListener('click', () => window.switchTab('login'));
@@ -3288,4 +3401,5 @@ document.addEventListener('DOMContentLoaded', () => {
     onNotFound: () => window.showPage('notfound-page'),
     onForbidden: () => window.showToast('คุณไม่มีสิทธิ์เข้าหน้านี้', 'error')
   });
+  if (currentUser) window.setTimeout(() => warmDashboardData(), 0);
 });
