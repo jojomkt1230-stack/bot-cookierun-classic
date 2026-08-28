@@ -1451,13 +1451,17 @@ async function updateAdminUser(request, path) {
   }
 
   if (action === 'days') {
-    const days = Number(payload.days);
-    if (!Number.isInteger(days) || days < 1 || days > 365) {
-      return json({ error: 'จำนวนวันต้องเป็นเลขเต็ม 1-365 วัน' }, 400);
+    const days = Number(payload.days ?? 0);
+    const hours = Number(payload.hours ?? 0);
+    const durationMinutes = (days * 1440) + (hours * 60);
+    if (!Number.isInteger(days) || days < 0 || days > 365 ||
+        !Number.isInteger(hours) || hours < 0 || hours > 23 ||
+        durationMinutes < 60 || durationMinutes > 365 * 1440) {
+      return json({ error: 'ระยะเวลาต้องอยู่ระหว่าง 1 ชั่วโมง ถึง 365 วัน' }, 400);
     }
     const { response, data } = await legacyJson(request, '/api/admin/license', {
       method: 'POST',
-      body: JSON.stringify({ memberCode, action: 'activate', days })
+      body: JSON.stringify({ memberCode, action: 'activate', days, hours, durationMinutes })
     });
     return json(data, response.status);
   }

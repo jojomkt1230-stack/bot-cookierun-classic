@@ -2948,6 +2948,7 @@ window.openEditUserModal = function(userId) {
   const passInput = document.getElementById('edit-user-password');
   const diaInput = document.getElementById('edit-user-diamonds');
   const addTimeInput = document.getElementById('edit-user-add-time');
+  const addHoursInput = document.getElementById('edit-user-add-hours');
   const programLimitInput = document.getElementById('edit-user-program-limit');
   const ipRestrictedInput = document.getElementById('edit-user-ip-restricted');
 
@@ -2959,6 +2960,7 @@ window.openEditUserModal = function(userId) {
   if (passInput) passInput.value = '';
   if (diaInput) diaInput.value = user.diamonds || 0;
   if (addTimeInput) addTimeInput.value = '';
+  if (addHoursInput) addHoursInput.value = '';
   if (programLimitInput) programLimitInput.value = Number(user.maxPrograms || 4);
   if (ipRestrictedInput) ipRestrictedInput.value = user.ipRestricted === false ? 'false' : 'true';
 
@@ -2970,6 +2972,7 @@ window.saveEditedUser = async function() {
   const newUsername = document.getElementById('edit-user-username')?.value.trim();
   const newDiamonds = parseInt(document.getElementById('edit-user-diamonds')?.value || 0);
   const addTime = parseInt(document.getElementById('edit-user-add-time')?.value || 0);
+  const addHours = parseInt(document.getElementById('edit-user-add-hours')?.value || 0);
   const newPassword = document.getElementById('edit-user-password')?.value || '';
   const maxPrograms = parseInt(document.getElementById('edit-user-program-limit')?.value || 4);
   const ipRestricted = document.getElementById('edit-user-ip-restricted')?.value === 'true';
@@ -2981,6 +2984,10 @@ window.saveEditedUser = async function() {
   }
   if (addTime < 0 || addTime > 365) {
     window.showToast('จำนวนวันต้องอยู่ระหว่าง 0-365 วัน', 'error');
+    return;
+  }
+  if (addHours < 0 || addHours > 23) {
+    window.showToast('จำนวนชั่วโมงต้องอยู่ระหว่าง 0-23 ชั่วโมง', 'error');
     return;
   }
   if (newPassword && (newPassword.length < 8 || newPassword.length > 128)) {
@@ -3004,9 +3011,10 @@ window.saveEditedUser = async function() {
     if (Number(user?.diamonds || 0) !== newDiamonds) requests.push(
       axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/diamonds`, { diamonds: newDiamonds }, adminApiConfig())
     );
-    if (addTime > 0) requests.push(
+    if (addTime > 0 || addHours > 0) requests.push(
       axios.patch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}/days`, {
-        days: addTime
+        days: addTime,
+        hours: addHours
       }, adminApiConfig())
     );
     if (newPassword) requests.push(
