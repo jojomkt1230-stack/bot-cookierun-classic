@@ -916,12 +916,9 @@ async function lineWebhook(request) {
   } catch {
     return json({ error: 'invalid payload' }, 400);
   }
-  const events = Array.isArray(payload.events) ? payload.events : [];
-  for (const event of events) {
-    if (event?.type === 'message' && event?.message?.type === 'image') {
-      await processLineImage(request, event);
-    }
-  }
+  // LINE OA is now a support-only channel. Do not inspect images, verify
+  // slips, or issue access codes here; all payments are verified from the
+  // authenticated website top-up page instead.
   return json({ ok: true });
 }
 

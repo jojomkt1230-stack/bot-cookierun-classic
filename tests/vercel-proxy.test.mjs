@@ -146,6 +146,14 @@ test('verifies website slips directly and activates membership days', async () =
   assert.doesNotMatch(source, /\/api\/member\/topup\/slip/);
 });
 
+test('keeps LINE OA support-only without processing image slips', async () => {
+  const source = await readFile(new URL('../api/proxy.js', import.meta.url), 'utf8');
+  const webhook = source.slice(source.indexOf('async function lineWebhook'), source.indexOf('async function registerWithLegacy'));
+  assert.doesNotMatch(webhook, /processLineImage/);
+  assert.doesNotMatch(webhook, /reserveSlipAccessCodes/);
+  assert.match(webhook, /return json\(\{ ok: true \}\)/);
+});
+
 test('returns detailed topup history only after authenticating the current member', async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
