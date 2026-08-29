@@ -397,6 +397,14 @@ function renderPaymentPlans(settings = getSystemSettings()) {
       </div>
     `).join('');
   }
+  const selector = document.getElementById('topup-amount');
+  if (selector) {
+    const selected = Number(selector.value);
+    selector.innerHTML = '<option value="">เลือกแพ็กเกจที่โอน</option>' + plans.map(({ amount, days }) => (
+      `<option value="${amount}">${amount.toLocaleString('th-TH')} บาท · เพิ่ม ${days.toLocaleString('th-TH')} วัน</option>`
+    )).join('');
+    if (plans.some(({ amount }) => amount === selected)) selector.value = String(selected);
+  }
 }
 
 function applySystemSettingsToUI() {
@@ -626,14 +634,6 @@ window.addSetupGuideCard = function() {
   if (editor.children.length >= 20) {
     window.showToast('เพิ่มช่องคำแนะนำได้สูงสุด 20 ช่อง', 'error');
     return;
-  }
-  const selector = document.getElementById('topup-amount');
-  if (selector) {
-    const selected = Number(selector.value);
-    selector.innerHTML = '<option value="">เลือกแพ็กเกจที่โอน</option>' + plans.map(({ amount, days }) => (
-      `<option value="${amount}">${amount.toLocaleString('th-TH')} บาท · เพิ่ม ${days.toLocaleString('th-TH')} วัน</option>`
-    )).join('');
-    if (plans.some(({ amount }) => amount === selected)) selector.value = String(selected);
   }
   editor.append(createSetupGuideEditorRow({
     id: `setup-${Date.now()}`,
