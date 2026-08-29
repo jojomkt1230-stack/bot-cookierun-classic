@@ -1,9 +1,9 @@
 export const DEFAULT_PAYMENT_PLANS = Object.freeze([
-  Object.freeze({ amount: 15, days: 1 }),
-  Object.freeze({ amount: 30, days: 2 }),
-  Object.freeze({ amount: 45, days: 3 }),
-  Object.freeze({ amount: 100, days: 7 }),
-  Object.freeze({ amount: 350, days: 30 })
+  Object.freeze({ amount: 20, days: 1 }),
+  Object.freeze({ amount: 40, days: 2 }),
+  Object.freeze({ amount: 60, days: 3 }),
+  Object.freeze({ amount: 120, days: 7 }),
+  Object.freeze({ amount: 380, days: 30 })
 ]);
 
 function clonePlans(plans) {

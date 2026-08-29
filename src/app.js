@@ -231,7 +231,8 @@ const DEFAULT_SETTINGS = {
   botStatus: 'online',
   announcement: '',
   promptPayNumber: '',
-  promptPayAccountName: '',
+  promptPayAccountName: 'เจตษฎาพร ยางศรี',
+  slipReceiverName: 'เจตษฎาพร ยางศรี',
   promptPayQrUrl: '',
   botName: 'BotCKRC V1.87',
   siteName: 'CKRCS BOT',
@@ -267,11 +268,11 @@ const DEFAULT_SETTINGS = {
     month1: { label: '30 วัน', days: 30, price: 300 }
   },
   paymentPlans: [
-    { amount: 15, days: 1 },
-    { amount: 30, days: 2 },
-    { amount: 45, days: 3 },
-    { amount: 100, days: 7 },
-    { amount: 350, days: 30 }
+    { amount: 20, days: 1 },
+    { amount: 40, days: 2 },
+    { amount: 60, days: 3 },
+    { amount: 120, days: 7 },
+    { amount: 380, days: 30 }
   ],
   videoUrl: '',
   tutorialColor: 'cyan',
@@ -625,6 +626,14 @@ window.addSetupGuideCard = function() {
   if (editor.children.length >= 20) {
     window.showToast('เพิ่มช่องคำแนะนำได้สูงสุด 20 ช่อง', 'error');
     return;
+  }
+  const selector = document.getElementById('topup-amount');
+  if (selector) {
+    const selected = Number(selector.value);
+    selector.innerHTML = '<option value="">เลือกแพ็กเกจที่โอน</option>' + plans.map(({ amount, days }) => (
+      `<option value="${amount}">${amount.toLocaleString('th-TH')} บาท · เพิ่ม ${days.toLocaleString('th-TH')} วัน</option>`
+    )).join('');
+    if (plans.some(({ amount }) => amount === selected)) selector.value = String(selected);
   }
   editor.append(createSetupGuideEditorRow({
     id: `setup-${Date.now()}`,
@@ -1635,22 +1644,8 @@ window.handleSlipSubmit = async function(event) {
   if (msgEl) msgEl.textContent = '';
 
   try {
-    const orderRes = await axios.post(`${API_BASE_URL}/topup/orders/create`, {
-      amountBaht
-    }, {
-      headers: getAuthHeaders()
-    });
-
-    if (!orderRes.data || !orderRes.data.orderId) {
-      throw new Error('ไม่สามารถสร้างคำสั่งซื้อจากเซิร์ฟเวอร์ได้');
-    }
-
-    const orderId = orderRes.data.orderId;
-
-    // 2. Submit the slip image to the backend Slip2Go verification endpoint.
     const formData = new FormData();
     formData.append('image', currentSelectedSlipFile);
-    formData.append('orderId', orderId);
     formData.append('amountBaht', String(amountBaht));
 
     const verifyRes = await axios.post(`${API_BASE_URL}/topup/verify-slip`, formData, {
@@ -1660,7 +1655,8 @@ window.handleSlipSubmit = async function(event) {
     });
 
     if (verifyRes.data && verifyRes.data.status === 'approved') {
-      currentUser.diamonds = verifyRes.data.diamonds || ((currentUser.diamonds || 0) + (orderRes.data.creditToReceive || 100));
+      currentUser.expiresAt = verifyRes.data.expiresAt || currentUser.expiresAt;
+      currentUser.botExpiry = currentUser.expiresAt;
       safeStorageSet('user', JSON.stringify(currentUser));
 
       window.removeSlip();
@@ -1670,7 +1666,7 @@ window.handleSlipSubmit = async function(event) {
         msgEl.textContent = verifyRes.data.message || 'เติมเงินสำเร็จ';
         msgEl.style.color = 'var(--accent)';
       }
-      window.showToast(verifyRes.data.message || '🎉 เติมเงินสำเร็จผ่าน Slip2Go!', 'success');
+      window.showToast(verifyRes.data.message || '🎉 ตรวจสลิปและเพิ่มวันสำเร็จ!', 'success');
     } else {
       const message = verifyRes.data?.error || 'สลิปไม่ผ่านเงื่อนไขความปลอดภัย';
       if (msgEl) msgEl.textContent = message;
@@ -1684,7 +1680,7 @@ window.handleSlipSubmit = async function(event) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<span class="btn-icon">📤</span> ส่งสลิปตรวจสอบ';
+      btn.innerHTML = '<span class="btn-icon">✓</span> ตรวจสลิปและเติมวันทันที';
     }
   }
 };

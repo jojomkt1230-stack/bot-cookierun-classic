@@ -441,7 +441,7 @@
         <section id="section-topup" class="content-section hidden">
           <div class="section-header card-panel">
             <h2>💰 เติมเงินรับวันใช้งาน</h2>
-            <p class="subtitle">โอนเงินตามแพ็กเกจ แล้วส่งสลิปตรวจสอบผ่าน LINE OA</p>
+            <p class="subtitle">โอนเงินตามแพ็กเกจ อัปโหลดสลิป และรับวันใช้งานเข้าบัญชีนี้ทันที</p>
           </div>
           <div class="topup-grid">
             <div class="topup-promptpay-card">
@@ -452,30 +452,51 @@
                 <img id="qr-code-img" src="" alt="QR Code PromptPay" class="qr-image" />
               </div>
               <div class="usage-plans" id="payment-plans-display" aria-label="แพ็กเกจวันใช้งาน">
-                <span><strong>15 บาท</strong> = 1 วัน</span>
-                <span><strong>30 บาท</strong> = 2 วัน</span>
-                <span><strong>45 บาท</strong> = 3 วัน</span>
-                <span><strong>100 บาท</strong> = 7 วัน</span>
-                <span><strong>350 บาท</strong> = 30 วัน</span>
+                <span><strong>20 บาท</strong> = 1 วัน</span>
+                <span><strong>40 บาท</strong> = 2 วัน</span>
+                <span><strong>60 บาท</strong> = 3 วัน</span>
+                <span><strong>120 บาท</strong> = 7 วัน</span>
+                <span><strong>380 บาท</strong> = 30 วัน</span>
               </div>
             </div>
             <div class="topup-slip-card payment-steps-card">
-              <h3>📋 ขั้นตอนการเติมเงินรับวันใช้งาน</h3>
+              <h3>🧾 ตรวจสลิปและเติมวันอัตโนมัติ</h3>
               <div class="payment-warning" role="alert">
                 <span class="payment-warning-icon" aria-hidden="true">!</span>
-                <span>ต้องโอนเงินตามจำนวนวันใช้งานเท่านั้น ดูทางด้านซ้ายได้เลยครับ หากโอนผิด สามารถแจ้งที่ไลน์แอดได้เช่นกัน</span>
+                <span>ต้องโอนยอดให้ตรงแพ็กเกจ ระบบจะเพิ่มวันให้บัญชีที่กำลังล็อกอินหลังตรวจสลิปผ่านเท่านั้น</span>
               </div>
               <ol class="payment-steps">
                 <li>โอนเงินเข้าบัญชีที่แสดงทางด้านซ้าย</li>
-                <li>คลิกปุ่มตรวจสอบสลิปด้านล่าง ระบบจะเปิด LINE แล้วส่งรูปสลิปลงในแชทเพื่อตรวจสอบ</li>
-                <li>คลิกลิงก์หรือแอดไลน์ <strong>@715ybpdq</strong></li>
-                <li>เมื่อตรวจสอบสลิปเสร็จ จะได้รับโค้ดสำหรับนำไปกรอกที่หน้าแรกของเว็บไซต์</li>
-                <li>ระบบจะเพิ่มวันใช้งานให้อัตโนมัติ</li>
+                <li>เลือกแพ็กเกจให้ตรงกับยอดที่โอน</li>
+                <li>อัปโหลดรูปสลิปที่มี QR ชัดเจน</li>
+                <li>กดตรวจสลิป ระบบจะตรวจยอด ผู้รับ และสลิปซ้ำ</li>
+                <li>เมื่อผ่าน ระบบจะเพิ่มวันให้บัญชีนี้ทันทีโดยไม่ต้องกรอกโค้ด</li>
               </ol>
-              <a class="line-slip-button" href="https://lin.ee/zQypOkt" target="_blank" rel="noopener noreferrer">
-                <span class="line-slip-icon">LINE</span>
-                <span>คลิกตรวจสอบสลิปที่ LINE <strong>@715ybpdq</strong></span>
-              </a>
+              <form class="web-slip-form" onsubmit="handleSlipSubmit(event)">
+                <label class="topup-package-field" for="topup-amount">
+                  <span>แพ็กเกจที่โอน</span>
+                  <select id="topup-amount" required>
+                    <option value="">เลือกแพ็กเกจที่โอน</option>
+                  </select>
+                </label>
+                <label class="slip-upload-area" for="slip-input">
+                  <input id="slip-input" type="file" accept="image/jpeg,image/png,image/webp" onchange="handleSlipPreview(event)" hidden />
+                  <span id="upload-placeholder" class="upload-placeholder">
+                    <span class="upload-icon">📸</span>
+                    <strong>กดเพื่อเลือกรูปสลิป</strong>
+                    <span class="upload-hint">รองรับ JPG, PNG, WEBP · ไม่เกิน 4 MB</span>
+                  </span>
+                  <span id="slip-preview-container" class="slip-preview-container hidden">
+                    <img id="slip-preview" class="slip-preview-img" alt="ตัวอย่างสลิปที่เลือก" />
+                    <button class="remove-slip-btn" type="button" onclick="event.preventDefault(); removeSlip()" aria-label="ลบรูปสลิป">×</button>
+                  </span>
+                </label>
+                <button id="submit-slip-btn" class="web-slip-submit" type="submit">
+                  <span class="btn-icon">✓</span> ตรวจสลิปและเติมวันทันที
+                </button>
+                <p id="topup-msg" class="topup-result-message" role="status" aria-live="polite"></p>
+              </form>
+              <a class="line-slip-fallback" href="https://lin.ee/zQypOkt" target="_blank" rel="noopener noreferrer">มีปัญหา? ติดต่อ LINE <strong>@715ybpdq</strong></a>
               <p class="payment-thanks">ขอบคุณที่ไว้วางใจ CKRCS</p>
             </div>
           </div>

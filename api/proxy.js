@@ -669,6 +669,11 @@ function detectedImageType(bytes) {
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
     return { mime: 'image/jpeg', extension: 'jpg' };
   }
+  if (bytes.length >= 12
+    && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+    && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') {
+    return { mime: 'image/webp', extension: 'webp' };
+  }
   return null;
 }
 
@@ -2063,30 +2068,129 @@ async function verifyLegacyTopup(request) {
     return json({ error: 'ข้อมูลสลิปไม่ถูกต้อง' }, 400);
   }
 
-  const image = incoming.get('image');
-  const orderId = String(incoming.get('orderId') || '');
-  if (!(image instanceof File) || !orderId) {
-    return json({ error: 'กรุณาเลือกรูปสลิปและระบุรายการเติมเงิน' }, 400);
+  const uploaded = incoming.get('image');
+  const expectedAmount = Number(incoming.get('amountBaht'));
+  if (!(uploaded instanceof File) || uploaded.size < 100 || uploaded.size > 4_194_304) {
+    return json({ error: 'กรุณาเลือกรูปสลิป JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB' }, 400);
+  }
+  if (!Number.isInteger(expectedAmount)) return json({ error: 'กรุณาเลือกแพ็กเกจให้ถูกต้อง' }, 400);
+
+  const { response: memberResponse, data: member } = await legacyJson(request, '/api/member/me', {
+    method: 'GET', includeContentType: false
+  });
+  if (!memberResponse.ok) return json(member, memberResponse.status);
+  const bearerToken = String(request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const memberCode = String(member.memberCode || await getMemberCodeForSession(bearerToken) || '').trim();
+  if (!memberCode) return json({ error: 'ไม่พบบัญชีที่ล็อกอิน กรุณาเข้าสู่ระบบใหม่' }, 401);
+
+  const { response: configResponse, data: publicConfig } = await legacyJson(request, '/api/public/config', {
+    method: 'GET', includeContentType: false
+  });
+  if (!configResponse.ok) return json({ error: 'โหลดข้อมูลรับเงินไม่สำเร็จ' }, 503);
+  const portal = await resolvePortalConfig(publicConfig.siteName || '');
+  const plans = normalizePaymentPlans(portal.config.paymentPlans);
+  const selectedPlan = plans.find(({ amount }) => amount === expectedAmount);
+  if (!selectedPlan) {
+    return json({ error: `ยอดที่เลือกไม่ตรงแพ็กเกจ รองรับ ${lineSlipPlanSummary(plans)}` }, 400);
   }
 
-  const form = new FormData();
-  form.set('topupId', orderId);
-  form.set('file', image, image.name || 'slip.jpg');
+  const promptpayNumber = String(process.env.PROMPTPAY_NUMBER || publicConfig.promptpayNumber || '').replace(/\D/g, '');
+  const receiverName = String(
+    process.env.SLIP_RECEIVER_NAME || portal.config.slipReceiverName || 'เจตษฎาพร ยางศรี'
+  ).trim();
+  const slipSecret = String(process.env.SLIP2GO_API_SECRET || '').trim();
+  if (!promptpayNumber || !slipSecret) {
+    return json({ error: 'ระบบตรวจสลิปยังตั้งค่าไม่ครบ กรุณาติดต่อแอดมิน' }, 503);
+  }
 
-  const upstream = await legacyFetch(request, '/api/member/topup/slip', {
+  const fileBytes = await uploaded.arrayBuffer();
+  const imageType = detectedImageType(new Uint8Array(fileBytes));
+  if (!imageType) return json({ error: 'ไฟล์นี้ไม่ใช่รูปสลิป JPG, PNG หรือ WEBP' }, 400);
+  const receiverType = promptpayNumber.length === 13 ? '02003' : '02001';
+  const verifyForm = new FormData();
+  verifyForm.set('file', new Blob([fileBytes], { type: imageType.mime }), `web-slip.${imageType.extension}`);
+  verifyForm.set('payload', JSON.stringify({
+    checkDuplicate: true,
+    checkReceiver: [{
+      accountType: receiverType,
+      accountNumber: promptpayNumber,
+      accountNameTH: receiverName
+    }]
+  }));
+
+  const requestId = `web-${memberCode}-${Date.now()}`;
+  const { verification, result } = await verifyLineSlip(
+    verifyForm,
+    slip2GoAuthorization(slipSecret),
+    requestId
+  );
+  const resultCode = String(result.code || `HTTP_${verification.status}`);
+  if (!verification.ok || resultCode !== '200200' || !result.data) {
+    return json({ error: slipResultMessage(resultCode, result.message) }, 422);
+  }
+
+  const paidAmount = Math.round(Number(result.data.amount) * 100) / 100;
+  if (paidAmount !== expectedAmount) {
+    return json({ error: `ยอดในสลิป ${paidAmount} บาท ไม่ตรงแพ็กเกจ ${expectedAmount} บาท` }, 422);
+  }
+  const reference = String(result.data.transRef || result.data.referenceId || '').trim();
+  const slipTime = Date.parse(String(result.data.dateTime || ''));
+  if (!reference || reference.length > 180 || !Number.isFinite(slipTime) || slipTime > Date.now() + 300_000) {
+    return json({ error: 'เลขอ้างอิงหรือเวลาบนสลิปไม่ถูกต้อง' }, 422);
+  }
+
+  let record;
+  try {
+    [record] = await reserveSlipAccessCodes({
+      reference,
+      lineUserId: `web:${memberCode}`,
+      amount: paidAmount,
+      durationMinutes: selectedPlan.days * 1440,
+      count: 1,
+      source: 'web-slip'
+    });
+  } catch (error) {
+    if (String(error?.message) === 'SLIP_ALREADY_USED') {
+      return json({ error: 'สลิปนี้ถูกใช้เติมวันไปแล้ว' }, 409);
+    }
+    throw error;
+  }
+
+  const deviceId = `web-slip-${String(memberCode).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 90)}`;
+  const claimed = await claimAccessCode(record.code, memberCode, deviceId);
+  if (claimed.error === 'USED') return json({ error: 'สลิปนี้ถูกใช้เติมวันไปแล้ว' }, 409);
+  if (!claimed.record || !claimed.claimId) return json({ error: 'ไม่สามารถล็อกรายการเติมวันได้' }, 409);
+
+  const adminToken = await getAdminServiceToken();
+  if (!adminToken) {
+    await releaseAccessCode(record.code, claimed.claimId);
+    return json({ error: 'กรุณาให้แอดมินเข้าสู่ระบบหน้าเว็บหนึ่งครั้งเพื่อเปิดบริการเติมวัน' }, 503);
+  }
+  const { response: activateResponse, data: activation } = await legacyJson(request, '/api/admin/license', {
     method: 'POST',
-    body: form,
-    includeContentType: false
+    memberToken: adminToken,
+    body: JSON.stringify({
+      memberCode,
+      action: 'activate',
+      days: selectedPlan.days,
+      durationMinutes: selectedPlan.days * 1440
+    })
   });
-  const data = await responseData(upstream);
-  if (!upstream.ok) return json(data, upstream.status);
+  if (!activateResponse.ok) {
+    await releaseAccessCode(record.code, claimed.claimId);
+    return json({ error: activation.error || 'ตรวจสลิปผ่าน แต่เพิ่มวันไม่สำเร็จ กรุณาติดต่อแอดมิน' }, 503);
+  }
 
+  const expiresAt = String(activation.expiresAt || '');
+  await finishAccessCode(record.code, claimed.claimId, expiresAt);
+  await markAccessCodeDelivered(record.code);
   return json({
     ok: true,
     status: 'approved',
-    diamonds: Number(data.credits || 0),
-    credits: Number(data.credits || 0),
-    message: data.message || 'ตรวจสลิปและเพิ่มเครดิตสำเร็จ'
+    amountBaht: paidAmount,
+    daysAdded: selectedPlan.days,
+    expiresAt,
+    message: `ตรวจสลิปสำเร็จ เพิ่มวันใช้งาน ${selectedPlan.days} วันแล้ว`
   });
 }
 

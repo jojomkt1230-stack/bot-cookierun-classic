@@ -307,7 +307,7 @@ function parseReservedSlipCodes(value) {
   return parsed.codes.map(normalizeAccessCode).filter(Boolean);
 }
 
-export async function reserveSlipAccessCodes({ reference, lineUserId, amount, durationMinutes, count = 1 }) {
+export async function reserveSlipAccessCodes({ reference, lineUserId, amount, durationMinutes, count = 1, source = 'line-slip' }) {
   const cleanReference = String(reference || '').trim();
   const cleanLineUserId = String(lineUserId || '').trim();
   const duration = validCodeDuration(durationMinutes);
@@ -323,7 +323,7 @@ export async function reserveSlipAccessCodes({ reference, lineUserId, amount, du
       code: makeAccessCode(),
       durationMinutes: duration,
       status: 'available',
-      source: 'line-slip',
+      source: String(source || 'line-slip').slice(0, 40),
       createdAt,
       paymentReference: cleanReference,
       lineUserId: cleanLineUserId,

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 process.env.COOKIEBOT_SITES_TOKEN = 'test-project-token';
 process.env.COOKIEBOT_API_URL = 'https://legacy.example';
@@ -136,44 +137,13 @@ test('creates a topup through the legacy Sites API with the real member token', 
   }
 });
 
-test('sends the slip image to the legacy Slip2Go verification route', async () => {
-  const originalFetch = globalThis.fetch;
-  let captured;
-
-  globalThis.fetch = async (url, init) => {
-    captured = { url, init };
-    return Response.json({
-      ok: true,
-      credits: 115,
-      message: 'verified'
-    });
-  };
-
-  try {
-    const incoming = new FormData();
-    incoming.set('orderId', 'topup-123456');
-    incoming.set('image', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], 'slip.jpg', {
-      type: 'image/jpeg'
-    }));
-
-    const response = await proxy.fetch(apiRequest('topup/verify-slip', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer member-token' },
-      body: incoming
-    }));
-    const data = await response.json();
-    const forwarded = captured.init.body;
-
-    assert.equal(response.status, 200);
-    assert.equal(captured.url, 'https://legacy.example/api/member/topup/slip');
-    assert.equal(captured.init.headers.get('authorization'), 'Bearer member-token');
-    assert.equal(forwarded.get('topupId'), 'topup-123456');
-    assert.equal(forwarded.get('file').name, 'slip.jpg');
-    assert.equal(data.status, 'approved');
-    assert.equal(data.diamonds, 115);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+test('verifies website slips directly and activates membership days', async () => {
+  const source = await readFile(new URL('../api/proxy.js', import.meta.url), 'utf8');
+  assert.match(source, /verifyLineSlip\(\s*verifyForm/);
+  assert.match(source, /source:\s*'web-slip'/);
+  assert.match(source, /action:\s*'activate'/);
+  assert.match(source, /days:\s*selectedPlan\.days/);
+  assert.doesNotMatch(source, /\/api\/member\/topup\/slip/);
 });
 
 test('returns detailed topup history only after authenticating the current member', async () => {

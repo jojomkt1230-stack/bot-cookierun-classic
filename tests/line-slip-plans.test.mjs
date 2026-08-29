@@ -59,18 +59,18 @@ test('does not retry a permanent slip verification failure', async () => {
 });
 
 test('maps verified slip amounts to the correct duration and code count', () => {
-  assert.deepEqual(lineSlipPlan(1500), { durationMinutes: 1440, codeCount: 1 });
-  assert.deepEqual(lineSlipPlan(3000), { durationMinutes: 1440, codeCount: 2 });
-  assert.deepEqual(lineSlipPlan(4500), { durationMinutes: 1440, codeCount: 3 });
-  assert.deepEqual(lineSlipPlan(10000), { durationMinutes: 10080, codeCount: 1 });
-  assert.deepEqual(lineSlipPlan(35000), { durationMinutes: 43200, codeCount: 1 });
+  assert.deepEqual(lineSlipPlan(2000), { durationMinutes: 1440, codeCount: 1 });
+  assert.deepEqual(lineSlipPlan(4000), { durationMinutes: 1440, codeCount: 2 });
+  assert.deepEqual(lineSlipPlan(6000), { durationMinutes: 1440, codeCount: 3 });
+  assert.deepEqual(lineSlipPlan(12000), { durationMinutes: 10080, codeCount: 1 });
+  assert.deepEqual(lineSlipPlan(38000), { durationMinutes: 43200, codeCount: 1 });
 });
 
 test('rejects unsupported payment amounts without issuing codes', () => {
-  assert.equal(lineSlipPlan(2000), null);
+  assert.equal(lineSlipPlan(1500), null);
   assert.equal(lineSlipPlan(9999), null);
-  assert.match(lineSlipPlanSummary(), /30 บาท = 2 วัน/);
-  assert.match(lineSlipPlanSummary(), /45 บาท = 3 วัน/);
+  assert.match(lineSlipPlanSummary(), /40 บาท = 2 วัน/);
+  assert.match(lineSlipPlanSummary(), /60 บาท = 3 วัน/);
 });
 
 test('uses admin-configured prices and days for LINE slip issuance', () => {
