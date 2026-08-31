@@ -2110,8 +2110,9 @@ function renderUsageHistoryItems() {
         <span><b>เสร็จสิ้นเมื่อ</b>${escapeHtml(thaiDateTime(item.completedAt || item.createdAt))}</span>`
       : `
         <span><b>โค้ด</b><code>${escapeHtml(item.code || '-')}</code></span>
+        ${Number(item.amount || 0) > 0 ? `<span><b>ยอดที่เติม</b>${numberText(item.amount)} บาท</span>` : ''}
         <span><b>ระยะเวลาที่ได้รับ</b>${escapeHtml(codeDurationText(item.durationMinutes))}</span>
-        <span><b>แหล่งที่มา</b>${item.source === 'line-slip' ? 'ตรวจสลิปผ่าน LINE' : 'โค้ดจากผู้ดูแล'}</span>
+        <span><b>แหล่งที่มา</b>${['line-slip', 'web-slip'].includes(item.source) ? 'ตรวจสลิปผ่านหน้าเว็บ' : 'โค้ดจากผู้ดูแล'}</span>
         <span><b>วันหมดอายุหลังใช้โค้ด</b>${escapeHtml(thaiDateTime(item.expiresAt))}</span>`;
     return `
       <article class="usage-history-card card-panel usage-history-card--${item.type}">

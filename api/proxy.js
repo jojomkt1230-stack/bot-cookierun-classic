@@ -1983,6 +1983,10 @@ async function memberUsageHistory(request) {
       type: 'code',
       title: 'ใช้โค้ดวันใช้งาน',
       code: code.code,
+      // Web slip payments are persisted on the access-code record. Keep the
+      // paid amount in the activity response so the customer's history never
+      // loses the amount even when the legacy top-up table is unavailable.
+      amount: Number(code.amount || 0),
       durationMinutes: Number(code.durationMinutes || 0),
       source: code.source || 'admin',
       paymentReference: code.paymentReference || '',
