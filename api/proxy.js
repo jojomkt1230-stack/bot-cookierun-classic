@@ -16,7 +16,7 @@ import {
   reserveSlipAccessCodes,
   validCodeDuration
 } from './code-store.js';
-import { listFarmEvents, listLatestFarmEvents, storeFarmEvent, summarizeFarmEvents } from './farm-store.js';
+import { listFarmEvents, listFarmMemberCodes, storeFarmEvent, summarizeFarmEvents } from './farm-store.js';
 import {
   clearMemberSessions,
   getMemberSessionSummary,
@@ -1114,7 +1114,10 @@ export function buildLineSlipTopups(codes = [], members = []) {
   const payments = new Map();
 
   for (const code of codes) {
-    if (String(code?.source || '') !== 'line-slip') continue;
+    // LINE and website slip payments are both persisted as access-code
+    // records. Keep both sources in the admin history.
+    const source = String(code?.source || '').trim();
+    if (!['line-slip', 'web-slip'].includes(source)) continue;
     const paymentReference = String(code?.paymentReference || '').trim();
     if (!paymentReference) continue;
 
@@ -1128,11 +1131,13 @@ export function buildLineSlipTopups(codes = [], members = []) {
         createdAt: code?.createdAt || null,
         deliveredAt: code?.deliveredAt || null,
         codes: [],
-        memberCodes: new Set()
+        memberCodes: new Set(),
+        sources: new Set()
       };
       payments.set(paymentReference, payment);
     }
 
+    payment.sources.add(source);
     payment.codes.push(String(code?.code || ''));
     if (code?.memberCode) payment.memberCodes.add(String(code.memberCode));
     if (!payment.deliveredAt && code?.deliveredAt) payment.deliveredAt = code.deliveredAt;
@@ -1158,7 +1163,7 @@ export function buildLineSlipTopups(codes = [], members = []) {
       credits: 0,
       status: 'approved',
       sourceStatus: 'verified',
-      source: 'line-slip',
+      source: payment.sources.size === 1 ? Array.from(payment.sources)[0] : 'mixed-slip',
       slipRef: payment.paymentReference,
       lineUserId: payment.lineUserId,
       codeCount: payment.codes.length,
@@ -1305,24 +1310,44 @@ async function adminDisabledUsers(request) {
 async function adminFarmDataList(request) {
   const overview = await adminOverview(request);
   if (overview.errorResponse) return overview.errorResponse;
-  const members = (overview.data.members || []).map(mapMember);
-  const latestByMember = await listLatestFarmEvents(members.map((member) => member.memberCode)).catch((error) => {
-    console.error('[Admin Farm] Latest activity unavailable:', error?.message || error);
-    return new Map();
+  const overviewMembers = (overview.data.members || []).map(mapMember);
+  const historicalCodes = await listFarmMemberCodes().catch((error) => {
+    console.error('[Admin Farm] Historical member directory unavailable:', error?.message || error);
+    return [];
   });
-  // Do not read up to 5,000 farm events for every member before showing the
-  // directory. Detail history is loaded for only the selected member.
-  return json({
-    members: members.map((member) => {
-      const latest = latestByMember.get(member.memberCode);
-      return {
+  const membersByCode = new Map(overviewMembers.map((member) => [member.memberCode, member]));
+  for (const memberCode of historicalCodes) {
+    if (!membersByCode.has(memberCode)) {
+      membersByCode.set(memberCode, {
+        username: memberCode,
+        memberCode,
+        createdAt: null
+      });
+    }
+  }
+  const members = [...membersByCode.values()];
+  // listFarmEvents uses ZREVRANGE + one MGET, so each member costs only two
+  // Redis commands (not thousands of per-event GETs).  Besides restoring the
+  // totals expected by the table, this is also a safe fallback when an older
+  // Redis endpoint returns pipeline rows in a shape that cannot provide the
+  // latest-event directory.
+  const rows = await Promise.all(members.map(async (member) => {
+    const events = await listFarmEvents(member.memberCode).catch((error) => {
+      console.error('[Admin Farm] Member history unavailable:', error?.message || error);
+      return [];
+    });
+    if (!events.length) return null;
+    const summary = summarizeFarmEvents(events);
+    return {
       username: member.username,
       memberCode: member.memberCode,
       joinedAt: member.createdAt || null,
-      lastActiveAt: latest?.occurredAt || null,
-      summaryReady: false
-      };
-    }).filter((member) => member.lastActiveAt)
+      ...summary,
+      summaryReady: true
+    };
+  }));
+  return json({
+    members: rows.filter(Boolean)
       .sort((left, right) => Date.parse(right.lastActiveAt) - Date.parse(left.lastActiveAt))
   });
 }

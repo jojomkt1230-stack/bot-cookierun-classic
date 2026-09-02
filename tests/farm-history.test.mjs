@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 process.env.STORAGE_REST_API_URL = 'https://redis.example';
 process.env.STORAGE_REST_API_TOKEN = 'redis-token';
 
-const { listFarmEvents, normalizeFarmEvent, storeFarmEvent } = await import('../api/farm-store.js');
+const { listFarmEvents, listFarmMemberCodes, normalizeFarmEvent, storeFarmEvent } = await import('../api/farm-store.js');
 
 const sample = {
   eventId: '12345678-abcd-4abc-8abc-123456789012',
@@ -75,6 +75,23 @@ test('returns only records belonging to the requested member code', async () => 
     const events = await listFarmEvents('CKRCS-1234');
     assert.equal(events.length, 1);
     assert.equal(events[0].memberCode, 'CKRCS-1234');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('discovers member codes from historical per-member indexes', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    assert.equal(body[0], 'SCAN');
+    return Response.json({ result: ['0', [
+      'ckrcs:farm-history:v1:member:CKRCS-OLD-001',
+      'ckrcs:farm-history:v1:member:CKRCS-OLD-002'
+    ]] });
+  };
+  try {
+    assert.deepEqual((await listFarmMemberCodes()).sort(), ['CKRCS-OLD-001', 'CKRCS-OLD-002']);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -28,6 +28,46 @@ function memberIndexKey(memberCode) {
   return `${FARM_PREFIX}:member:${memberCode}`;
 }
 
+const MEMBER_INDEX_PATTERN = `${FARM_PREFIX}:member:*`;
+
+async function scanFarmMemberCodesFrom(command, sourceLabel) {
+  const codes = new Set();
+  let cursor = '0';
+  try {
+    // Historical versions created only per-member sorted sets and no global
+    // member directory. SCAN is therefore required once to discover old
+    // accounts that no longer appear in the legacy account overview.
+    do {
+      const result = await command('SCAN', cursor, 'MATCH', MEMBER_INDEX_PATTERN, 'COUNT', '1000');
+      if (!Array.isArray(result) || result.length < 2) break;
+      cursor = String(result[0] ?? '0');
+      const keys = Array.isArray(result[1]) ? result[1] : [];
+      for (const key of keys) {
+        const text = String(key || '');
+        if (text.startsWith(`${FARM_PREFIX}:member:`)) {
+          const code = cleanText(text.slice(`${FARM_PREFIX}:member:`.length), 180).toUpperCase();
+          if (code) codes.add(code);
+        }
+      }
+    } while (cursor !== '0');
+  } catch (error) {
+    console.error(`[Farm History] ${sourceLabel} member scan unavailable:`, error?.message || error);
+  }
+  return codes;
+}
+
+export async function listFarmMemberCodes() {
+  const [current, legacy] = await Promise.all([
+    sessionStorageConfigured()
+      ? scanFarmMemberCodesFrom(sessionRedisCommand, 'primary storage')
+      : new Set(),
+    dedicatedSessionStorageSelected() && codeStorageConfigured()
+      ? scanFarmMemberCodesFrom(redisCommand, 'legacy storage')
+      : new Set()
+  ]);
+  return [...new Set([...current, ...legacy])];
+}
+
 function parseEvent(value) {
   if (typeof value !== 'string' || !value) return null;
   try {
@@ -147,6 +187,15 @@ export async function listFarmEvents(memberCode, limit = MAX_MEMBER_EVENTS) {
 }
 
 function pipelineResult(value) {
+  // Upstash REST pipelines return each row as { result, error }, while the
+  // local/fallback adapters historically returned [error, result].  Treating
+  // the object as the result itself made listLatestFarmEvents() see no ids,
+  // so the admin page filtered every farmer out even though their events were
+  // present in Redis.
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if (value.error) throw new Error(String(value.error));
+    return value.result;
+  }
   if (Array.isArray(value) && value.length === 2 && value[0] == null) return value[1];
   return value;
 }
